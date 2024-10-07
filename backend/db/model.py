@@ -2,7 +2,7 @@ import json
 import math
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship, WriteOnlyMapped
@@ -30,6 +30,8 @@ class Detection(Base):
 
     confidence: Mapped[float] = mapped_column(nullable=True)
 
+    annotated: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
+
     created_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
     last_change: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
     last_access: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
@@ -54,6 +56,7 @@ class Detection(Base):
     def n_bbox(self, ps):
         self.bbox = points_to_json(ps)
 
+
 class Image(Base):
     __tablename__ = 'images'
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -66,11 +69,18 @@ class Image(Base):
 
     confidence: Mapped[float] = mapped_column(nullable=True)
 
+    imagehash: Mapped[str] = mapped_column(index=True)
+
     work_state: Mapped[WorkState] = mapped_column(default=WorkState.NEW, nullable=False)
+
+    detection_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    annotated_detection_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
     created_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
     last_change: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
     last_access: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
+
+    deleted: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
 
     collection: Mapped['Collection'] = relationship(back_populates="images", foreign_keys='Image.collection_id')
     detections: WriteOnlyMapped[List['Detection']] = relationship(back_populates="image")
