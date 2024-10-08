@@ -1,8 +1,7 @@
 import enum
-import json
 
 from pydantic import BaseModel
-from typing import List, Union, Optional
+from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -31,7 +30,7 @@ class DetectionNew(BaseModel):
     type: str
     bbox: str
 
-    confidence: Optional[str] = None
+    confidence: Optional[float] = None
 
 
 class Detection(DetectionNew):

@@ -36,8 +36,8 @@ from metacheck.schemas.base_objects import ImageUpdate
 logger = logging.getLogger(__name__)
 
 
-@image_route.post("/upload/{document_id}/{order}", tags=["Image"])
-async def upload_image(document_id: UUID, order: int, file: UploadFile, db: AsyncSession = Depends(get_async_session)):
+@image_route.post("/upload/{collection_id}/{order}", tags=["Image"])
+async def upload_image(collection_id: UUID, order: int, file: UploadFile, db: AsyncSession = Depends(get_async_session)):
     if 'image' not in file.content_type:
         raise HTTPException(status_code=400, detail=f"Unsuported file type - only images are supported.")
 
@@ -50,11 +50,11 @@ async def upload_image(document_id: UUID, order: int, file: UploadFile, db: Asyn
             raise HTTPException(status_code=400, detail="Failed to decode/open image.")
         imagehash = hashlib.md5(raw_input).hexdigest()
 
-        image_duplicate = await crud_image.is_image_duplicate(db, document_id, imagehash)
+        image_duplicate = await crud_image.is_image_duplicate(db, collection_id, imagehash)
         if image_duplicate:
             raise HTTPException(status_code=400, detail=f'Image is already uploaded as {image_duplicate.name}.')
 
-        write_path = await get_image_path(image_id=image_id, document_id=document_id)
+        write_path = await get_image_path(image_id=image_id, collection_id=collection_id)
         async with aiofiles.open(write_path, mode='wb') as f:
             await f.write(raw_input)
 
@@ -62,27 +62,26 @@ async def upload_image(document_id: UUID, order: int, file: UploadFile, db: Asyn
                                       resolution=config.IMAGE_PREVIEW_RESOLUTION)
 
         image_new = {'id': image_id,
-                     'document_id': document_id,
+                     'collection_id': collection_id,
                      'order': order,
                      'name': file.filename,
                      'width': image.shape[1],
                      'height': image.shape[0],
                      'deleted': False,
                      'imagehash': imagehash,
-                     'work_state': model.WorkState.NEW,
-                     'processing_state': model.ProcessingState.PRISTINE}
+                     'work_state': model.WorkState.NEW}
         await crud_general.new(db, image_new, model.Image)
 
         # preview is optional, so we don't check if this goes through
         try:
-            await crud_collection.check_preview_and_set(db, document_id, image_id)
+            await crud_collection.check_preview_and_set(db, collection_id, image_id)
         except DBError as e:
             logger.exception(f'Failed creating image preview')
 
     except DBError as e:
         logger.exception(f'Failed to upload image')
-        if os.path.exists(await get_image_path(image_id=image_id, document_id=document_id)):
-            os.remove(await get_image_path(image_id=image_id, document_id=document_id))
+        if os.path.exists(await get_image_path(image_id=image_id, collection_id=collection_id)):
+            os.remove(await get_image_path(image_id=image_id, collection_id=collection_id))
         if os.path.exists(await get_preview_path(image_id)):
             os.remove(await get_preview_path(image_id))
         raise HTTPException(status_code=400, detail="Failed to upload image and add to dataset")
@@ -106,7 +105,7 @@ async def put_image(image_update: ImageUpdate, db: AsyncSession = Depends(get_as
 async def get_image_raster(image_id: UUID,
                            db: AsyncSession = Depends(get_async_session)):
     db_image = await crud_general.get(db, base_objects.Image, model.Image, image_id)
-    image_path = await get_image_path(image_id=image_id, document_id=db_image.document_id)
+    image_path = await get_image_path(image_id=image_id, collection_id=db_image.collection_id)
     return FileResponse(image_path)
 
 
@@ -119,15 +118,15 @@ async def image_preview(image_id: UUID, db: AsyncSession = Depends(get_async_ses
     return FileResponse(image_preview_path)
 
 
-async def get_image_path(image_id: UUID, document_id: UUID):
-    path = os.path.join(config.IMAGE_UPLOADED_DIR, str(document_id))
+async def get_image_path(image_id: UUID, collection_id: UUID):
+    path = os.path.join(config.IMAGE_UPLOADED_DIR, str(collection_id))
     await aiofiles_os.makedirs(path, exist_ok=True)
     return os.path.join(path, f'{image_id}.jpg')
 
 
 async def make_image_preview(db: AsyncSession, image_id: UUID, preview_path: str):
     image = await crud_general.get(db, base_objects.Image, model.Image, image_id)
-    image_path = os.path.join(config.IMAGE_UPLOADED_DIR, f'{image.document_id}', f'{image_id}.jpg')
+    image_path = os.path.join(config.IMAGE_UPLOADED_DIR, f'{image.collection_id}', f'{image_id}.jpg')
     image = cv2.imread(image_path, 1)
     await make_preview_from_image(image, preview_path, resolution=config.IMAGE_PREVIEW_RESOLUTION)
 

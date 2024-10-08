@@ -9,3 +9,5 @@ pydantic~=2.9.2
 asyncpg~=0.29.0
 uvicorn~=0.31.0
 python-multipart~=0.0.12
+SQLAlchemy-Utils~=0.41.2
+psycopg2-binary~=2.9.9

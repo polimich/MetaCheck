@@ -28,9 +28,13 @@ async def check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id:
     try:
         async with db.begin():
             # Update collection preview if it is null to image_id
+            db_image = await db.execute(select(model.Image).filter(model.Image.id == image_id))
+            db_image = db_image.scalar_one()
             await db.execute(update(model.Collection)
                              .where(model.Collection.id == collection_id, model.Collection.preview_image_id == None)
-                             .values(preview_image_id=image_id))
+                             .values(preview_image_id=image_id,
+                                     preview_image_width=db_image.width,
+                                     preview_image_height=db_image.height))
 
     except exc.SQLAlchemyError as e:
         logger.exception(f'Failed updating collection preview')

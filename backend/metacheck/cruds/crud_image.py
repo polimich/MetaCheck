@@ -13,11 +13,11 @@ from metacheck.schemas import base_objects
 logger = logging.getLogger(__name__)
 
 
-async def is_image_duplicate(db: AsyncSession, document_id, img_hash):
+async def is_image_duplicate(db: AsyncSession, collection_id, img_hash):
     try:
         async with db.begin():
-            stm = select(model.Image).join(model.Document, model.Image.document_id == model.Document.id) \
-                .where(model.Document.id == document_id) \
+            stm = select(model.Image).join(model.Collection, model.Image.collection_id == model.Collection.id) \
+                .where(model.Collection.id == collection_id) \
                 .where(model.Image.imagehash == img_hash) \
                 .where(model.Image.deleted == False)
             result = await db.execute(stm)

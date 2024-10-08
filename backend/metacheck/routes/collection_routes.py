@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 @collection_route.post("",  tags=["Collection"])
-async def post_document(document_new: base_objects.CollectionNew, db: AsyncSession = Depends(get_async_session)):
-    document = document_new.model_dump()
-    await crud_general.new(db, document, model.Collection)
+async def post_collection(collection_new: base_objects.CollectionNew, db: AsyncSession = Depends(get_async_session)):
+    collection = collection_new.model_dump()
+    await crud_general.new(db, collection, model.Collection)
 
 
 @collection_route.get("/{collection_id}", response_model=base_objects.Collection,  tags=["Collection"])
