@@ -16,7 +16,7 @@ class Config:
         self.SERVER_NAME = os.getenv("SERVER_NAME", "MetaCheck")
         self.MODE = os.getenv("MODE", 'server')
 
-        self.DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:pass@localhost:5432/metacheck_db")
+        self.DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:pass@localhost:5432/metacheck_db")
         self.APP_URL_ROOT = os.getenv("APP_URL_ROOT", "/")
 
         self.IMAGE_UPLOADED_DIR = os.getenv("IMAGE_UPLOADED_DIR",

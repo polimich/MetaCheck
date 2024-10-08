@@ -35,6 +35,7 @@ from metacheck.schemas.base_objects import ImageUpdate
 
 logger = logging.getLogger(__name__)
 
+
 @image_route.post("/upload/{document_id}/{order}", tags=["Image"])
 async def upload_image(document_id: UUID, order: int, file: UploadFile, db: AsyncSession = Depends(get_async_session)):
     if 'image' not in file.content_type:

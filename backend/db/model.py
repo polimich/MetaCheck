@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 from typing import List
 
+import numpy as np
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship, WriteOnlyMapped
 
