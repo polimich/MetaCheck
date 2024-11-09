@@ -38,13 +38,13 @@ function toggleLeftDrawer() {
           aria-label="Menu"
           @click="toggleLeftDrawer"
         />
-        <q-toolbar-title> Quasar App </q-toolbar-title>
+        <q-toolbar-title> MetaCheck </q-toolbar-title>
       </q-toolbar>
     </q-header>
 
     <q-drawer v-model="leftDrawerOpen" show-if-above bordered>
       <q-list>
-        <q-item-label header> Essential Links </q-item-label>
+        <q-item-label header> Menu </q-item-label>
         <NavLink v-for="link in linksList" :key="link.title" v-bind="link" />
       </q-list>
     </q-drawer>

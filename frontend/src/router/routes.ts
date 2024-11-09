@@ -5,10 +5,37 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      { path: '', component: () => import('pages/IndexPage.vue') },
+      {
+        path: '',
+        name: 'home',
+        component: () => import('pages/IndexPage.vue'),
+      },
       {
         path: 'collections',
+        name: 'collections',
         component: () => import('pages/CollectionsPage.vue'),
+      },
+    ],
+  },
+  {
+    path: '/collections',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      {
+        path: ':collectionId',
+        name: 'collection',
+        component: () => import('pages/CollectionDetail.vue'),
+      },
+    ],
+  },
+  {
+    path: '/collections/:collectionId',
+    component: () => import('layouts/MainLayout.vue'),
+    children: [
+      {
+        path: ':imageId',
+        name: 'image',
+        component: () => import('pages/ImageDetail.vue'),
       },
     ],
   },
