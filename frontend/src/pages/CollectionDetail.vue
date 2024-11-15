@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
 import { ref } from 'vue';
-import { Image, ImageAddDto, useCollectionStore } from 'src/stores';
+import {
+  Image,
+  ImageAddDto,
+  useCollectionStore,
+  useImageStore,
+} from 'src/stores';
 import { getPreviewImage } from 'utils';
 
 const route = useRoute();
 const router = useRouter();
-const dataStore = useCollectionStore();
+const collectionStore = useCollectionStore();
+const imageStore = useImageStore();
 const collectionId = route.params.collectionId as string;
-dataStore.loadImagesInCollection(collectionId);
+collectionStore.loadImagesInCollection(collectionId);
 const grid = ref(true);
 const fileTypes = 'image/*';
 
@@ -19,6 +25,7 @@ const imageToAdd = ref<ImageAddDto>({
   file: undefined,
 });
 const onRowClick = (_evt: Event, row: Image) => {
+  imageStore.loadImage(row.id);
   router.push({
     name: 'image',
     params: {
@@ -28,7 +35,7 @@ const onRowClick = (_evt: Event, row: Image) => {
 };
 
 const handleUpload = async () => {
-  await dataStore.uploadImageToCollection(imageToAdd.value);
+  await collectionStore.uploadImageToCollection(imageToAdd.value);
 };
 const onReset = () => {
   imageToAdd.value.order = 0;
@@ -49,9 +56,10 @@ const onReset = () => {
     <q-table
       title="Images"
       :grid="grid"
-      :rows="dataStore.images"
+      :rows="collectionStore.images"
       row-key="name"
-      :loading="dataStore.loading"
+      :loading="collectionStore.loading"
+      @row-click="onRowClick"
     >
       <template v-slot:top-right>
         <q-btn-toggle
@@ -67,7 +75,7 @@ const onReset = () => {
           round
           color="primary"
           icon="add"
-          :disable="dataStore.loading"
+          :disable="collectionStore.loading"
           @click="isAddOpen = true"
         />
         <q-dialog v-model="isAddOpen" @hide="onReset">

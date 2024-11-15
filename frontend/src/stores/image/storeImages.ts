@@ -3,10 +3,13 @@ import { ref } from 'vue';
 import { Image } from 'src/stores';
 import { axios, axiosErrorHandler } from 'src/api/index';
 
-export const useStoreImages = defineStore('images', () => {
+export const useImageStore = defineStore('images', () => {
   const image = ref<Image>();
   const loading = ref(false);
 
+  const init = () => {
+    return;
+  };
   const loadImage = async (imageId: string) => {
     loading.value = true;
     try {
@@ -21,6 +24,7 @@ export const useStoreImages = defineStore('images', () => {
 
   return {
     image,
+    init,
     loadImage,
   };
 });

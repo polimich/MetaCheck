@@ -27,6 +27,9 @@ export const useCollectionStore = defineStore('collections', () => {
 
   // API Calls
   // Collection
+  const init = () => {
+    return;
+  };
 
   const loadCollections = async () => {
     setLoading(true);
@@ -133,6 +136,7 @@ export const useCollectionStore = defineStore('collections', () => {
     images,
     loading,
     getCollectionTableView,
+    init,
     loadCollections,
     loadImagesInCollection,
     addCollection,
