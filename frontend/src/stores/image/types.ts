@@ -27,3 +27,23 @@ export interface ImageAddDto {
   order: number;
   file?: File;
 }
+
+export interface Detection {
+  id: string;
+  image_id: string;
+  type: string;
+  bbox: string;
+  confidence: number;
+  annotated: boolean;
+  created_date: string;
+  last_change: string;
+  last_access: string;
+  deleted: boolean;
+}
+
+export interface Bbox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}

@@ -1,32 +1,24 @@
 import { Stage } from 'konva/lib/Stage';
 import { Layer } from 'konva/lib/Layer';
 import { Transformer } from 'konva/lib/shapes/Transformer';
-
+import { Annotation } from './annotation';
+import { UnwrapNestedRefs } from 'vue';
 class ImageInfo {
   element!: HTMLImageElement;
   width = 0;
   height = 0;
 }
 
-class Markbox {
-  id = Date.now().toString();
-  labelName = '';
-  x = 0;
-  y = 0;
-  width = 0;
-  height = 0;
-}
-
 class InnerToolBox {
   public boxStyle = 'display:none;';
-  private markbox = new Markbox();
+  private annotation = new Annotation();
 
-  public getMarkboxId(): string {
-    return this.markbox.id;
+  public getAnnotationId(): string {
+    return this.annotation.id;
   }
 
-  public updateMarkbox(markbox: Markbox): void {
-    this.markbox = markbox;
+  public updateAnnotation(annotation: Annotation): void {
+    this.annotation = annotation;
   }
 
   public show(mouseEvent: MouseEvent): void {
@@ -34,7 +26,7 @@ class InnerToolBox {
     const offsetFromY = mouseEvent.offsetY;
     this.boxStyle = `left:${offsetFormX}px;top:${offsetFromY}px;`;
   }
-  public hidden(): void {
+  public hide(): void {
     this.boxStyle = 'display:none;';
   }
 }
@@ -89,12 +81,13 @@ class Annotator {
     };
   }
 
+  // eslint-disable-next-line
   public initCanvas(stageRef: any): void {
     this.stage = stageRef.getStage();
     this.layer = this.stage.findOne('Layer') as Layer;
     this.transformer = this.stage.findOne('#transformer') as Transformer;
     this.transformer.nodes([]);
-    this.innerToolBox.hidden();
+    this.innerToolBox.hide();
     this.changeAnnotateMode('add');
   }
 
@@ -134,4 +127,17 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
-export { Markbox, Annotator };
+// helper functions
+
+function enterAnnotatorBox(annotatorBox: HTMLDivElement | null) {
+  if (!annotatorBox) return;
+  annotatorBox.focus();
+}
+
+function leaveAnnotatorBox(annotator: UnwrapNestedRefs<Annotator> & object) {
+  document.body.style.cursor = 'auto';
+  annotator.innerToolBox.hide();
+  // save annotation to database
+}
+
+export { Annotation, Annotator, enterAnnotatorBox, leaveAnnotatorBox };

@@ -1,43 +1,43 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
 import { getRasterImage } from 'utils';
-import { onBeforeMount, onMounted, reactive, Ref, ref } from 'vue';
+import { onBeforeMount, onMounted, reactive, Ref, ref, watch } from 'vue';
 import { useImageStore } from 'src/stores';
 import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Stage } from 'konva/lib/Stage';
 import type { Node } from 'konva/lib/Node';
-import { Annotator, Markbox } from 'src/service/annotator.ts';
+import {
+  Annotator,
+  Annotation,
+  enterAnnotatorBox,
+  leaveAnnotatorBox,
+} from 'src/service/annotator.ts';
 import Konva from 'konva';
 import Container = Konva.Container;
 import { Vector2d } from 'konva/lib/types';
+import { createAnnotation } from 'src/service/annotation.ts';
 
 const route = useRoute();
 const imageStore = useImageStore();
+const imageId = route.params.imageId as string;
+const imageUrl = getRasterImage(imageId);
+const imageScale = ref<number>(1);
+imageStore.loadImage(imageId);
+imageStore.loadDetections(imageId);
+console.log('setup');
 // Reactive variables
 const annotatorBox: Ref<HTMLDivElement | null> = ref(null);
 
 const isMounted = ref(false);
 const stage = ref<Stage | null>(null);
 const loading = ref(false);
+const dataLoaded = ref(false);
 const annotator = reactive(new Annotator());
-const imageId = route.params.imageId as string;
-const imageUrl = getRasterImage(imageId);
-const imageScale = ref<number>(1);
+
+const annotations = ref<Annotation[]>([]);
+
+// resize observer
 let resizeObserver: ResizeObserver | null = null;
-
-const markboxes: Markbox[] = reactive([
-  {
-    id: '1',
-    labelName: 'test',
-    x: 100,
-    y: 100,
-    width: 100,
-    height: 100,
-  },
-]);
-
-// functions
-// responsive
 function setupResizeObserver() {
   if (!annotatorBox.value) return;
 
@@ -47,152 +47,158 @@ function setupResizeObserver() {
 
   resizeObserver.observe(annotatorBox.value);
 }
+// functions
 
 const init = async (): Promise<void> => {
   if (!isMounted.value) return;
-  // TODO: get markboxes from API
+  if (!dataLoaded.value) return;
   if (!annotatorBox.value) return;
-  await initAnnotator(annotatorBox.value, imageUrl, markboxes);
+  annotations.value = imageStore.annotations;
+  await initAnnotator(annotatorBox.value, imageUrl, annotations.value);
 };
 
 const initAnnotator = async (
   container: Element,
   url: string,
-  markboxes: Markbox[],
+  annotations: Annotation[],
 ): Promise<void> => {
   loading.value = true;
   await annotator.initImageSetting(container, url);
   annotator.initCanvas(stage.value);
-  if (markboxes.length >= 1) {
-    annotator.innerToolBox.updateMarkbox(markboxes[0]);
+  if (annotations.length >= 1) {
+    annotator.innerToolBox.updateAnnotation(annotations[0]);
   }
   loading.value = false;
 };
 
 // markboxes
 
-// anotator box
-function enterAnnotatorBox() {
-  if (!annotatorBox.value) return;
-  annotatorBox.value.focus();
-}
+// create annotation
+// const createAnnotation = () => {
+//   console.log('createAnnotation');
+//   if (annotator.mode !== 'add') return;
+//   const pointerPosition = annotator.layer.getRelativePointerPosition();
+//   if (!pointerPosition) return;
+//   const { x, y } = pointerPosition;
+//   const newAnnotation = new Annotation();
+//   newAnnotation.image_id = imageId;
+//   newAnnotation.x = x > 0 ? x : 0;
+//   newAnnotation.y = y > 0 ? y : 0;
+//   annotations.value.push(newAnnotation);
+//   annotator.innerToolBox.updateAnnotation(newAnnotation);
+//   annotator.isAnnotating = true;
+// };
 
-function leaveAnnotatorBox() {
-  document.body.style.cursor = 'auto';
-  annotator.innerToolBox.hidden();
-  // save markbox to database
-}
-// create markbox
-const createMarkbox = () => {
-  if (annotator.mode !== 'add') return;
-  const pointerPosition = annotator.layer.getRelativePointerPosition();
-  if (!pointerPosition) return;
-  const { x, y } = pointerPosition;
-  console.log('x, y', x, y);
-  const markbox = new Markbox();
-  markbox.x = x > 0 ? x : 0;
-  markbox.y = y > 0 ? y : 0;
-  markboxes.push(markbox);
-  annotator.innerToolBox.updateMarkbox(markbox);
-  annotator.isAnnotating = true;
-};
-
-const editMarkboxVolume = (): void => {
+const editAnnotationVolume = (): void => {
+  console.log('editAnnotationVolume');
   if (annotator.mode !== 'add') return;
   if (!annotator.isAnnotating) return;
   const pointerPosition = annotator.layer.getRelativePointerPosition();
   if (!pointerPosition) return;
   const { x: newX, y: newY } = pointerPosition;
-  const markbox = getLastestMarkbox();
-  if (!markbox) return;
-  const { x: oldX, y: oldY } = markbox;
-  markbox.width = newX - oldX;
-  markbox.height = newY - oldY;
+  const currentAnnotation = getLatestAnnotation();
+  if (!currentAnnotation) return;
+  const { x: oldX, y: oldY } = currentAnnotation;
+  currentAnnotation.width = newX - oldX;
+  currentAnnotation.height = newY - oldY;
 };
 
-const stopEditMarkboxVolume = (event: KonvaPointerEvent) => {
+const stopEditAnnotationVolume = (event: KonvaPointerEvent) => {
+  console.log('stopEditAnnotationVolume');
   if (annotator.mode !== 'add') return;
 
   annotator.isAnnotating = false;
-  const markbox = getLastestMarkbox();
-  if (!markbox) return;
+  const currentAnnotation = getLatestAnnotation();
+  if (!currentAnnotation) return;
 
-  if (markbox.height === 0 || markbox.width === 0) {
-    removeMarkbox(markbox.id);
+  if (currentAnnotation.height === 0 || currentAnnotation.width === 0) {
+    removeAnnotation(currentAnnotation.id);
     return;
   }
 
-  adjustMarkbox(event.target, markbox);
+  adjustAnnotation(event.target, currentAnnotation);
 
   if (annotator.transformer.nodes().length == 0)
-    annotator.innerToolBox.updateMarkbox(markbox);
+    annotator.innerToolBox.updateAnnotation(currentAnnotation);
 
   annotator.innerToolBox.show(event.evt);
 };
 
 const leaveAnnotateRange = () => {};
 
-//drag markbox
-const startDragMarkbox = (event: KonvaPointerEvent) => {
-  annotator.innerToolBox.hidden();
+//drag Annotation
+const startDragAnnotation = (event: KonvaPointerEvent) => {
+  console.log('startDragAnnotation');
+  annotator.innerToolBox.hide();
 
   const { x, y, id } = event.target.attrs;
-  const markbox = getMarkboxById(id);
-  if (!markbox) return;
-  markbox.x = x / imageScale.value;
-  markbox.y = y / imageScale.value;
+  const currentAnnotation = getAnnotationById(id, annotations.value);
+  if (!currentAnnotation) return;
+  currentAnnotation.x = x / imageScale.value;
+  currentAnnotation.y = y / imageScale.value;
 };
 
-const stopDragMarkbox = (event: KonvaPointerEvent) => {
+const stopDragAnnotation = (event: KonvaPointerEvent) => {
+  console.log('stopDragAnnotation');
   const { id, x, y, height, width } = event.target.attrs;
   const { height: stageHeight, width: stageWidth } = annotator.stageConfig;
-  const markbox = getMarkboxById(id);
+  const currentAnnotation = getAnnotationById(id, annotations.value);
 
-  if (!markbox) return;
-  if (markbox.y < 0) {
-    markbox.y = 0;
-  } else if (markbox.y + height > stageHeight / annotator.imageScale) {
-    markbox.y = stageHeight / annotator.imageScale - height;
+  // check if the annotation is out of the stage
+  if (!currentAnnotation) return;
+  if (currentAnnotation.y < 0) {
+    currentAnnotation.y = 0;
+  } else if (
+    currentAnnotation.y + height >
+    stageHeight / annotator.imageScale
+  ) {
+    currentAnnotation.y = stageHeight / annotator.imageScale - height;
   } else {
-    markbox.y = y;
+    currentAnnotation.y = y;
   }
 
-  if (markbox.x < 0) {
-    markbox.x = 0;
-  } else if (markbox.x + width > stageWidth / annotator.imageScale) {
-    markbox.x = stageWidth / annotator.imageScale - width;
+  if (currentAnnotation.x < 0) {
+    currentAnnotation.x = 0;
+  } else if (currentAnnotation.x + width > stageWidth / annotator.imageScale) {
+    currentAnnotation.x = stageWidth / annotator.imageScale - width;
   } else {
-    markbox.x = x;
+    currentAnnotation.x = x;
   }
 
   annotator.innerToolBox.show(event.evt);
-  // TODO save markbox to database
+  // TODO save annotation to database
 };
 
 function updateTransformerContent(id: string, evt: MouseEvent): void {
+  console.log('updateTransformerContent');
   const node = annotator.stage.findOne(`#${id}`);
   if (!node) return;
   annotator.transformer.nodes([node]);
   annotator.innerToolBox.show(evt);
 }
 
-const startResizeMarkbox = (event: KonvaPointerEvent) => {
+const startResizeAnnotation = (event: KonvaPointerEvent) => {
+  console.log('startResizeAnnotation');
   const target = event.target;
 
   if (target.getClassName() !== 'Rect') {
     annotator.transformer.nodes([]);
-    annotator.innerToolBox.hidden();
+    annotator.innerToolBox.hide();
     return;
   }
 
-  const markbox = getMarkboxById(target.attrs.id);
-  if (!markbox) return;
+  const currentAnnotation = getAnnotationById(
+    target.attrs.id,
+    annotations.value,
+  );
+  if (!currentAnnotation) return;
 
-  annotator.innerToolBox.updateMarkbox(markbox);
-  updateTransformerContent(markbox.id, event.evt);
+  annotator.innerToolBox.updateAnnotation(currentAnnotation);
+  updateTransformerContent(currentAnnotation.id, event.evt);
 };
 
-const stopResizeMarkbox = (event: KonvaPointerEvent) => {
+const stopResizeAnnotation = (event: KonvaPointerEvent) => {
+  console.log('stopResizeAnnotation');
   const {
     id: eventId,
     x: eventX,
@@ -201,14 +207,14 @@ const stopResizeMarkbox = (event: KonvaPointerEvent) => {
     scaleY,
   } = event.target.attrs;
 
-  const markbox = getMarkboxById(eventId);
-  if (!markbox) return;
+  const currentAnnotation = getAnnotationById(eventId, annotations.value);
+  if (!currentAnnotation) return;
 
-  if (scaleX.toFixed(5) !== '1') markbox.width *= scaleX;
-  if (scaleY.toFixed(5) !== '1') markbox.height *= scaleY;
+  if (scaleX.toFixed(5) !== '1') currentAnnotation.width *= scaleX;
+  if (scaleY.toFixed(5) !== '1') currentAnnotation.height *= scaleY;
 
-  markbox.x = eventX;
-  markbox.y = eventY;
+  currentAnnotation.x = eventX;
+  currentAnnotation.y = eventY;
 
   event.target.setAttrs({
     x: eventX,
@@ -217,12 +223,13 @@ const stopResizeMarkbox = (event: KonvaPointerEvent) => {
     scaleY: 1,
   });
   annotator.innerToolBox.show(event.evt);
-  console.log('stopResizeMarkbox', markbox);
-  // TODO save markbox to database
+  console.log('stopResizeAnnotation', currentAnnotation);
+  // TODO save annotation to database
 };
 
 // resize layer
 const wheelResizeLayer = (event: KonvaPointerEvent) => {
+  console.log('wheelResizeLayer');
   // wheel event
   const wheel = event.evt as MouseEvent as WheelEvent;
   wheel.preventDefault();
@@ -252,49 +259,59 @@ const wheelResizeLayer = (event: KonvaPointerEvent) => {
 };
 
 const dragLayer = () => {
-  annotator.innerToolBox.hidden();
+  console.log('dragLayer');
+  annotator.innerToolBox.hide();
 };
 
 const resetLayerPosition = () => {
+  console.log('resetLayerPosition');
   annotator.layer.setAttrs({
     x: 0,
     y: 0,
     scaleX: annotator.imageScale,
     scaleY: annotator.imageScale,
   });
-  annotator.innerToolBox.hidden();
+  annotator.innerToolBox.hide();
 };
 
 //
 
-function getMarkboxById(id: string): Markbox | undefined {
-  return markboxes.find((item) => item.id === id);
+function getAnnotationById(
+  id: string,
+  annotations: Annotation[],
+): Annotation | undefined {
+  console.log('getAnnotationById');
+  return annotations.find((item) => item.id === id);
 }
 
-function getLastestMarkbox(): Markbox | undefined {
-  return markboxes.at(-1);
+function getLatestAnnotation(): Annotation | undefined {
+  console.log('getLatestAnnotation');
+  return annotations.value.at(-1);
 }
 
-function removeMarkbox(id: string) {
-  console.log('remove markbox', id);
+function removeAnnotation(id: string) {
+  console.log('remove annotation', id);
   const rect = annotator.stage.findOne(`#${id}`);
+  // console.log('stage', annotator.stage);
+  // console.log('id', id);
+  // console.log('2', rect);
+
   if (!rect) return;
   const parent = rect.findAncestor('Group') as Container;
   parent.destroy();
   annotator.transformer.nodes([]);
 
-  annotator.innerToolBox.hidden();
-  const targetIndex = markboxes.findIndex((item) => item.id === id);
+  annotator.innerToolBox.hide();
+  const targetIndex = annotations.value.findIndex((item) => item.id === id);
   if (targetIndex === -1) return;
-  markboxes.splice(targetIndex, 1);
-  if (markboxes.length === 0) return;
-  annotator.innerToolBox.updateMarkbox(markboxes.at(-1)!);
-  //TODO save markbox to database
-  console.log(markboxes);
-  // emits("saveMarkbox", props.file.name, markboxes);
+  annotations.value.splice(targetIndex, 1);
+  if (annotations.value.length === 0) return;
+  annotator.innerToolBox.updateAnnotation(annotations.value.at(-1)!);
+  //TODO save annotation to database
 }
 
-function adjustMarkbox(node: Node, markbox: Markbox) {
+function adjustAnnotation(node: Node, currentAnnotation: Annotation) {
+  console.log('adjustAnnotation');
   const {
     x: nodeX,
     y: nodeY,
@@ -305,21 +322,22 @@ function adjustMarkbox(node: Node, markbox: Markbox) {
     const newX = nodeX + shapeWidth;
     const newWidth = Math.abs(shapeWidth);
     node.setAttrs({ x: newX, width: newWidth });
-    markbox.x = newX;
-    markbox.width = newWidth;
+    currentAnnotation.x = newX;
+    currentAnnotation.width = newWidth;
   }
 
   if (shapeHeight < 0) {
     const newY = nodeY + shapeHeight;
     const newHeight = Math.abs(shapeHeight);
     node.setAttrs({ y: newY, height: newHeight });
-    markbox.y = newY;
-    markbox.height = newHeight;
+    currentAnnotation.y = newY;
+    currentAnnotation.height = newHeight;
   }
-  // TODO save markbox to database
+  // TODO save annotation to database
 }
 
 function handleKeyDownEvent(event: KeyboardEvent) {
+  console.log('handleKeyDownEvent');
   const key = event.key.toUpperCase();
   console.log(key);
   switch (key) {
@@ -334,9 +352,9 @@ function handleKeyDownEvent(event: KeyboardEvent) {
     case 'BACKSPACE':
     case 'DELETE':
     case 'DEL':
-      if (markboxes.length === 0) return;
-      if (annotator.innerToolBox.getMarkboxId() === '') return;
-      removeMarkbox(annotator.innerToolBox.getMarkboxId());
+      if (annotations.value.length === 0) return;
+      if (annotator.innerToolBox.getAnnotationId() === '') return;
+      removeAnnotation(annotator.innerToolBox.getAnnotationId());
       break;
     case 'Z':
       resetLayerPosition();
@@ -348,45 +366,60 @@ function handleKeyDownEvent(event: KeyboardEvent) {
 
 // lifecycle
 onBeforeMount(async () => {
+  dataLoaded.value = false;
   await imageStore.loadImage(imageId);
-  // configKonva.value.width = imageStore.image?.width as number;
-  // configKonva.value.height = imageStore.image?.height as number;
+  await imageStore.loadDetections(imageId);
+  dataLoaded.value = true;
 });
 
 onMounted(async () => {
+  console.log('mounted');
   isMounted.value = true;
-  await init();
   setupResizeObserver();
+  await init();
+  console.log('mounted end');
 });
+
+watch(dataLoaded, async () => {
+  await init();
+});
+
+const save = async () => {
+  await imageStore.createOrUpdateDetections(imageId);
+};
 </script>
 
 <template>
   <!--  <q-img :src="getRasterImage(imageId)" id="img" />-->
+
   <div class="full-width row wrap container">
     <div
       class="annotator"
       ref="annotatorBox"
       tabindex="0"
-      @mouseover="enterAnnotatorBox"
-      @mouseleave="leaveAnnotatorBox"
+      @mouseover="enterAnnotatorBox(annotatorBox)"
+      @mouseleave="leaveAnnotatorBox(annotator)"
       @keydown="handleKeyDownEvent"
     >
       <v-stage
         :config="annotator.stageConfig"
         ref="stage"
-        @mousedown="startResizeMarkbox"
+        @mousedown="startResizeAnnotation"
       >
         <v-layer
           :config="annotator.layerConfig"
-          @mousemove="editMarkboxVolume"
-          @mouseup="stopEditMarkboxVolume"
+          @mousemove="editAnnotationVolume"
+          @mouseup="stopEditAnnotationVolume"
           @mouseleave="leaveAnnotateRange"
           @wheel="wheelResizeLayer"
           @dragmove="dragLayer"
         >
-          <v-image :config="annotator.imageConfig" @mousedown="createMarkbox" />
+          <v-image
+            :config="annotator.imageConfig"
+            @mousedown="createAnnotation(annotator, imageId, annotations)"
+          />
           <v-group
-            v-for="item in markboxes"
+            v-for="item in annotations"
             :key="item.id"
             :config="{ name: item.id, visible: true }"
           >
@@ -399,16 +432,22 @@ onMounted(async () => {
                 height: item.height,
                 stroke: '#000000',
                 draggable: true,
+                fill: 'rgba(0,0,0,0.3)',
               }"
-              @dragmove="startDragMarkbox"
-              @dragend="stopDragMarkbox"
-              @transformend="stopResizeMarkbox"
+              @dragmove="startDragAnnotation"
+              @dragend="stopDragAnnotation"
+              @transformend="stopResizeAnnotation"
             />
           </v-group>
           <v-transformer :config="annotator.transformerConfig" />
         </v-layer>
       </v-stage>
     </div>
+  </div>
+  <div class="row">
+    <q-btn @click="save" class="absolute top-0 right-0" icon="save">
+      Save
+    </q-btn>
   </div>
 </template>
 <style>
