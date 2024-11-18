@@ -135,6 +135,19 @@ export const useImageStore = defineStore('images', () => {
     }
   };
 
+  const createDetection = async (annotation: Annotation) => {
+    loading.value = true;
+    try {
+      const detection = annotationToDetection(annotation);
+      await axios.post(`/image/detections/${image.value?.id}`, [detection]);
+      await loadDetections(annotation.image_id);
+    } catch (e) {
+      axiosErrorHandler(e);
+    } finally {
+      loading.value = false;
+    }
+  };
+
   return {
     image,
     detections,
@@ -145,5 +158,6 @@ export const useImageStore = defineStore('images', () => {
     createOrUpdateDetections,
     deleteDetection,
     updateDetection,
+    createDetection,
   };
 });
