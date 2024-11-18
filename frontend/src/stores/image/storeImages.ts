@@ -38,6 +38,33 @@ export const useImageStore = defineStore('images', () => {
     }
   };
 
+  const deleteDetection = async (detectionId: string) => {
+    loading.value = true;
+    try {
+      await axios.delete(`/image/detections/${detectionId}`);
+      detections.value = detections.value?.filter((d) => d.id !== detectionId);
+      annotations.value = annotations.value?.filter(
+        (a) => a.id !== detectionId,
+      );
+    } catch (e) {
+      axiosErrorHandler(e);
+    } finally {
+      loading.value = false;
+    }
+  };
+
+  const updateDetection = async (annotation: Annotation) => {
+    loading.value = true;
+    try {
+      const detection = annotationToDetection(annotation);
+      await axios.put('/image/detections', detection);
+    } catch (e) {
+      axiosErrorHandler(e);
+    } finally {
+      loading.value = false;
+    }
+  };
+
   const detectionToAnnotation = (detection: Detection): Annotation => {
     const { x, y, width, height } = bboxToObject(detection.bbox);
     const annotation = new Annotation();
@@ -116,5 +143,7 @@ export const useImageStore = defineStore('images', () => {
     loadImage,
     loadDetections,
     createOrUpdateDetections,
+    deleteDetection,
+    updateDetection,
   };
 });
