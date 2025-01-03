@@ -76,3 +76,25 @@ async def update_image_detections(db: AsyncSession, image_id: UUID,
     except exc.SQLAlchemyError as e:
         logger.exception(f'Failed updating detections in database')
         raise DBError(f'Failed updating detections in database') from e
+
+async def update_or_create_image_detections(db: AsyncSession, image_id: UUID,
+                                            detection_updates: List[base_objects.DetectionUpdate]):
+    try:
+        async with db.begin():
+            db_image_detection_ids = await db.scalars(select(model.Detection.id).
+                                                        where(model.Detection.image_id == image_id))
+            db_image_detection_ids = list(db_image_detection_ids.all())
+            valid_detection_updates = [detection_update for detection_update in detection_updates
+                                         if detection_update.id in db_image_detection_ids]
+            logger.info(valid_detection_updates)
+            await update_all(db, valid_detection_updates, model.Detection)
+            new_detection_updates = [detection_update for detection_update in detection_updates
+                                     if detection_update.id not in db_image_detection_ids]
+            if new_detection_updates:
+                db_image = await db.scalar(select(model.Image).where(model.Image.id == image_id))
+                db_image.detections.add_all([model.Detection(**detection_update.model_dump()) for detection_update in new_detection_updates])
+
+    except exc.SQLAlchemyError as e:
+        logger.exception(f'Failed updating detections in database')
+        raise DBError(f'Failed updating detections in database') from e
+

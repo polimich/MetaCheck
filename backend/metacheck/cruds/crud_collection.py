@@ -1,7 +1,7 @@
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import exc, select, update
+from sqlalchemy import exc, select, update, delete
 
 from metacheck.database import DBError
 from db import model
@@ -39,3 +39,43 @@ async def check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id:
     except exc.SQLAlchemyError as e:
         logger.exception(f'Failed updating collection preview')
         raise DBError(f'Failed updating collection preview') from e
+
+# get all collections
+
+async def get_collections(db: AsyncSession) -> list[base_objects.Collection]:
+    try:
+        async with db.begin():
+            db_collections = await db.execute(select(model.Collection))
+            db_collections = db_collections.scalars().all()
+            collections = [base_objects.Collection(**model.orm2dict(collection)) for collection in db_collections]
+            return collections
+
+    except exc.SQLAlchemyError as e:
+        logger.exception(f'Failed reading collections from database')
+        raise DBError(f'Failed reading collections from database') from e
+
+# delete collection and all images from collection
+
+async def delete_collection(db: AsyncSession, collection_id: UUID):
+    try:
+        async with db.begin():
+            await db.execute(delete(model.Image).where(model.Image.collection_id == collection_id))
+            await db.execute(delete(model.Collection).where(model.Collection.id == collection_id))
+
+    except exc.SQLAlchemyError as e:
+        logger.exception(f'Failed deleting collection from database')
+        raise DBError(f'Failed deleting collection from database') from e
+
+# get all images from collection
+
+async def get_collection_images(db: AsyncSession, collection_id: UUID) -> list[base_objects.Image]:
+    try:
+        async with db.begin():
+            db_images = await db.execute(select(model.Image).filter(model.Image.collection_id == collection_id))
+            db_images = db_images.scalars().all()
+            images = [base_objects.Image(**model.orm2dict(image)) for image in db_images]
+            return images
+
+    except exc.SQLAlchemyError as e:
+        logger.exception(f'Failed reading images from database')
+        raise DBError(f'Failed reading images from database') from e

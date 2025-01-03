@@ -154,3 +154,17 @@ async def get_image_detections(image_id: UUID, text_region_ids: List[UUID] = Que
 async def put_image_detections(image_id: UUID, text_region_updates: List[base_objects.DetectionUpdate],
                                  db: AsyncSession = Depends(get_async_session)):
     await crud_image.update_image_detections(db, image_id, text_region_updates)
+
+@image_route.post("/detections/{image_id}/create-or-update", tags=["Image"])
+async def post_image_detections(image_id: UUID, detections: List[base_objects.DetectionUpdate],
+                                  db: AsyncSession = Depends(get_async_session)):
+    await crud_image.update_or_create_image_detections(db, image_id, detections)
+
+@image_route.delete("/detections/{detection_id}", tags=["Image"])
+async def delete_image_detection(detection_id: UUID, db: AsyncSession = Depends(get_async_session)):
+    await crud_general.delete_obj(db, detection_id, model.Detection)
+
+@image_route.put("/detections", tags=["Image"])
+async def put_image_detection(detection_update: base_objects.DetectionUpdate,
+                                 db: AsyncSession = Depends(get_async_session)):
+    await crud_general.update_obj(db, detection_update, model.Detection)
