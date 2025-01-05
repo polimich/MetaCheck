@@ -131,6 +131,25 @@ export const useCollectionStore = defineStore('collections', () => {
       setLoading(false);
     }
   };
+
+  const importCollection = async (file: File) => {
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await axios.post('collection/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      await loadCollections();
+    } catch (error) {
+      axiosErrorHandler(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     collections,
     images,
@@ -144,5 +163,6 @@ export const useCollectionStore = defineStore('collections', () => {
     deleteCollection,
     getCollectionImages,
     uploadImageToCollection,
+    importCollection,
   };
 });

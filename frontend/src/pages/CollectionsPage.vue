@@ -50,21 +50,33 @@ const columns: QTableProps['columns'] = [
 ];
 const visibleColumns = ['name', 'description', 'info', 'actions'];
 const isAddOpen = ref(false);
+const isImportOpen = ref(false);
 const collectionToAdd = ref<CollectionAddDto>({
   description: '',
   id: uuidv4(),
   info: '',
   name: '',
 });
+const collectionToImport = ref<File | null>(null);
 
 const handleCreate = async () => {
   await dataStore.addCollection(collectionToAdd.value);
 };
 
-const onReset = () => {
+const handleResetAdd = () => {
   collectionToAdd.value.description = '';
   collectionToAdd.value.info = '';
   collectionToAdd.value.name = '';
+};
+
+const handleImport = async () => {
+  if (collectionToImport.value) {
+    await dataStore.importCollection(collectionToImport.value);
+  }
+};
+
+const handleResetImport = () => {
+  collectionToImport.value = null;
 };
 
 const onRowClick = (_evt: Event, row: CollectionAddDto) => {
@@ -88,15 +100,23 @@ const onRowClick = (_evt: Event, row: CollectionAddDto) => {
     >
       <template v-slot:top-right>
         <q-btn
+          color="primary"
+          label="Import"
+          class="q-mx-sm"
+          :disable="dataStore.loading"
+          @click="isImportOpen = true"
+        />
+        <q-btn
           round
           color="primary"
           icon="add"
           :disable="dataStore.loading"
           @click="isAddOpen = true"
         />
-        <q-dialog v-model="isAddOpen" @hide="onReset">
+
+        <q-dialog v-model="isAddOpen" @hide="handleResetAdd">
           <q-card style="min-width: 400px">
-            <q-form @submit="handleCreate" @reset="onReset">
+            <q-form @submit="handleCreate" @reset="handleResetAdd">
               <q-card-section>
                 <div class="text-h6">Add dialog</div>
               </q-card-section>
@@ -137,6 +157,40 @@ const onRowClick = (_evt: Event, row: CollectionAddDto) => {
                 <q-btn
                   flat
                   label="Add"
+                  color="primary"
+                  v-close-popup
+                  type="submit"
+                />
+                <q-btn
+                  flat
+                  label="Cancel"
+                  type="reset"
+                  color="negative"
+                  v-close-popup
+                />
+              </q-card-actions>
+            </q-form>
+          </q-card>
+        </q-dialog>
+        <q-dialog v-model="isImportOpen" @hide="handleResetImport">
+          <q-card style="min-width: 400px">
+            <q-form @submit="handleImport" @reset="handleResetImport">
+              <q-card-section>
+                <div class="text-h6">Import Collection</div>
+                <div>Please upload your collection in the YOLO format</div>
+              </q-card-section>
+              <q-card-section class="q-pt-none">
+                <q-file
+                  filled
+                  label="Upload zip-file"
+                  v-model="collectionToImport"
+                  :accept="'.zip'"
+                />
+              </q-card-section>
+              <q-card-actions align="right">
+                <q-btn
+                  flat
+                  label="Import"
                   color="primary"
                   v-close-popup
                   type="submit"
