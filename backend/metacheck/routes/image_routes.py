@@ -44,39 +44,7 @@ async def upload_image(collection_id: UUID, order: int, file: UploadFile, db: As
     image_id = uuid.uuid4()
     try:
         raw_input = file.file.read()
-        contents = np.asarray(bytearray(raw_input), dtype="uint8")
-        image = cv2.imdecode(contents, cv2.IMREAD_COLOR)
-        if image is None:
-            raise HTTPException(status_code=400, detail="Failed to decode/open image.")
-        imagehash = hashlib.md5(raw_input).hexdigest()
-
-        image_duplicate = await crud_image.is_image_duplicate(db, collection_id, imagehash)
-        if image_duplicate:
-            raise HTTPException(status_code=400, detail=f'Image is already uploaded as {image_duplicate.name}.')
-
-        write_path = await get_image_path(image_id=image_id, collection_id=collection_id)
-        async with aiofiles.open(write_path, mode='wb') as f:
-            await f.write(raw_input)
-
-        await make_preview_from_image(image, await get_preview_path(image_id),
-                                      resolution=config.IMAGE_PREVIEW_RESOLUTION)
-
-        image_new = {'id': image_id,
-                     'collection_id': collection_id,
-                     'order': order,
-                     'name': file.filename,
-                     'width': image.shape[1],
-                     'height': image.shape[0],
-                     'deleted': False,
-                     'imagehash': imagehash,
-                     'work_state': model.WorkState.NEW}
-        await crud_general.new(db, image_new, model.Image)
-
-        # preview is optional, so we don't check if this goes through
-        try:
-            await crud_collection.check_preview_and_set(db, collection_id, image_id)
-        except DBError as e:
-            logger.exception(f'Failed creating image preview')
+        await save_image(raw_input, file.filename, collection_id, image_id, order, db)
 
     except DBError as e:
         logger.exception(f'Failed to upload image')
@@ -89,6 +57,42 @@ async def upload_image(collection_id: UUID, order: int, file: UploadFile, db: As
         file.file.close()
 
     return {"message": f"Successfully uploaded {file.filename}"}
+
+
+async def save_image(raw_input, image_name, collection_id, image_id, order, db: AsyncSession):
+    contents = np.asarray(bytearray(raw_input), dtype="uint8")
+    image = cv2.imdecode(contents, cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Failed to decode/open image.")
+    imagehash = hashlib.md5(raw_input).hexdigest()
+
+    image_duplicate = await crud_image.is_image_duplicate(db, collection_id, imagehash)
+    if image_duplicate:
+        raise HTTPException(status_code=400, detail=f'Image is already uploaded as {image_duplicate.name}.')
+
+    write_path = await get_image_path(image_id=image_id, collection_id=collection_id)
+    async with aiofiles.open(write_path, mode='wb') as f:
+        await f.write(raw_input)
+
+    await make_preview_from_image(image, await get_preview_path(image_id),
+                                  resolution=config.IMAGE_PREVIEW_RESOLUTION)
+
+    image_new = {'id': image_id,
+                 'collection_id': collection_id,
+                 'order': order,
+                 'name': image_name,
+                 'width': image.shape[1],
+                 'height': image.shape[0],
+                 'deleted': False,
+                 'imagehash': imagehash,
+                 'work_state': model.WorkState.NEW}
+    await crud_general.new(db, image_new, model.Image)
+
+    # preview is optional, so we don't check if this goes through
+    try:
+        await crud_collection.check_preview_and_set(db, collection_id, image_id)
+    except DBError as e:
+        logger.exception(f'Failed creating image preview')
 
 
 @image_route.get("/{image_id}", response_model=base_objects.Image, tags=["Image"])
