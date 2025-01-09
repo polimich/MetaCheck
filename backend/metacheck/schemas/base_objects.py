@@ -22,6 +22,16 @@ class ProcessingState(str, enum.Enum):
     CANCELLED = 'cancelled'
 
 
+class BaseEntity(BaseModel):
+    id: UUID
+
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: bool
+
+
 # DETECTION
 #################################################################
 class DetectionNew(BaseModel):
@@ -181,3 +191,64 @@ class TitleUpdate(BaseModel):
     last_access: Optional[datetime] = None
 
     deleted: Optional[bool] = None
+
+
+# Volume
+#################################################################
+class VolumeNew(BaseModel):
+    id: UUID
+    collection_id: UUID
+    parent_id: Optional[UUID] = None
+    part_number: Optional[str] = str()
+    part_name: Optional[str] = str()
+    date_issued: Optional[str] = str()
+
+    title: Optional[str] = str()
+    sub_title: Optional[str] = str()
+    edition: Optional[str] = str()
+    place_term: Optional[str] = str()
+    publisher: Optional[str] = str()
+    manufacturer_publisher: Optional[str] = str()
+    manufacturer_place_term: Optional[str] = str()
+    author: Optional[str] = str()
+    illustrator: Optional[str] = str()
+    translator: Optional[str] = str()
+    editor: Optional[str] = str()
+    series_name: Optional[str] = str()
+    series_number: Optional[str] = str()
+
+
+class Volume(VolumeNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class VolumeUpdate(BaseModel):
+    id: UUID
+    collection_id: Optional[UUID] = None
+    parent_id: Optional[UUID] = None
+    part_number: Optional[str] = None
+    part_name: Optional[str] = None
+    date_issued: Optional[str] = None
+
+    title: Optional[str] = None
+    sub_title: Optional[str] = None
+    edition: Optional[str] = None
+    place_term: Optional[str] = None
+    publisher: Optional[str] = None
+    manufacturer_publisher: Optional[str] = None
+    manufacturer_place_term: Optional[str] = None
+    author: Optional[str] = None
+    illustrator: Optional[str] = None
+    translator: Optional[str] = None
+    editor: Optional[str] = None
+    series_name: Optional[str] = None
+    series_number: Optional[str] = None
+
+

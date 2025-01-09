@@ -21,25 +21,24 @@ class Base(DeclarativeBase):
     pass
 
 
-class Detection(Base):
-    __tablename__ = 'detections'
+class MyTableMixin:
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    image_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('images.id'), index=True, nullable=False)
-
-    type: Mapped[str] = mapped_column(nullable=False)
-    bbox: Mapped[str] = mapped_column(nullable=False)
-
-    confidence: Mapped[float] = mapped_column(nullable=True)
-
-    annotated: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
-
     created_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
     last_change: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
     last_access: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-
     deleted: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
 
+
+class Detection(MyTableMixin, Base):
+    __tablename__ = 'detections'
+    image_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('images.id'), index=True, nullable=False)
     image: Mapped['Image'] = relationship(viewonly=True)
+
+    type: Mapped[str] = mapped_column(nullable=False)
+    bbox: Mapped[str] = mapped_column(nullable=False)
+    confidence: Mapped[float] = mapped_column(nullable=True)
+    annotated: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
+
 
     @property
     def np_bbox(self):
@@ -58,10 +57,11 @@ class Detection(Base):
         self.bbox = points_to_json(ps)
 
 
-class Image(Base):
+class Image(MyTableMixin, Base):
     __tablename__ = 'images'
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     collection_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('collections.id'), index=True, nullable=False)
+    collection: Mapped['Collection'] = relationship(back_populates="images", foreign_keys='Image.collection_id')
+    detections: WriteOnlyMapped[List['Detection']] = relationship(back_populates="image")
 
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     order: Mapped[int] = mapped_column(nullable=False)
@@ -69,27 +69,16 @@ class Image(Base):
     width: Mapped[int] = mapped_column(nullable=False)
 
     confidence: Mapped[float] = mapped_column(nullable=True)
-
     imagehash: Mapped[str] = mapped_column(index=True)
-
     work_state: Mapped[WorkState] = mapped_column(default=WorkState.NEW, nullable=False)
-
     detection_count: Mapped[int] = mapped_column(default=0, nullable=False)
     annotated_detection_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
-    created_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-    last_change: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-    last_access: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
 
-    deleted: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
-
-    collection: Mapped['Collection'] = relationship(back_populates="images", foreign_keys='Image.collection_id')
-    detections: WriteOnlyMapped[List['Detection']] = relationship(back_populates="image")
-
-
-class Collection(Base):
+class Collection(MyTableMixin, Base):
     __tablename__ = 'collections'
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    images: WriteOnlyMapped[List['Image']] = relationship(back_populates='collection', foreign_keys='Image.collection_id')
+    titles: WriteOnlyMapped[List['Title']] = relationship(back_populates='collection', foreign_keys='Title.collection_id')
 
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     description: Mapped[str] = mapped_column(default="", nullable=False)
@@ -102,37 +91,45 @@ class Collection(Base):
     image_count: Mapped[int] = mapped_column(default=0, nullable=False)
     detection_count: Mapped[int] = mapped_column(default=0, nullable=False)
     annotated_detection_count: Mapped[int] = mapped_column(default=0, nullable=False)
-
-    created_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-    last_change: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-    last_access: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-
-    deleted: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
-
     preview_image_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('images.id'), index=True, nullable=True)
 
     preview_image_height: Mapped[int] = mapped_column(default=337, nullable=False)
     preview_image_width: Mapped[int] = mapped_column(default=524, nullable=False)
 
-    images: WriteOnlyMapped[List['Image']] = relationship(back_populates='collection', foreign_keys='Image.collection_id')
-    titles: WriteOnlyMapped[List['Title']] = relationship(back_populates='collection', foreign_keys='Title.collection_id')
 
-
-class Title(Base):
+class Title(MyTableMixin, Base):
     __tablename__ = 'titles'
-
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     collection_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('collections.id'), index=True, nullable=False)
     collection: Mapped['Collection'] = relationship(back_populates="titles", foreign_keys='Title.collection_id')
 
     title: Mapped[str] = mapped_column(default="", nullable=False)
     sub_title: Mapped[str] = mapped_column(default="", nullable=False)
 
-    created_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-    last_change: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
-    last_access: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
 
-    deleted: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
+class Volume(MyTableMixin, Base):
+    __tablename__ = 'volumes'
+    collection_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('collections.id'), index=True, nullable=False)
+    collection: Mapped['Collection'] = relationship(back_populates="volumes", foreign_keys='Volume.collection_id')
+
+    parent_id: Mapped[uuid.UUID] = mapped_column(nullable=True)
+    part_number: Mapped[str] = mapped_column(default="", nullable=False)
+    part_name: Mapped[str] = mapped_column(default="", nullable=False)
+    date_issued: Mapped[str] = mapped_column(default="", nullable=False)
+
+    ### monografie
+    title: Mapped[str] = mapped_column(default="", nullable=False)
+    sub_title: Mapped[str] = mapped_column(default="", nullable=False)
+    edition: Mapped[str] = mapped_column(default="", nullable=False)
+    place_term: Mapped[str] = mapped_column(default="", nullable=False)
+    publisher: Mapped[str] = mapped_column(default="", nullable=False)
+    manufacturer_publisher: Mapped[str] = mapped_column(default="", nullable=False)
+    manufacturer_place_term: Mapped[str] = mapped_column(default="", nullable=False)
+    author: Mapped[str] = mapped_column(default="", nullable=False)
+    illustrator: Mapped[str] = mapped_column(default="", nullable=False)
+    translator: Mapped[str] = mapped_column(default="", nullable=False)
+    editor: Mapped[str] = mapped_column(default="", nullable=False)
+    series_name: Mapped[str] = mapped_column(default="", nullable=False)
+    series_number: Mapped[str] = mapped_column(default="", nullable=False)
 
 
 def json_to_points(json_points, precision=1):
