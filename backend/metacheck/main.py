@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from metacheck.database import DBError
-from metacheck.routes import collection_route, image_route, debug_route
+from metacheck.routes import collection_route, image_route, debug_route, title_route
 
 from metacheck_common.config import config
 
@@ -42,6 +42,7 @@ async def startup():
 app.include_router(collection_route, prefix="/api/collection")
 app.include_router(image_route, prefix="/api/image")
 app.include_router(debug_route, prefix="/api/debug")
+app.include_router(title_route, prefix="/api/title")
 
 if os.path.isdir("metacheck/static"):
     app.mount("/", StaticFiles(directory="metacheck/static", html=True), name="static")

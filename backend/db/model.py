@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 
 import numpy as np
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship, WriteOnlyMapped
 
 from metacheck.schemas.base_objects import WorkState
@@ -115,6 +115,24 @@ class Collection(Base):
     preview_image_width: Mapped[int] = mapped_column(default=524, nullable=False)
 
     images: WriteOnlyMapped[List['Image']] = relationship(back_populates='collection', foreign_keys='Image.collection_id')
+    titles: WriteOnlyMapped[List['Title']] = relationship(back_populates='collection', foreign_keys='Title.collection_id')
+
+
+class Title(Base):
+    __tablename__ = 'titles'
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    collection_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('collections.id'), index=True, nullable=False)
+    collection: Mapped['Collection'] = relationship(back_populates="titles", foreign_keys='Title.collection_id')
+
+    title: Mapped[str] = mapped_column(default="", nullable=False)
+    sub_title: Mapped[str] = mapped_column(default="", nullable=False)
+
+    created_date: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
+    last_change: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
+    last_access: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True, nullable=False)
+
+    deleted: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
 
 
 def json_to_points(json_points, precision=1):

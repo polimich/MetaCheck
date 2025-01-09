@@ -130,6 +130,8 @@ class Collection(CollectionNew):
     preview_image_height: int
     preview_image_width: int
 
+    images: list[Image] = list()
+
     class Config:
         from_attributes = True
 
@@ -149,3 +151,33 @@ class CollectionUpdate(BaseModel):
     is_public: Optional[bool] = None
     deleted: Optional[bool] = None
 #################################################################
+
+# Title
+#################################################################
+class TitleNew(BaseModel):
+    id: UUID
+    title: Optional[str] = str()
+    sub_title: Optional[str] = str()
+    collection_id: Optional[UUID] = None
+
+
+class Title(TitleNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class TitleUpdate(BaseModel):
+    id: UUID
+    title: Optional[str] = None
+    sub_title: Optional[str] = None
+    collection_id: Optional[UUID] = None
+
+    last_access: Optional[datetime] = None
+
+    deleted: Optional[bool] = None
