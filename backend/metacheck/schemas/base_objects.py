@@ -208,8 +208,8 @@ class VolumeNew(BaseModel):
     edition: Optional[str] = str()
     place_term: Optional[str] = str()
     publisher: Optional[str] = str()
-    manufacturer_publisher: Optional[str] = str()
-    manufacturer_place_term: Optional[str] = str()
+    manufacture_publisher: Optional[str] = str()
+    manufacture_place_term: Optional[str] = str()
     author: Optional[str] = str()
     illustrator: Optional[str] = str()
     translator: Optional[str] = str()
@@ -242,13 +242,55 @@ class VolumeUpdate(BaseModel):
     edition: Optional[str] = None
     place_term: Optional[str] = None
     publisher: Optional[str] = None
-    manufacturer_publisher: Optional[str] = None
-    manufacturer_place_term: Optional[str] = None
+    manufacture_publisher: Optional[str] = None
+    manufacture_place_term: Optional[str] = None
     author: Optional[str] = None
     illustrator: Optional[str] = None
     translator: Optional[str] = None
     editor: Optional[str] = None
     series_name: Optional[str] = None
     series_number: Optional[str] = None
+
+
+def IssueNew():
+    id: UUID
+    collection_id: UUID
+
+    parent_id: Optional[UUID] = None
+    part_number: Optional[str] = str()
+    date_issued: Optional[str] = str()
+
+    title: Optional[str] = str()
+    sub_title: Optional[str] = str()
+    place_term: Optional[str] = str()
+    publisher: Optional[str] = str()
+    manufacture: Optional[str] = str()
+    redaktor: Optional[str] = str()
+
+def Issue(IssueNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+def IssueUpdate():
+    id: UUID
+    collection_id: Optional[UUID] = None
+
+    parent_id: Optional[UUID] = None
+    part_number: Optional[str] = None
+    date_issued: Optional[str] = None
+
+    title: Optional[str] = None
+    sub_title: Optional[str] = None
+    place_term: Optional[str] = None
+    publisher: Optional[str] = None
+    manufacture: Optional[str] = None
+    redaktor: Optional[str] = None
 
 
