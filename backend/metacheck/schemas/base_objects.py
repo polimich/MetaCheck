@@ -1,25 +1,25 @@
 import enum
-
-from pydantic import BaseModel
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
+
+from pydantic import BaseModel
 
 
 class WorkState(str, enum.Enum):
-    NEW = 'new'
-    IN_PROGRESS = 'in_progress'
-    DONE = 'done'
-    FINAL = 'final'
+    NEW = "new"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+    FINAL = "final"
 
 
 class ProcessingState(str, enum.Enum):
-    PRISTINE = 'pristine'
-    QUEUED = 'queued'
-    PROCESSING = 'processing'
-    ERROR = 'error'
-    DONE = 'done'
-    CANCELLED = 'cancelled'
+    PRISTINE = "pristine"
+    QUEUED = "queued"
+    PROCESSING = "processing"
+    ERROR = "error"
+    DONE = "done"
+    CANCELLED = "cancelled"
 
 
 class BaseEntity(BaseModel):
@@ -62,6 +62,8 @@ class DetectionUpdate(BaseModel):
     bbox: Optional[str] = None
 
     deleted: Optional[bool] = None
+
+
 #################################################################
 
 
@@ -108,6 +110,8 @@ class ImageUpdate(BaseModel):
     last_access: Optional[datetime] = None
 
     deleted: Optional[bool] = None
+
+
 #################################################################
 
 
@@ -160,7 +164,10 @@ class CollectionUpdate(BaseModel):
 
     is_public: Optional[bool] = None
     deleted: Optional[bool] = None
+
+
 #################################################################
+
 
 # Title
 #################################################################
@@ -267,6 +274,7 @@ def IssueNew():
     manufacture: Optional[str] = str()
     redaktor: Optional[str] = str()
 
+
 def Issue(IssueNew):
     created_date: datetime
     last_change: datetime
@@ -292,5 +300,3 @@ def IssueUpdate():
     publisher: Optional[str] = None
     manufacture: Optional[str] = None
     redaktor: Optional[str] = None
-
-

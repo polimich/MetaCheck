@@ -1,18 +1,24 @@
-import os
 import logging
 import logging.config
+import os
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from metacheck.database import DBError
-from metacheck.routes import collection_route, image_route, debug_route, title_route, volume_route, issue_route
-
+from metacheck.routes import (
+    collection_route,
+    image_route,
+    debug_route,
+    title_route,
+    volume_route,
+    issue_route,
+)
 from metacheck_common.config import config
 
-exception_logger = logging.getLogger('scribble_sense.exception_logger')
+exception_logger = logging.getLogger("scribble_sense.exception_logger")
 exception_logger.propagate = False
 
 
@@ -27,11 +33,16 @@ tags_metadata = [
     {
         "name": "Image",
         "description": "",
-    }
+    },
 ]
 
 
-app = FastAPI(openapi_tags=tags_metadata, title="MetaCheck", version="0.1.0", root_path=config.APP_URL_ROOT)
+app = FastAPI(
+    openapi_tags=tags_metadata,
+    title="MetaCheck",
+    version="0.1.0",
+    root_path=config.APP_URL_ROOT,
+)
 
 
 @app.on_event("startup")
@@ -56,21 +67,21 @@ async def unicorn_exception_handler(request: Request, exc: Exception):
         # DBError exceptions are already logged when they are raised
         return JSONResponse(status_code=400, content={"message": str(exc)})
     else:
-        exception_logger.error(f'URL: {request.url}')
-        exception_logger.error(f'CLIENT: {request.client}')
+        exception_logger.error(f"URL: {request.url}")
+        exception_logger.error(f"CLIENT: {request.client}")
         exception_logger.exception(exc)
         return Response(status_code=500)
 
 
 if config.PRODUCTION:
-    logging.warning(f'PRODUCTION')
+    logging.warning(f"PRODUCTION")
 else:
-    logging.warning(f'DEVELOPMENT')
+    logging.warning(f"DEVELOPMENT")
     # set allow origins to [URL of frontend app]
     app.add_middleware(
-         CORSMiddleware,
-         allow_origins=["http://localhost:9000"],
-         allow_credentials=True,
-         allow_methods=["*"],
-         allow_headers=["*"],
-     )
+        CORSMiddleware,
+        allow_origins=["http://localhost:9000"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
