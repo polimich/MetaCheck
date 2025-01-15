@@ -79,7 +79,10 @@ class Image(MyTableMixin, Base):
         back_populates="images", foreign_keys="Image.collection_id"
     )
     detections: WriteOnlyMapped[List["Detection"]] = relationship(
-        back_populates="image"
+        back_populates="image", foreign_keys="Detection.image_id"
+    )
+    pages: WriteOnlyMapped[List["Page"]] = relationship(
+        back_populates="image", foreign_keys="Page.image_id"
     )
 
     name: Mapped[str] = mapped_column(String(300), nullable=False)
@@ -107,6 +110,12 @@ class Collection(MyTableMixin, Base):
     )
     issues: WriteOnlyMapped[List["Issue"]] = relationship(
         back_populates="collection", foreign_keys="Issue.collection_id"
+    )
+    chapters: WriteOnlyMapped[List["Chapter"]] = relationship(
+        back_populates="collection", foreign_keys="Chapter.collection_id"
+    )
+    articles: WriteOnlyMapped[List["Article"]] = relationship(
+        back_populates="collection", foreign_keys="Article.collection_id"
     )
 
     name: Mapped[str] = mapped_column(String(300), nullable=False)
@@ -150,7 +159,7 @@ class Volume(MyTableMixin, Base):
         back_populates="volumes", foreign_keys="Volume.collection_id"
     )
 
-    parent_id: Mapped[uuid.UUID] = mapped_column(nullable=True)
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
     part_number: Mapped[str] = mapped_column(default="", nullable=False)
     part_name: Mapped[str] = mapped_column(default="", nullable=False)
     date_issued: Mapped[str] = mapped_column(default="", nullable=False)
@@ -180,7 +189,7 @@ class Issue(MyTableMixin, Base):
         back_populates="issues", foreign_keys="Issue.collection_id"
     )
 
-    parent_id: Mapped[uuid.UUID] = mapped_column(nullable=True)
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
     part_number: Mapped[str] = mapped_column(default="", nullable=False)
     date_issued: Mapped[str] = mapped_column(default="", nullable=False)
 
@@ -190,6 +199,60 @@ class Issue(MyTableMixin, Base):
     publisher: Mapped[str] = mapped_column(default="", nullable=False)
     manufacture: Mapped[str] = mapped_column(default="", nullable=False)
     redaktor: Mapped[str] = mapped_column(default="", nullable=False)
+
+
+class Page(MyTableMixin, Base):
+    __tablename__ = "pages"
+    image_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("images.id"), index=True, nullable=False
+    )
+    image: Mapped["Image"] = relationship(
+        back_populates="pages", foreign_keys="Page.image_id"
+    )
+
+    batch_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
+
+    page_index: Mapped[int] = mapped_column(nullable=True)
+    page_number: Mapped[str] = mapped_column(default="", nullable=False)
+    page_type: Mapped[str] = mapped_column(default="", nullable=False)
+
+
+class Chapter(MyTableMixin, Base):
+    __tablename__ = "chapters"
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("collections.id"), index=True, nullable=False
+    )
+    collection: Mapped["Collection"] = relationship(
+        back_populates="chapters", foreign_keys="Chapter.collection_id"
+    )
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
+
+    page_index_start: Mapped[int] = mapped_column(nullable=True)
+    page_index_end: Mapped[int] = mapped_column(nullable=True)
+
+    title: Mapped[str] = mapped_column(default="", nullable=False)
+    sub_title: Mapped[str] = mapped_column(default="", nullable=False)
+    part_number: Mapped[str] = mapped_column(default="", nullable=False)
+
+
+class Article(MyTableMixin, Base):
+    __tablename__ = "articles"
+    collection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("collections.id"), index=True, nullable=False
+    )
+    collection: Mapped["Collection"] = relationship(
+        back_populates="articles", foreign_keys="Article.collection_id"
+    )
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
+
+    page_index_start: Mapped[int] = mapped_column(nullable=True)
+    page_index_end: Mapped[int] = mapped_column(nullable=True)
+
+    title: Mapped[str] = mapped_column(default="", nullable=False)
+    author: Mapped[str] = mapped_column(default="", nullable=False)
+    abstract: Mapped[str] = mapped_column(default="", nullable=False)
+    keywords: Mapped[str] = mapped_column(default="", nullable=False)
 
 
 def json_to_points(json_points, precision=1):

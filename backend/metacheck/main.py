@@ -15,6 +15,9 @@ from metacheck.routes import (
     title_route,
     volume_route,
     issue_route,
+    page_route,
+    chapter_route,
+    article_route,
 )
 from metacheck_common.config import config
 
@@ -56,6 +59,10 @@ app.include_router(debug_route, prefix="/api/debug")
 app.include_router(title_route, prefix="/api/title")
 app.include_router(volume_route, prefix="/api/volume")
 app.include_router(issue_route, prefix="/api/issues")
+app.include_router(page_route, prefix="/api/page")
+app.include_router(chapter_route, prefix="/api/chapter")
+app.include_router(article_route, prefix="/api/article")
+
 
 if os.path.isdir("metacheck/static"):
     app.mount("/", StaticFiles(directory="metacheck/static", html=True), name="static")

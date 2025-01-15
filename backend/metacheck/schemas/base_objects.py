@@ -144,8 +144,6 @@ class Collection(CollectionNew):
     preview_image_height: int
     preview_image_width: int
 
-    images: list[Image] = list()
-
     class Config:
         from_attributes = True
 
@@ -196,7 +194,6 @@ class TitleUpdate(BaseModel):
     collection_id: Optional[UUID] = None
 
     last_access: Optional[datetime] = None
-
     deleted: Optional[bool] = None
 
 
@@ -258,12 +255,17 @@ class VolumeUpdate(BaseModel):
     series_name: Optional[str] = None
     series_number: Optional[str] = None
 
+    last_access: Optional[datetime] = None
+    deleted: Optional[bool] = None
 
-def IssueNew():
+
+# Issue
+#################################################################
+class IssueNew(BaseModel):
     id: UUID
     collection_id: UUID
+    parent_id: UUID
 
-    parent_id: Optional[UUID] = None
     part_number: Optional[str] = str()
     date_issued: Optional[str] = str()
 
@@ -275,7 +277,7 @@ def IssueNew():
     redaktor: Optional[str] = str()
 
 
-def Issue(IssueNew):
+class Issue(IssueNew):
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -286,7 +288,7 @@ def Issue(IssueNew):
         from_attributes = True
 
 
-def IssueUpdate():
+class IssueUpdate(BaseModel):
     id: UUID
     collection_id: Optional[UUID] = None
 
@@ -300,3 +302,126 @@ def IssueUpdate():
     publisher: Optional[str] = None
     manufacture: Optional[str] = None
     redaktor: Optional[str] = None
+
+    last_access: Optional[datetime] = None
+    deleted: Optional[bool] = None
+
+
+# Page
+#################################################################
+class PageNew(BaseModel):
+    id: UUID
+    image_id: UUID
+    batch_id: UUID
+    parent_id: UUID
+
+    page_index: Optional[int] = None
+    page_number: Optional[str] = str()
+    page_type: Optional[str] = str()
+
+
+class Page(PageNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class PageUpdate(BaseModel):
+    id: UUID
+    image_id: Optional[UUID] = None
+    batch_id: Optional[UUID] = None
+    parent_id: Optional[UUID] = None
+
+    page_index: Optional[int] = None
+    page_number: Optional[str] = None
+    page_type: Optional[str] = None
+
+    last_access: Optional[datetime] = None
+    deleted: Optional[bool] = None
+
+
+# Chapter
+#################################################################
+class ChapterNew(BaseModel):
+    id: UUID
+    parent_id: UUID
+
+    page_index_start: Optional[int] = None
+    page_index_end: Optional[int] = None
+
+    title: Optional[str] = str()
+    sub_title: Optional[str] = str()
+    part_number: Optional[str] = str()
+
+
+class Chapter(ChapterNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class ChapterUpdate(BaseModel):
+    id: UUID
+    parent_id: Optional[UUID] = None
+
+    page_index_start: Optional[int] = None
+    page_index_end: Optional[int] = None
+
+    title: Optional[str] = None
+    sub_title: Optional[str] = None
+    part_number: Optional[str] = None
+
+    last_access: Optional[datetime] = None
+    deleted: Optional[bool] = None
+
+
+# Article
+#################################################################
+class ArticleNew(BaseModel):
+    id: UUID
+    parent_id: UUID
+
+    page_index_start: Optional[int] = None
+    page_index_end: Optional[int] = None
+
+    title: Optional[str] = str()
+    author: Optional[str] = str()
+    abstract: Optional[str] = str()
+    keywords: Optional[str] = str()
+
+
+class Article(ArticleNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
+
+
+class ArticleUpdate(BaseModel):
+    id: UUID
+    parent_id: Optional[UUID] = None
+
+    page_index_start: Optional[int] = None
+    page_index_end: Optional[int] = None
+
+    title: Optional[str] = None
+    author: Optional[str] = None
+    abstract: Optional[str] = None
+    keywords: Optional[str] = None
+
+    last_access: Optional[datetime] = None
+    deleted: Optional[bool] = None
