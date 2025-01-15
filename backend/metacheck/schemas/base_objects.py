@@ -22,6 +22,47 @@ class ProcessingState(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
+class PageType(enum.Enum):
+    ABSTRACT = "Abstract"
+    ADVERTISEMENT = "Advertisement"
+    APPENDIX = "Appendix"
+    BACK_COVER = "BackCover"
+    BACK_END_PAPER = "BackEndPaper"
+    BACK_END_SHEET = "BackEndSheet"
+    BIBLIOGRAPHY = "Bibliography"
+    BLANK = "Blank"
+    CALIBRATION_TABLE = "CalibrationTable"
+    COVER = "Cover"
+    CUSTOM_INCLUDE = "CustomInclude"
+    DEDICATION = "Dedication"
+    EDGE = "Edge"
+    ERRATA = "Errata"
+    FLY_LEAF = "FlyLeaf"
+    FRAGMENTS_OF_BOOKBINDING = "FragmentsOfBookbinding"
+    FRONT_COVER = "FrontCover"
+    FRONT_END_PAPER = "FrontEndPaper"
+    FRONT_END_SHEET = "FrontEndSheet"
+    FRONT_JACKET = "FrontJacket"
+    FRONTISPIECE = "Frontispiece"
+    ILLUSTRATION = "Illustration"
+    IMPRESSUM = "Impressum"
+    IMPRIMATUR = "Imprimatur"
+    INDEX = "Index"
+    JACKET = "Jacket"
+    LIST_OF_ILLUSTRATIONS = "ListOfIllustrations"
+    LIST_OF_MAPS = "ListOfMaps"
+    LIST_OF_TABLES = "ListOfTables"
+    MAP = "Map"
+    NORMAL_PAGE = "NormalPage"
+    OBITUARY = "Obituary"
+    PREFACE = "Preface"
+    SHEET_MUSIC = "SheetMusic"
+    SPINE = "Spine"
+    TABLE = "Table"
+    TABLE_OF_CONTENTS = "TableOfContents"
+    TITLE_PAGE = "TitlePage"
+
+
 class BaseEntity(BaseModel):
     id: UUID
 
@@ -167,16 +208,79 @@ class CollectionUpdate(BaseModel):
 #################################################################
 
 
+# MetaDetection
+#################################################################
+
+
+class MetaDetectionNew(BaseModel):
+    id: UUID
+    confidence: Optional[float] = None
+    value: str
+
+
+class MetaDetection(MetaDetectionNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class MetaDetectionUpdate(BaseModel):
+    id: UUID
+    confidence: Optional[float] = None
+    value: Optional[str] = None
+
+    last_access: Optional[datetime] = None
+    deleted: Optional[bool] = None
+
+
+# PageTypeDetection
+#################################################################
+class PageTypeDetectionNew(BaseModel):
+    id: UUID
+    confidence: Optional[float] = None
+    value: PageType
+
+
+class PageTypeDetection(PageTypeDetectionNew):
+
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class PageTypeDetectionUpdate(BaseModel):
+    id: UUID
+    confidence: Optional[float] = None
+    value: Optional[PageType] = None
+
+    last_access: Optional[datetime] = None
+    deleted: Optional[bool] = None
+
+
 # Title
 #################################################################
 class TitleNew(BaseModel):
     id: UUID
-    title: Optional[str] = str()
-    sub_title: Optional[str] = str()
+    title_id: Optional[UUID] = None
+    sub_title_id: Optional[UUID] = None
     collection_id: Optional[UUID] = None
 
 
 class Title(TitleNew):
+
+    title: Optional[MetaDetection] = None
+    sub_title: Optional[MetaDetection] = None
+    collection: Optional[Collection] = None
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -189,8 +293,8 @@ class Title(TitleNew):
 
 class TitleUpdate(BaseModel):
     id: UUID
-    title: Optional[str] = None
-    sub_title: Optional[str] = None
+    title_id: Optional[str] = None
+    sub_title_id: Optional[str] = None
     collection_id: Optional[UUID] = None
 
     last_access: Optional[datetime] = None
@@ -203,26 +307,46 @@ class VolumeNew(BaseModel):
     id: UUID
     collection_id: UUID
     parent_id: Optional[UUID] = None
-    part_number: Optional[str] = str()
-    part_name: Optional[str] = str()
-    date_issued: Optional[str] = str()
 
-    title: Optional[str] = str()
-    sub_title: Optional[str] = str()
-    edition: Optional[str] = str()
-    place_term: Optional[str] = str()
-    publisher: Optional[str] = str()
-    manufacture_publisher: Optional[str] = str()
-    manufacture_place_term: Optional[str] = str()
-    author: Optional[str] = str()
-    illustrator: Optional[str] = str()
-    translator: Optional[str] = str()
-    editor: Optional[str] = str()
-    series_name: Optional[str] = str()
-    series_number: Optional[str] = str()
+    part_number_id: Optional[UUID] = None
+    part_name_id: Optional[UUID] = None
+    date_issued_id: Optional[UUID] = None
+
+    title_id: Optional[UUID] = None
+    sub_title_id: Optional[UUID] = None
+    edition_id: Optional[UUID] = None
+    place_term_id: Optional[UUID] = None
+    publisher_id: Optional[UUID] = None
+    manufacture_publisher_id: Optional[UUID] = None
+    manufacture_place_term_id: Optional[UUID] = None
+    author_id: Optional[UUID] = None
+    illustrator_id: Optional[UUID] = None
+    translator_id: Optional[UUID] = None
+    editor_id: Optional[UUID] = None
+    series_name_id: Optional[UUID] = None
+    series_number_id: Optional[UUID] = None
 
 
 class Volume(VolumeNew):
+
+    part_number: Optional[MetaDetection] = None
+    part_name: Optional[MetaDetection] = None
+    date_issued: Optional[MetaDetection] = None
+
+    title: Optional[MetaDetection] = None
+    sub_title: Optional[MetaDetection] = None
+    edition: Optional[MetaDetection] = None
+    place_term: Optional[MetaDetection] = None
+    publisher: Optional[MetaDetection] = None
+    manufacture_publisher: Optional[MetaDetection] = None
+    manufacture_place_term: Optional[MetaDetection] = None
+    author: Optional[MetaDetection] = None
+    illustrator: Optional[MetaDetection] = None
+    translator: Optional[MetaDetection] = None
+    editor: Optional[MetaDetection] = None
+    series_name: Optional[MetaDetection] = None
+    series_number: Optional[MetaDetection] = None
+
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -237,23 +361,24 @@ class VolumeUpdate(BaseModel):
     id: UUID
     collection_id: Optional[UUID] = None
     parent_id: Optional[UUID] = None
-    part_number: Optional[str] = None
-    part_name: Optional[str] = None
-    date_issued: Optional[str] = None
 
-    title: Optional[str] = None
-    sub_title: Optional[str] = None
-    edition: Optional[str] = None
-    place_term: Optional[str] = None
-    publisher: Optional[str] = None
-    manufacture_publisher: Optional[str] = None
-    manufacture_place_term: Optional[str] = None
-    author: Optional[str] = None
-    illustrator: Optional[str] = None
-    translator: Optional[str] = None
-    editor: Optional[str] = None
-    series_name: Optional[str] = None
-    series_number: Optional[str] = None
+    part_number_id: Optional[UUID] = None
+    part_name_id: Optional[UUID] = None
+    date_issued_id: Optional[UUID] = None
+
+    title_id: Optional[UUID] = None
+    sub_title_id: Optional[UUID] = None
+    edition_id: Optional[UUID] = None
+    place_term_id: Optional[UUID] = None
+    publisher_id: Optional[UUID] = None
+    manufacture_publisher_id: Optional[UUID] = None
+    manufacture_place_term_id: Optional[UUID] = None
+    author_id: Optional[UUID] = None
+    illustrator_id: Optional[UUID] = None
+    translator_id: Optional[UUID] = None
+    editor_id: Optional[UUID] = None
+    series_name_id: Optional[UUID] = None
+    series_number_id: Optional[UUID] = None
 
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None
@@ -266,18 +391,28 @@ class IssueNew(BaseModel):
     collection_id: UUID
     parent_id: UUID
 
-    part_number: Optional[str] = str()
-    date_issued: Optional[str] = str()
+    part_number_id: Optional[UUID] = None
+    date_issued_id: Optional[UUID] = None
 
-    title: Optional[str] = str()
-    sub_title: Optional[str] = str()
-    place_term: Optional[str] = str()
-    publisher: Optional[str] = str()
-    manufacture: Optional[str] = str()
-    redaktor: Optional[str] = str()
+    title_id: Optional[UUID] = None
+    sub_title_id: Optional[UUID] = None
+    place_term_id: Optional[UUID] = None
+    publisher_id: Optional[UUID] = None
+    manufacture_id: Optional[UUID] = None
+    redaktor_id: Optional[UUID] = None
 
 
 class Issue(IssueNew):
+    part_number: Optional[MetaDetection] = None
+    date_issued: Optional[MetaDetection] = None
+
+    title: Optional[MetaDetection] = None
+    sub_title: Optional[MetaDetection] = None
+    place_term: Optional[MetaDetection] = None
+    publisher: Optional[MetaDetection] = None
+    manufacture: Optional[MetaDetection] = None
+    redaktor: Optional[MetaDetection] = None
+
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -291,17 +426,17 @@ class Issue(IssueNew):
 class IssueUpdate(BaseModel):
     id: UUID
     collection_id: Optional[UUID] = None
-
     parent_id: Optional[UUID] = None
-    part_number: Optional[str] = None
-    date_issued: Optional[str] = None
 
-    title: Optional[str] = None
-    sub_title: Optional[str] = None
-    place_term: Optional[str] = None
-    publisher: Optional[str] = None
-    manufacture: Optional[str] = None
-    redaktor: Optional[str] = None
+    part_number_id: Optional[UUID] = None
+    date_issued_id: Optional[UUID] = None
+
+    title_id: Optional[UUID] = None
+    sub_title_id: Optional[UUID] = None
+    place_term_id: Optional[UUID] = None
+    publisher_id: Optional[UUID] = None
+    manufacture_id: Optional[UUID] = None
+    redaktor_id: Optional[UUID] = None
 
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None
@@ -316,11 +451,15 @@ class PageNew(BaseModel):
     parent_id: UUID
 
     page_index: Optional[int] = None
-    page_number: Optional[str] = str()
-    page_type: Optional[str] = str()
+
+    page_number_id: Optional[UUID] = None
+    page_type_id: Optional[UUID] = None
 
 
 class Page(PageNew):
+    page_number: Optional[MetaDetection] = None
+    page_type: Optional[PageTypeDetection] = None
+
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -338,8 +477,9 @@ class PageUpdate(BaseModel):
     parent_id: Optional[UUID] = None
 
     page_index: Optional[int] = None
-    page_number: Optional[str] = None
-    page_type: Optional[str] = None
+
+    page_number_id: Optional[UUID] = None
+    page_type_id: Optional[UUID] = None
 
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None
@@ -349,17 +489,23 @@ class PageUpdate(BaseModel):
 #################################################################
 class ChapterNew(BaseModel):
     id: UUID
+    collection_id: UUID
     parent_id: UUID
 
     page_index_start: Optional[int] = None
     page_index_end: Optional[int] = None
 
-    title: Optional[str] = str()
-    sub_title: Optional[str] = str()
-    part_number: Optional[str] = str()
+    title_id: Optional[UUID] = None
+    sub_title_id: Optional[UUID] = None
+    part_number_id: Optional[UUID] = None
 
 
 class Chapter(ChapterNew):
+    collection: Optional[Collection] = None
+    title: Optional[MetaDetection] = None
+    sub_title: Optional[MetaDetection] = None
+    part_number: Optional[MetaDetection] = None
+
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -373,13 +519,14 @@ class Chapter(ChapterNew):
 class ChapterUpdate(BaseModel):
     id: UUID
     parent_id: Optional[UUID] = None
+    collection_id: Optional[UUID] = None
 
     page_index_start: Optional[int] = None
     page_index_end: Optional[int] = None
 
-    title: Optional[str] = None
-    sub_title: Optional[str] = None
-    part_number: Optional[str] = None
+    title_id: Optional[UUID] = None
+    sub_title_id: Optional[UUID] = None
+    part_number_id: Optional[UUID] = None
 
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None
@@ -394,13 +541,18 @@ class ArticleNew(BaseModel):
     page_index_start: Optional[int] = None
     page_index_end: Optional[int] = None
 
-    title: Optional[str] = str()
-    author: Optional[str] = str()
-    abstract: Optional[str] = str()
-    keywords: Optional[str] = str()
+    title_id: Optional[UUID] = None
+    author_id: Optional[UUID] = None
+    abstract_id: Optional[UUID] = None
+    keywords_id: Optional[UUID] = None
 
 
 class Article(ArticleNew):
+    title: Optional[MetaDetection] = None
+    author: Optional[MetaDetection] = None
+    abstract: Optional[MetaDetection] = None
+    keywords: Optional[MetaDetection] = None
+
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -418,10 +570,10 @@ class ArticleUpdate(BaseModel):
     page_index_start: Optional[int] = None
     page_index_end: Optional[int] = None
 
-    title: Optional[str] = None
-    author: Optional[str] = None
-    abstract: Optional[str] = None
-    keywords: Optional[str] = None
+    title_id: Optional[UUID] = None
+    author_id: Optional[UUID] = None
+    abstract_id: Optional[UUID] = None
+    keywords_id: Optional[UUID] = None
 
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None

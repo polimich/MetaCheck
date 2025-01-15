@@ -2,7 +2,7 @@ import json
 import math
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from sqlalchemy import ForeignKey, String
@@ -14,7 +14,7 @@ from sqlalchemy.orm import (
     WriteOnlyMapped,
 )
 
-from metacheck.schemas.base_objects import WorkState
+from metacheck.schemas.base_objects import WorkState, PageType
 
 # converts ORM row object to dict
 orm2dict = lambda r: {c.name: getattr(r, c.name) for c in r.__table__.columns}
@@ -81,9 +81,9 @@ class Image(MyTableMixin, Base):
     detections: WriteOnlyMapped[List["Detection"]] = relationship(
         back_populates="image", foreign_keys="Detection.image_id"
     )
-    pages: WriteOnlyMapped[List["Page"]] = relationship(
-        back_populates="image", foreign_keys="Page.image_id"
-    )
+    # pages: WriteOnlyMapped[List["Page"]] = relationship(
+    #     back_populates="image", foreign_keys="Page.image_id"
+    # )
 
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     order: Mapped[int] = mapped_column(nullable=False)
@@ -137,6 +137,20 @@ class Collection(MyTableMixin, Base):
     preview_image_width: Mapped[int] = mapped_column(default=524, nullable=False)
 
 
+class MetaDetection(MyTableMixin, Base):
+    __tablename__ = "meta_detections"
+
+    confidence: Mapped[float] = mapped_column(nullable=True)
+    value: Mapped[str] = mapped_column(default="", nullable=False)
+
+
+class PageTypeDetection(MyTableMixin, Base):
+    __tablename__ = "page_type_detections"
+
+    confidence: Mapped[float] = mapped_column(nullable=True)
+    value: Mapped[PageType] = mapped_column(nullable=False)
+
+
 class Title(MyTableMixin, Base):
     __tablename__ = "titles"
     collection_id: Mapped[uuid.UUID] = mapped_column(
@@ -146,12 +160,23 @@ class Title(MyTableMixin, Base):
         back_populates="titles", foreign_keys="Title.collection_id"
     )
 
-    title: Mapped[str] = mapped_column(default="", nullable=False)
-    sub_title: Mapped[str] = mapped_column(default="", nullable=False)
+    title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Title.title_id"
+    )
+    sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Title.sub_title_id"
+    )
 
 
 class Volume(MyTableMixin, Base):
     __tablename__ = "volumes"
+
     collection_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("collections.id"), index=True, nullable=False
     )
@@ -159,100 +184,295 @@ class Volume(MyTableMixin, Base):
         back_populates="volumes", foreign_keys="Volume.collection_id"
     )
 
-    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
-    part_number: Mapped[str] = mapped_column(default="", nullable=False)
-    part_name: Mapped[str] = mapped_column(default="", nullable=False)
-    date_issued: Mapped[str] = mapped_column(default="", nullable=False)
+    parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(index=True, nullable=True)
 
-    ### monografie
-    title: Mapped[str] = mapped_column(default="", nullable=False)
-    sub_title: Mapped[str] = mapped_column(default="", nullable=False)
-    edition: Mapped[str] = mapped_column(default="", nullable=False)
-    place_term: Mapped[str] = mapped_column(default="", nullable=False)
-    publisher: Mapped[str] = mapped_column(default="", nullable=False)
-    manufacture_publisher: Mapped[str] = mapped_column(default="", nullable=False)
-    manufacture_place_term: Mapped[str] = mapped_column(default="", nullable=False)
-    author: Mapped[str] = mapped_column(default="", nullable=False)
-    illustrator: Mapped[str] = mapped_column(default="", nullable=False)
-    translator: Mapped[str] = mapped_column(default="", nullable=False)
-    editor: Mapped[str] = mapped_column(default="", nullable=False)
-    series_name: Mapped[str] = mapped_column(default="", nullable=False)
-    series_number: Mapped[str] = mapped_column(default="", nullable=False)
+    part_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    part_number: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.part_number_id"
+    )
+
+    part_name_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    part_name: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.part_name_id"
+    )
+
+    date_issued_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    date_issued: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.date_issued_id"
+    )
+
+    title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.title_id"
+    )
+
+    sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.sub_title_id"
+    )
+
+    edition_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    edition: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.edition_id"
+    )
+
+    place_term_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    place_term: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.place_term_id"
+    )
+
+    publisher_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    publisher: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.publisher_id"
+    )
+
+    manufacture_publisher_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    manufacture_publisher: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.manufacture_publisher_id"
+    )
+
+    manufacture_place_term_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    manufacture_place_term: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.manufacture_place_term_id"
+    )
+
+    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    author: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.author_id"
+    )
+
+    illustrator_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    illustrator: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.illustrator_id"
+    )
+
+    translator_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    translator: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.translator_id"
+    )
+
+    editor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    editor: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.editor_id"
+    )
+
+    series_name_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    series_name: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.series_name_id"
+    )
+
+    series_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    series_number: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Volume.series_number_id"
+    )
 
 
 class Issue(MyTableMixin, Base):
     __tablename__ = "issues"
+
     collection_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("collections.id"), index=True, nullable=False
     )
-    collection: Mapped["Collection"] = relationship(
-        back_populates="issues", foreign_keys="Issue.collection_id"
+    collection: Mapped["Collection"] = relationship(foreign_keys="Issue.collection_id")
+
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
+
+    part_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    part_number: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.part_number_id"
     )
 
-    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
-    part_number: Mapped[str] = mapped_column(default="", nullable=False)
-    date_issued: Mapped[str] = mapped_column(default="", nullable=False)
+    date_issued_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    date_issued: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.date_issued_id"
+    )
 
-    title: Mapped[str] = mapped_column(default="", nullable=False)
-    sub_title: Mapped[str] = mapped_column(default="", nullable=False)
-    place_term: Mapped[str] = mapped_column(default="", nullable=False)
-    publisher: Mapped[str] = mapped_column(default="", nullable=False)
-    manufacture: Mapped[str] = mapped_column(default="", nullable=False)
-    redaktor: Mapped[str] = mapped_column(default="", nullable=False)
+    title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.title_id"
+    )
+
+    sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.sub_title_id"
+    )
+
+    place_term_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    place_term: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.place_term_id"
+    )
+
+    publisher_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    publisher: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.publisher_id"
+    )
+
+    manufacture_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    manufacture: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.manufacture_id"
+    )
+
+    redaktor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    redaktor: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Issue.redaktor_id"
+    )
 
 
 class Page(MyTableMixin, Base):
     __tablename__ = "pages"
+
     image_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("images.id"), index=True, nullable=False
     )
-    image: Mapped["Image"] = relationship(
-        back_populates="pages", foreign_keys="Page.image_id"
+    image: Mapped["Image"] = relationship(foreign_keys="Page.image_id")
+
+    batch_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
+
+    page_index: Mapped[Optional[int]] = mapped_column(nullable=True)
+
+    page_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    page_number: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Page.page_number_id"
     )
 
-    batch_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
-    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
-
-    page_index: Mapped[int] = mapped_column(nullable=True)
-    page_number: Mapped[str] = mapped_column(default="", nullable=False)
-    page_type: Mapped[str] = mapped_column(default="", nullable=False)
+    page_type_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("page_type_detections.id"), index=True, nullable=True
+    )
+    page_type: Mapped[Optional["PageTypeDetection"]] = relationship(
+        foreign_keys="Page.page_type_id"
+    )
 
 
 class Chapter(MyTableMixin, Base):
     __tablename__ = "chapters"
+
     collection_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("collections.id"), index=True, nullable=False
     )
     collection: Mapped["Collection"] = relationship(
-        back_populates="chapters", foreign_keys="Chapter.collection_id"
+        foreign_keys="Chapter.collection_id"
     )
-    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
 
-    page_index_start: Mapped[int] = mapped_column(nullable=True)
-    page_index_end: Mapped[int] = mapped_column(nullable=True)
+    page_index_start: Mapped[int] = mapped_column(nullable=False)
 
-    title: Mapped[str] = mapped_column(default="", nullable=False)
-    sub_title: Mapped[str] = mapped_column(default="", nullable=False)
-    part_number: Mapped[str] = mapped_column(default="", nullable=False)
+    page_index_end: Mapped[int] = mapped_column(nullable=False)
+
+    title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Chapter.title_id"
+    )
+
+    sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Chapter.sub_title_id"
+    )
+
+    part_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    part_number: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Chapter.part_number_id"
+    )
 
 
 class Article(MyTableMixin, Base):
     __tablename__ = "articles"
+
     collection_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("collections.id"), index=True, nullable=False
     )
     collection: Mapped["Collection"] = relationship(
-        back_populates="articles", foreign_keys="Article.collection_id"
+        foreign_keys="Article.collection_id"
     )
-    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=True)
+    parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
 
-    page_index_start: Mapped[int] = mapped_column(nullable=True)
-    page_index_end: Mapped[int] = mapped_column(nullable=True)
+    page_index_start: Mapped[int] = mapped_column(nullable=False)
 
-    title: Mapped[str] = mapped_column(default="", nullable=False)
-    author: Mapped[str] = mapped_column(default="", nullable=False)
-    abstract: Mapped[str] = mapped_column(default="", nullable=False)
-    keywords: Mapped[str] = mapped_column(default="", nullable=False)
+    page_index_end: Mapped[int] = mapped_column(nullable=False)
+
+    title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    title: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Article.title_id"
+    )
+
+    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    author: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Article.author_id"
+    )
+
+    abstract_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    abstract: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Article.abstract_id"
+    )
+
+    keywords_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_detections.id"), index=True, nullable=True
+    )
+    keywords: Mapped[Optional["MetaDetection"]] = relationship(
+        foreign_keys="Article.keywords_id"
+    )
 
 
 def json_to_points(json_points, precision=1):
