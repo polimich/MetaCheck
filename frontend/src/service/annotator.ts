@@ -135,9 +135,8 @@ function enterAnnotatorBox(annotatorBox: HTMLDivElement | null) {
 }
 
 function leaveAnnotatorBox(annotator: UnwrapNestedRefs<Annotator> & object) {
-  document.body.style.cursor = 'auto';
+  document.body.style.cursor = 'default';
   annotator.innerToolBox.hide();
-  // save annotation to database
 }
 
 export { Annotation, Annotator, enterAnnotatorBox, leaveAnnotatorBox };

@@ -1,0 +1,277 @@
+<script setup lang="ts">
+import { useRoute } from 'vue-router';
+import { getRasterImage } from 'utils';
+import { onBeforeMount, onMounted, reactive, Ref, ref, watch } from 'vue';
+import { useImageStore } from 'src/stores';
+import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
+import { Stage } from 'konva/lib/Stage';
+import {
+  Annotator,
+  Annotation,
+  enterAnnotatorBox,
+  leaveAnnotatorBox,
+} from 'src/service/annotator.ts';
+import { Vector2d } from 'konva/lib/types';
+import {
+  createAnnotation,
+  startEditAnnotationVolume,
+  removeAnnotation,
+  startDragAnnotation,
+  startResizeAnnotation,
+  stopDragAnnotation,
+  stopEditAnnotationVolume,
+  stopResizeAnnotation,
+  leaveAnnotateRange,
+} from 'src/service/annotation.ts';
+
+const props = defineProps({
+  imageId: String,
+});
+
+const route = useRoute();
+const imageStore = useImageStore();
+const imageId = props.imageId ?? (route.params.imageId as string);
+const imageUrl = getRasterImage(imageId);
+
+// Reactive variables
+const annotatorBox: Ref<HTMLDivElement | null> = ref(null);
+const isMounted = ref(false);
+const stage = ref<Stage | null>(null);
+const loading = ref(false);
+const dataLoaded = ref(false);
+const annotator = reactive(new Annotator());
+
+// resize observer
+let resizeObserver: ResizeObserver | null = null;
+function setupResizeObserver() {
+  if (!annotatorBox.value) return;
+
+  resizeObserver = new ResizeObserver(async () => {
+    await init();
+  });
+
+  resizeObserver.observe(annotatorBox.value);
+}
+
+// functions
+
+const init = async (): Promise<void> => {
+  if (!isMounted.value) return;
+  if (!dataLoaded.value) return;
+  if (!annotatorBox.value) return;
+  await initAnnotator(annotatorBox.value, imageUrl, imageStore.annotations);
+};
+
+const initAnnotator = async (
+  container: Element,
+  url: string,
+  annotations: Annotation[],
+): Promise<void> => {
+  loading.value = true;
+  await annotator.initImageSetting(container, url);
+  annotator.initCanvas(stage.value);
+  if (annotations.length >= 1) {
+    annotator.innerToolBox.updateAnnotation(annotations[0]);
+  }
+  loading.value = false;
+};
+
+// resize layer
+const wheelResizeLayer = (event: KonvaPointerEvent) => {
+  console.log('wheelResizeLayer');
+  // wheel event
+  const wheel = event.evt as MouseEvent as WheelEvent;
+  wheel.preventDefault();
+
+  const altKey = wheel.altKey;
+  if (!altKey) return;
+  const direction = wheel.deltaY;
+
+  //layer resize
+  const oldScale = annotator.layer.scaleX();
+  const scaleBy = 1.05;
+  const newScale = direction > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+  annotator.layer.scale({ x: newScale, y: newScale });
+
+  // layer position
+  const pointerPosition = annotator.stage.getPointerPosition() as Vector2d;
+
+  const mousePointTo = {
+    x: (pointerPosition.x - annotator.layer.x()) / oldScale,
+    y: (pointerPosition.y - annotator.layer.y()) / oldScale,
+  };
+  const newPos = {
+    x: pointerPosition.x - mousePointTo.x * newScale,
+    y: pointerPosition.y - mousePointTo.y * newScale,
+  };
+  annotator.layer.position(newPos);
+};
+
+const dragLayer = () => {
+  // annotator.innerToolBox.hide();
+};
+
+const resetLayerPosition = () => {
+  annotator.layer.setAttrs({
+    x: 0,
+    y: 0,
+    scaleX: annotator.imageScale,
+    scaleY: annotator.imageScale,
+  });
+  annotator.innerToolBox.hide();
+};
+
+async function handleKeyDownEvent(event: KeyboardEvent) {
+  const key = event.key.toUpperCase();
+  switch (key) {
+    case 'W':
+      // annotating
+      annotator.changeAnnotateMode('add');
+      break;
+    case 'E':
+      // dragging
+      annotator.changeAnnotateMode('drag');
+      break;
+    case 'BACKSPACE':
+    case 'DELETE':
+    case 'DEL':
+      if (imageStore.annotations.length === 0) return;
+      if (annotator.innerToolBox.getAnnotationId() === '') return;
+      await removeAnnotation({
+        id: annotator.innerToolBox.getAnnotationId(),
+        annotator: annotator,
+        imageStore: imageStore,
+      });
+      break;
+    case 'Z':
+      resetLayerPosition();
+      break;
+    default:
+      break;
+  }
+}
+
+// lifecycle
+onBeforeMount(async () => {
+  dataLoaded.value = false;
+  await imageStore.loadImage(imageId);
+  await imageStore.loadDetections(imageId);
+  dataLoaded.value = true;
+});
+
+onMounted(async () => {
+  isMounted.value = true;
+  setupResizeObserver();
+  await init();
+});
+
+watch(dataLoaded, async () => {
+  await init();
+});
+
+watch(imageStore, async () => {
+  await init();
+});
+
+const save = async () => {
+  await imageStore.createOrUpdateDetections(imageId);
+  await imageStore.loadDetections(imageId);
+};
+
+function addAlpha(color: string, opacity: number) {
+  // coerce values so it is between 0 and 1.
+  var _opacity = Math.round(Math.min(Math.max(opacity ?? 1, 0), 1) * 255);
+  return color + _opacity.toString(16).toUpperCase();
+}
+</script>
+
+<template>
+  <div class="full-width row wrap container">
+    <div
+      class="annotator"
+      ref="annotatorBox"
+      tabindex="1"
+      @mouseover="enterAnnotatorBox(annotatorBox)"
+      @mouseleave="leaveAnnotatorBox(annotator)"
+      @keydown="handleKeyDownEvent"
+    >
+      <v-stage
+        :config="annotator.stageConfig"
+        ref="stage"
+        @mousedown="
+          (event: KonvaPointerEvent) =>
+            startResizeAnnotation(event, annotator, imageStore.annotations)
+        "
+      >
+        <v-layer
+          :config="annotator.layerConfig"
+          @mousemove="
+            startEditAnnotationVolume(annotator, imageStore.annotations)
+          "
+          @mouseup="
+            (event: KonvaPointerEvent) =>
+              stopEditAnnotationVolume(event, annotator, imageStore)
+          "
+          @mouseleave="leaveAnnotateRange(annotator, imageStore)"
+          @wheel="wheelResizeLayer"
+          @dragmove="dragLayer"
+        >
+          <v-image
+            :config="annotator.imageConfig"
+            @mousedown="
+              createAnnotation(annotator, imageId, imageStore.annotations)
+            "
+          />
+          <v-group
+            v-for="item in imageStore.annotations"
+            :key="item.id"
+            :config="{ name: item.id, visible: true }"
+          >
+            <v-rect
+              :config="{
+                id: item.id,
+                x: item.x,
+                y: item.y,
+                stroke: item.color,
+                width: item.width,
+                height: item.height,
+                draggable: true,
+                fill: addAlpha(item.color, 0.3),
+              }"
+              @dragmove="
+                (event: KonvaPointerEvent) =>
+                  startDragAnnotation(event, annotator, imageStore.annotations)
+              "
+              @dragend="
+                (event: KonvaPointerEvent) =>
+                  stopDragAnnotation(event, annotator, imageStore.annotations)
+              "
+              @transformend="
+                (event: KonvaPointerEvent) =>
+                  stopResizeAnnotation(event, annotator, imageStore.annotations)
+              "
+            />
+          </v-group>
+          <v-transformer :config="annotator.transformerConfig" />
+        </v-layer>
+      </v-stage>
+    </div>
+  </div>
+  <div class="row">
+    <q-btn @click="save" class="absolute top-0 right-0" icon="save">
+      Save
+    </q-btn>
+  </div>
+</template>
+<style>
+.annotator {
+  min-width: 100%;
+  max-width: 100%;
+}
+.q-page-container {
+  height: 100vh;
+}
+.container {
+  height: 100%;
+}
+</style>

@@ -5,6 +5,7 @@ import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Container } from 'konva/lib/Container';
 import type { Node } from 'konva/lib/Node';
 import { useImageStore } from 'src/stores';
+import { Vector2d } from 'konva/lib/types';
 
 export class Annotation {
   id = uuidv4();
@@ -27,7 +28,6 @@ const createAnnotation = async (
   annotator: UnwrapNestedRefs<Annotator> & object,
   imageId: string,
   annotations: Annotation[],
-  imageStore: ReturnType<typeof useImageStore>,
 ) => {
   if (annotator.mode !== 'add') return;
   const pointerPosition = annotator.layer.getRelativePointerPosition();
@@ -38,7 +38,6 @@ const createAnnotation = async (
   newAnnotation.x = x > 0 ? x : 0;
   newAnnotation.y = y > 0 ? y : 0;
   annotations.push(newAnnotation);
-  await imageStore.createDetection(newAnnotation);
   annotator.innerToolBox.updateAnnotation(newAnnotation);
   annotator.isAnnotating = true;
 };
@@ -68,27 +67,25 @@ const startEditAnnotationVolume = (
 const stopEditAnnotationVolume = async (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
-  annotations: Annotation[],
   imageStore: ReturnType<typeof useImageStore>,
 ) => {
   if (annotator.mode !== 'add') return;
 
   annotator.isAnnotating = false;
-  const currentAnnotation = getLatestAnnotation(annotations);
+  const currentAnnotation = getLatestAnnotation(imageStore.annotations);
   if (!currentAnnotation) return;
 
   if (currentAnnotation.height === 0 || currentAnnotation.width === 0) {
-    await removeAnnotation(
-      currentAnnotation.id,
-      annotator,
-      annotations,
-      imageStore,
-      true,
-    );
+    await removeAnnotation({
+      id: currentAnnotation.id,
+      annotator: annotator,
+      imageStore: imageStore,
+      isNoVolume: true,
+    });
     return;
   }
 
-  await adjustAnnotation(event.target, currentAnnotation, imageStore);
+  adjustAnnotation(annotator, currentAnnotation, imageStore);
 
   if (annotator.transformer.nodes().length == 0)
     annotator.innerToolBox.updateAnnotation(currentAnnotation);
@@ -96,13 +93,17 @@ const stopEditAnnotationVolume = async (
   annotator.innerToolBox.show(event.evt);
 };
 
-async function removeAnnotation(
-  id: string,
-  annotator: UnwrapNestedRefs<Annotator> & object,
-  annotations: Annotation[],
-  imageStore: ReturnType<typeof useImageStore>,
+async function removeAnnotation({
+  id,
+  annotator,
+  imageStore,
   isNoVolume = false,
-) {
+}: {
+  id: string;
+  annotator: UnwrapNestedRefs<Annotator> & object;
+  imageStore: ReturnType<typeof useImageStore>;
+  isNoVolume?: boolean;
+}) {
   const rect = annotator.stage.findOne(`#${id}`);
   if (!rect) return;
 
@@ -111,30 +112,42 @@ async function removeAnnotation(
   annotator.transformer.nodes([]);
 
   annotator.innerToolBox.hide();
-  const targetIndex = annotations.findIndex((item) => item.id === id);
+  const targetIndex = imageStore.annotations.findIndex(
+    (item) => item.id === id,
+  );
   if (targetIndex === -1) return;
-  annotations.splice(targetIndex, 1);
-  if (annotations.length === 0) return;
-  annotator.innerToolBox.updateAnnotation(annotations.at(-1)!);
+  imageStore.annotations.splice(targetIndex, 1);
+  if (imageStore.annotations.length === 0) return;
+  annotator.innerToolBox.updateAnnotation(imageStore.annotations.at(-1)!);
   if (isNoVolume) return;
   await imageStore.deleteDetection(id);
 }
 
-async function adjustAnnotation(
-  node: Node,
+function adjustAnnotation(
+  annotator: UnwrapNestedRefs<Annotator> & object,
   currentAnnotation: Annotation,
   imageStore: ReturnType<typeof useImageStore>,
 ) {
+  const annotationNode = annotator.stage.findOne(
+    (node: Node) =>
+      node.attrs.id === currentAnnotation.id && node.getClassName() === 'Rect',
+  );
+
+  console.log('annotationNode', annotationNode);
+
+  if (!annotationNode) return;
   const {
     x: nodeX,
     y: nodeY,
     width: shapeWidth,
     height: shapeHeight,
-  } = node.attrs;
+  } = annotationNode.attrs;
+
   if (shapeWidth < 0) {
     const newX = nodeX + shapeWidth;
     const newWidth = Math.abs(shapeWidth);
-    node.setAttrs({ x: newX, width: newWidth });
+    console.log('newX', newX, 'newWidth', newWidth);
+    annotationNode.setAttrs({ x: newX, width: newWidth });
     currentAnnotation.x = newX;
     currentAnnotation.width = newWidth;
   }
@@ -142,11 +155,28 @@ async function adjustAnnotation(
   if (shapeHeight < 0) {
     const newY = nodeY + shapeHeight;
     const newHeight = Math.abs(shapeHeight);
-    node.setAttrs({ y: newY, height: newHeight });
+    annotationNode.setAttrs({ y: newY, height: newHeight });
     currentAnnotation.y = newY;
     currentAnnotation.height = newHeight;
   }
-  await imageStore.updateDetection(currentAnnotation);
+
+  // save into store
+  imageStore.annotations.forEach((item) => {
+    if (item.id === currentAnnotation.id) {
+      item.x = currentAnnotation.x;
+      item.y = currentAnnotation.y;
+      item.width = currentAnnotation.width;
+      item.height = currentAnnotation.height;
+    }
+  });
+
+  console.log(
+    imageStore.annotations.map((item) => {
+      if (item.id === currentAnnotation.id) {
+        return item;
+      }
+    }),
+  );
 }
 // drag
 const startDragAnnotation = (
@@ -174,12 +204,11 @@ const stopDragAnnotation = async (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
   annotations: Annotation[],
-  imageStore: ReturnType<typeof useImageStore>,
 ) => {
   const { id, x, y, height, width } = event.target.attrs;
   const { height: stageHeight, width: stageWidth } = annotator.stageConfig;
   const currentAnnotation = getAnnotationById(id, annotations);
-
+  console.log(currentAnnotation);
   // check if the annotation is out of the stage
   if (!currentAnnotation) return;
   if (currentAnnotation.y < 0) {
@@ -202,7 +231,6 @@ const stopDragAnnotation = async (
   }
 
   annotator.innerToolBox.show(event.evt);
-  await imageStore.updateDetection(currentAnnotation);
 };
 
 // resize
@@ -230,7 +258,6 @@ const stopResizeAnnotation = async (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
   annotations: Annotation[],
-  imageStore: ReturnType<typeof useImageStore>,
 ) => {
   const {
     id: eventId,
@@ -256,7 +283,6 @@ const stopResizeAnnotation = async (
     scaleY: 1,
   });
   annotator.innerToolBox.show(event.evt);
-  await imageStore.updateDetection(currentAnnotation);
 };
 
 function updateTransformerContent(
@@ -270,8 +296,31 @@ function updateTransformerContent(
   annotator.innerToolBox.show(evt);
 }
 
+const leaveAnnotateRange = (
+  annotator: UnwrapNestedRefs<Annotator> & object,
+  imageStore: ReturnType<typeof useImageStore>,
+) => {
+  if (annotator.mode !== 'add') return;
+  if (!annotator.isAnnotating) return;
+  annotator.isAnnotating = false;
+
+  const latestAnnotation = getLatestAnnotation(imageStore.annotations);
+  if (!latestAnnotation) return;
+
+  const mousePos = annotator.stage.getPointerPosition() as Vector2d;
+  const stageConfig = annotator.stageConfig;
+  if (mousePos.x >= stageConfig.width)
+    latestAnnotation.width = stageConfig.width - latestAnnotation.x;
+  if (mousePos.y >= stageConfig.height)
+    latestAnnotation.height = stageConfig.height - latestAnnotation.y;
+
+  adjustAnnotation(annotator, latestAnnotation, imageStore);
+  annotator.innerToolBox.hide();
+};
+
 export {
   createAnnotation,
+  leaveAnnotateRange,
   startEditAnnotationVolume,
   stopEditAnnotationVolume,
   removeAnnotation,

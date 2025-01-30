@@ -21,6 +21,7 @@ import {
   stopDragAnnotation,
   stopEditAnnotationVolume,
   stopResizeAnnotation,
+  leaveAnnotateRange,
 } from 'src/service/annotation.ts';
 
 const route = useRoute();
@@ -72,8 +73,6 @@ const initAnnotator = async (
   }
   loading.value = false;
 };
-
-const leaveAnnotateRange = () => {};
 
 // resize layer
 const wheelResizeLayer = (event: KonvaPointerEvent) => {
@@ -137,12 +136,11 @@ async function handleKeyDownEvent(event: KeyboardEvent) {
     case 'DEL':
       if (annotations.value.length === 0) return;
       if (annotator.innerToolBox.getAnnotationId() === '') return;
-      await removeAnnotation(
-        annotator.innerToolBox.getAnnotationId(),
-        annotator,
-        annotations.value,
-        imageStore,
-      );
+      await removeAnnotation({
+        id: annotator.innerToolBox.getAnnotationId(),
+        annotator: annotator,
+        imageStore: imageStore,
+      });
       break;
     case 'Z':
       resetLayerPosition();
@@ -204,22 +202,15 @@ function addAlpha(color: string, opacity: number) {
           @mousemove="startEditAnnotationVolume(annotator, annotations)"
           @mouseup="
             (event: KonvaPointerEvent) =>
-              stopEditAnnotationVolume(
-                event,
-                annotator,
-                annotations,
-                imageStore,
-              )
+              stopEditAnnotationVolume(event, annotator, imageStore)
           "
-          @mouseleave="leaveAnnotateRange"
+          @mouseleave="leaveAnnotateRange(annotator, imageStore)"
           @wheel="wheelResizeLayer"
           @dragmove="dragLayer"
         >
           <v-image
             :config="annotator.imageConfig"
-            @mousedown="
-              createAnnotation(annotator, imageId, annotations, imageStore)
-            "
+            @mousedown="createAnnotation(annotator, imageId, annotations)"
           />
           <v-group
             v-for="item in annotations"
@@ -242,16 +233,11 @@ function addAlpha(color: string, opacity: number) {
               "
               @dragend="
                 (event: KonvaPointerEvent) =>
-                  stopDragAnnotation(event, annotator, annotations, imageStore)
+                  stopDragAnnotation(event, annotator, annotations)
               "
               @transformend="
                 (event: KonvaPointerEvent) =>
-                  stopResizeAnnotation(
-                    event,
-                    annotator,
-                    annotations,
-                    imageStore,
-                  )
+                  stopResizeAnnotation(event, annotator, annotations)
               "
             />
           </v-group>
