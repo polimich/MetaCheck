@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { Bbox, Detection, Image } from 'src/stores';
 import { axios, axiosErrorHandler } from 'src/api/index';
 import { Annotation } from 'src/service/annotation.ts';
+import { getAnnotationColor } from 'utils';
 
 export const useImageStore = defineStore('images', () => {
   const image = ref<Image>();
@@ -80,6 +81,8 @@ export const useImageStore = defineStore('images', () => {
     annotation.last_access = detection.last_access;
     annotation.deleted = detection.deleted;
     annotation.image_id = detection.image_id;
+    annotation.type = detection.type;
+    annotation.color = getAnnotationColor(detection.type);
     return annotation;
   };
 

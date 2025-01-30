@@ -8,18 +8,19 @@ defineOptions({
 
 const linksList: NavLinkProps[] = [
   {
-    title: 'Main',
-    icon: 'school',
-    link: '/',
-  },
-  {
     title: 'Collections',
     icon: 'code',
     link: '/collections',
   },
+  {
+    title: 'Dev',
+    icon: 'code',
+    link: '/dev',
+  },
 ];
 
 const leftDrawerOpen = ref(false);
+console.log(leftDrawerOpen.value);
 
 function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value;
@@ -42,7 +43,7 @@ function toggleLeftDrawer() {
       </q-toolbar>
     </q-header>
 
-    <q-drawer v-model="leftDrawerOpen" show-if-above bordered>
+    <q-drawer v-model="leftDrawerOpen" bordered>
       <q-list>
         <q-item-label header> Menu </q-item-label>
         <NavLink v-for="link in linksList" :key="link.title" v-bind="link" />

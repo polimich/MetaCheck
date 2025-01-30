@@ -173,11 +173,15 @@ watch(dataLoaded, async () => {
 const save = async () => {
   await imageStore.createOrUpdateDetections(imageId);
 };
+
+function addAlpha(color: string, opacity: number) {
+  // coerce values so it is between 0 and 1.
+  var _opacity = Math.round(Math.min(Math.max(opacity ?? 1, 0), 1) * 255);
+  return color + _opacity.toString(16).toUpperCase();
+}
 </script>
 
 <template>
-  <!--  <q-img :src="getRasterImage(imageId)" id="img" />-->
-
   <div class="full-width row wrap container">
     <div
       class="annotator"
@@ -229,9 +233,8 @@ const save = async () => {
                 y: item.y,
                 width: item.width,
                 height: item.height,
-                stroke: '#000000',
                 draggable: true,
-                fill: 'rgba(0,0,0,0.3)',
+                fill: addAlpha(item.color, 0.3),
               }"
               @dragmove="
                 (event: KonvaPointerEvent) =>

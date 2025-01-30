@@ -20,6 +20,7 @@ export class Annotation {
   last_change = Date.now().toString();
   last_access = Date.now().toString();
   deleted = false;
+  color = '';
 }
 
 const createAnnotation = async (
@@ -37,7 +38,7 @@ const createAnnotation = async (
   newAnnotation.x = x > 0 ? x : 0;
   newAnnotation.y = y > 0 ? y : 0;
   annotations.push(newAnnotation);
-  await imageStore.createOrUpdateDetections(imageId);
+  await imageStore.createDetection(newAnnotation);
   annotator.innerToolBox.updateAnnotation(newAnnotation);
   annotator.isAnnotating = true;
 };
@@ -87,7 +88,7 @@ const stopEditAnnotationVolume = async (
     return;
   }
 
-  adjustAnnotation(event.target, currentAnnotation, imageStore);
+  await adjustAnnotation(event.target, currentAnnotation, imageStore);
 
   if (annotator.transformer.nodes().length == 0)
     annotator.innerToolBox.updateAnnotation(currentAnnotation);
@@ -119,7 +120,7 @@ async function removeAnnotation(
   await imageStore.deleteDetection(id);
 }
 
-function adjustAnnotation(
+async function adjustAnnotation(
   node: Node,
   currentAnnotation: Annotation,
   imageStore: ReturnType<typeof useImageStore>,
@@ -145,7 +146,7 @@ function adjustAnnotation(
     currentAnnotation.y = newY;
     currentAnnotation.height = newHeight;
   }
-  imageStore.updateDetection(currentAnnotation);
+  await imageStore.updateDetection(currentAnnotation);
 }
 // drag
 const startDragAnnotation = (
@@ -169,7 +170,7 @@ function getAnnotationById(
   return annotations.find((item) => item.id === id);
 }
 
-const stopDragAnnotation = (
+const stopDragAnnotation = async (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
   annotations: Annotation[],
@@ -201,7 +202,7 @@ const stopDragAnnotation = (
   }
 
   annotator.innerToolBox.show(event.evt);
-  imageStore.updateDetection(currentAnnotation);
+  await imageStore.updateDetection(currentAnnotation);
 };
 
 // resize

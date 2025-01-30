@@ -50,7 +50,7 @@ class Annotator {
   transformer: Transformer = new Transformer();
   transformerConfig = {
     id: 'transformer',
-    rotateEnabled: true,
+    rotateEnabled: false,
     enabledAnchors: [
       'top-left',
       'top-center',

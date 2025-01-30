@@ -8,3 +8,20 @@ export const getPreviewImage = (imageId: string) => {
 export const getRasterImage = (imageId: string) => {
   return imageRasterUrl + imageId;
 };
+
+type ColorMap = {
+  [key: string]: string;
+};
+
+const colorMap: ColorMap = {
+  kapitola: '#FF0000',
+  jine_cislo: '#00FF00',
+  cislo_strany: '#0000FF',
+  edited: '#FF00FF',
+  edited2: '#234678',
+};
+
+export const getAnnotationColor = (type: string) => {
+  const jsonKey = type.split(' ').join('_');
+  return colorMap[jsonKey] || '#000000';
+};

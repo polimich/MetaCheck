@@ -137,7 +137,7 @@ export const useCollectionStore = defineStore('collections', () => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      await axios.post('collection/import', formData, {
+      await axios.post('collection/import_yolo', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
