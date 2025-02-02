@@ -257,9 +257,6 @@ function addAlpha(color: string, opacity: number) {
   min-width: 100%;
   max-width: 100%;
 }
-.q-page-container {
-  height: 100vh;
-}
 .container {
   height: 100%;
 }

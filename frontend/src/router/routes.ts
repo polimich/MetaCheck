@@ -11,6 +11,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('pages/CollectionsPage.vue'),
       },
       {
+        path: 'new',
+        name: 'new',
+        component: () => import('pages/NewLabelSystemPage.vue'),
+      },
+
+      {
         path: 'collections',
         name: 'collections',
         component: () => import('pages/CollectionsPage.vue'),

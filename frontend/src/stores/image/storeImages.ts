@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { Bbox, Detection, Image } from 'src/stores';
+import { Bbox, Detection, DetectionType, Image } from 'src/stores';
 import { axios, axiosErrorHandler } from 'src/api/index';
 import { Annotation } from 'src/service/annotation.ts';
 import { getAnnotationColor } from 'utils';
@@ -10,6 +10,7 @@ export const useImageStore = defineStore('images', () => {
   const detections = ref<Detection[]>();
   const loading = ref(false);
   const annotations = ref<Annotation[]>([]);
+  const detectionTypes = ref<DetectionType[]>([]);
 
   const init = () => {
     return;
@@ -32,6 +33,7 @@ export const useImageStore = defineStore('images', () => {
       const { data } = await axios.get(`/image/detections/${imageId}`);
       detections.value = data;
       annotations.value = detections.value?.map(detectionToAnnotation) || [];
+      await loadDetectionTypes();
     } catch (e) {
       axiosErrorHandler(e);
     } finally {
@@ -151,6 +153,18 @@ export const useImageStore = defineStore('images', () => {
     }
   };
 
+  const loadDetectionTypes = async () => {
+    loading.value = true;
+    try {
+      const { data } = await axios.get('/detection_types');
+      detectionTypes.value = data;
+    } catch (e) {
+      axiosErrorHandler(e);
+    } finally {
+      loading.value = false;
+    }
+  };
+
   return {
     image,
     detections,
@@ -158,6 +172,7 @@ export const useImageStore = defineStore('images', () => {
     init,
     loadImage,
     loadDetections,
+    loadDetectionTypes,
     createOrUpdateDetections,
     deleteDetection,
     updateDetection,

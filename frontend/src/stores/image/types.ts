@@ -47,3 +47,9 @@ export interface Bbox {
   width: number;
   height: number;
 }
+
+export interface DetectionType {
+  id: string;
+  name: string;
+  color: string;
+}

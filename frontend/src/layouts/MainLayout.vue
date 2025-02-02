@@ -28,7 +28,7 @@ function toggleLeftDrawer() {
 </script>
 
 <template>
-  <q-layout view="hHh lpR fFf">
+  <q-layout view="hHh lpR fFf" class="fullscreen">
     <q-header elevated>
       <q-toolbar>
         <q-btn
