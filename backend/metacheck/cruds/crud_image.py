@@ -119,7 +119,6 @@ async def update_or_create_image_detections(
                 for detection_update in detection_updates
                 if detection_update.id in db_image_detection_ids
             ]
-            logger.info(valid_detection_updates)
             await update_all(db, valid_detection_updates, model.Detection)
             new_detection_updates = [
                 detection_update

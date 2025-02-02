@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import numpy as np
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Column, Table
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -41,6 +41,13 @@ class MyTableMixin:
     deleted: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
 
 
+class DetectionType(MyTableMixin, Base):
+    __tablename__ = "detection_types"
+    name: Mapped[str] = mapped_column(String(300), nullable=False)
+    color: Mapped[str] = mapped_column(String(7), nullable=False, default="")
+    display_name: Mapped[str] = mapped_column(String(300), nullable=False)
+
+
 class Detection(MyTableMixin, Base):
     __tablename__ = "detections"
     image_id: Mapped[uuid.UUID] = mapped_column(
@@ -48,10 +55,65 @@ class Detection(MyTableMixin, Base):
     )
     image: Mapped["Image"] = relationship(viewonly=True)
 
-    type: Mapped[str] = mapped_column(nullable=False)
+    type_id: Mapped[str] = mapped_column(
+        ForeignKey("detection_types.id"), nullable=False
+    )
+    type: Mapped["DetectionType"] = relationship(viewonly=True)
     bbox: Mapped[str] = mapped_column(nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=True)
     annotated: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
+
+    # volumePublishers: WriteOnlyMapped[List["VolumePublishers"]] = relationship(
+    #     "Volume", secondary="volume_publishers", back_populates="detections"
+    # )
+    #
+    # volumeManufacturePublishers: WriteOnlyMapped[
+    #     List["VolumeManufacturePublishers"]
+    # ] = relationship(
+    #     "Volume",
+    #     secondary="volume_manufacture_publishers",
+    #     back_populates="detections",
+    # )
+    #
+    # volumeManufacturePlaceTerms: WriteOnlyMapped[
+    #     List["VolumeManufacturePlaceTerms"]
+    # ] = relationship(
+    #     "Volume",
+    #     secondary="volume_manufacture_place_terms",
+    #     back_populates="detections",
+    # )
+    #
+    # volumeAuthors: WriteOnlyMapped[List["VolumeAuthors"]] = relationship(
+    #     "Volume", secondary="volume_authors", back_populates="detections"
+    # )
+    #
+    # volumeIllustrators: WriteOnlyMapped[List["VolumeIllustrators"]] = relationship(
+    #     "Volume", secondary="volume_illustrators", back_populates="detections"
+    # )
+    #
+    # volumeTranslators: WriteOnlyMapped[List["VolumeTranslators"]] = relationship(
+    #     "Volume", secondary="volume_translators", back_populates="detections"
+    # )
+    #
+    # volumeEditors: WriteOnlyMapped[List["VolumeEditors"]] = relationship(
+    #     "Volume", secondary="volume_editors", back_populates="detections"
+    # )
+    #
+    # issuePublishers: WriteOnlyMapped[List["IssuePublishers"]] = relationship(
+    #     "Issue", secondary="issue_publishers", back_populates="detections"
+    # )
+    #
+    # issueManufacturers: WriteOnlyMapped[List["IssueManufacturers"]] = relationship(
+    #     "Issue", secondary="issue_manufactures", back_populates="detections"
+    # )
+    #
+    # issueRedaktors: WriteOnlyMapped[List["IssueRedaktors"]] = relationship(
+    #     "Issue", secondary="issue_redaktors", back_populates="detections"
+    # )
+    #
+    # articleAuthors: WriteOnlyMapped[List["ArticleAuthors"]] = relationship(
+    #     "Article", secondary="article_authors", back_populates="detections"
+    # )
 
     @property
     def np_bbox(self):
@@ -137,13 +199,6 @@ class Collection(MyTableMixin, Base):
     preview_image_width: Mapped[int] = mapped_column(default=524, nullable=False)
 
 
-class MetaDetection(MyTableMixin, Base):
-    __tablename__ = "meta_detections"
-
-    confidence: Mapped[float] = mapped_column(nullable=True)
-    value: Mapped[str] = mapped_column(default="", nullable=False)
-
-
 class PageTypeDetection(MyTableMixin, Base):
     __tablename__ = "page_type_detections"
 
@@ -161,17 +216,66 @@ class Title(MyTableMixin, Base):
     )
 
     title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    title: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Title.title_id"
-    )
+    title: Mapped[Optional["Detection"]] = relationship(foreign_keys="Title.title_id")
     sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+    sub_title: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Title.sub_title_id"
     )
+
+
+volume_publishers_table = Table(
+    "volume_publishers_table",
+    Base.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+volume_manufacture_publishers_table = Table(
+    "volume_manufacture_publishers_table",
+    Base.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+volume_manufacture_place_terms_table = Table(
+    "volume_manufacture_place_terms_table",
+    Base.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+volume_authors_table = Table(
+    "volume_authors_table",
+    Base.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+volume_illustrators_table = Table(
+    "volume_illustrators_table",
+    Base.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+volume_translators_table = Table(
+    "volume_translators_table",
+    Base.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+
+volume_editors_table = Table(
+    "volume_editors_table",
+    Base.metadata,
+    Column("volume_id", ForeignKey("volumes.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
 
 
 class Volume(MyTableMixin, Base):
@@ -183,120 +287,120 @@ class Volume(MyTableMixin, Base):
     collection: Mapped["Collection"] = relationship(
         back_populates="volumes", foreign_keys="Volume.collection_id"
     )
+    periodical: Mapped[bool] = mapped_column(nullable=False, default=False)
 
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(index=True, nullable=True)
 
     part_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    part_number: Mapped[Optional["MetaDetection"]] = relationship(
+    part_number: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.part_number_id"
     )
 
     part_name_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    part_name: Mapped[Optional["MetaDetection"]] = relationship(
+    part_name: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.part_name_id"
     )
 
     date_issued_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    date_issued: Mapped[Optional["MetaDetection"]] = relationship(
+    date_issued: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.date_issued_id"
     )
 
     title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    title: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.title_id"
-    )
+    title: Mapped[Optional["Detection"]] = relationship(foreign_keys="Volume.title_id")
 
     sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+    sub_title: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.sub_title_id"
     )
 
     edition_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    edition: Mapped[Optional["MetaDetection"]] = relationship(
+    edition: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.edition_id"
     )
 
     place_term_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    place_term: Mapped[Optional["MetaDetection"]] = relationship(
+    place_term: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.place_term_id"
     )
 
-    publisher_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    publisher: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.publisher_id"
+    publishers: WriteOnlyMapped[List[Detection]] = relationship(
+        secondary=volume_publishers_table
     )
 
-    manufacture_publisher_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    manufacture_publisher: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.manufacture_publisher_id"
+    manufacture_publishers: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=volume_manufacture_publishers_table,
     )
 
-    manufacture_place_term_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    manufacture_place_term: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.manufacture_place_term_id"
+    manufacture_place_terms: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=volume_manufacture_place_terms_table
     )
 
-    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    author: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.author_id"
+    authors: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=volume_authors_table
     )
 
-    illustrator_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    illustrator: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.illustrator_id"
+    illustrators: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=volume_illustrators_table
     )
 
-    translator_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    translator: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.translator_id"
+    translators: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=volume_translators_table
     )
 
-    editor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    editor: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Volume.editor_id"
+    editors: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=volume_editors_table
     )
 
     series_name_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    series_name: Mapped[Optional["MetaDetection"]] = relationship(
+    series_name: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.series_name_id"
     )
 
     series_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    series_number: Mapped[Optional["MetaDetection"]] = relationship(
+    series_number: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Volume.series_number_id"
     )
+
+
+issue_publishers_table = Table(
+    "issue_publishers_table",
+    Base.metadata,
+    Column("issue_id", ForeignKey("issues.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+issue_manufactures_table = Table(
+    "issue_manufactures_table",
+    Base.metadata,
+    Column("issue_id", ForeignKey("issues.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
+
+issue_redaktors_table = Table(
+    "issue_redaktors_table",
+    Base.metadata,
+    Column("issue_id", ForeignKey("issues.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
 
 
 class Issue(MyTableMixin, Base):
@@ -310,59 +414,48 @@ class Issue(MyTableMixin, Base):
     parent_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
 
     part_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    part_number: Mapped[Optional["MetaDetection"]] = relationship(
+    part_number: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Issue.part_number_id"
     )
 
     date_issued_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    date_issued: Mapped[Optional["MetaDetection"]] = relationship(
+    date_issued: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Issue.date_issued_id"
     )
 
     title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    title: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Issue.title_id"
-    )
+    title: Mapped[Optional["Detection"]] = relationship(foreign_keys="Issue.title_id")
 
     sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+    sub_title: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Issue.sub_title_id"
     )
 
     place_term_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    place_term: Mapped[Optional["MetaDetection"]] = relationship(
+    place_term: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Issue.place_term_id"
     )
 
-    publisher_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    publisher: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Issue.publisher_id"
+    publishers: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=issue_publishers_table
     )
 
-    manufacture_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    manufacture: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Issue.manufacture_id"
+    manufactures: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=issue_manufactures_table
     )
 
-    redaktor_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    redaktor: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Issue.redaktor_id"
+    redaktors: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=issue_redaktors_table
     )
 
 
@@ -380,9 +473,9 @@ class Page(MyTableMixin, Base):
     page_index: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     page_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    page_number: Mapped[Optional["MetaDetection"]] = relationship(
+    page_number: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Page.page_number_id"
     )
 
@@ -410,25 +503,31 @@ class Chapter(MyTableMixin, Base):
     page_index_end: Mapped[int] = mapped_column(nullable=False)
 
     title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    title: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Chapter.title_id"
-    )
+    title: Mapped[Optional["Detection"]] = relationship(foreign_keys="Chapter.title_id")
 
     sub_title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    sub_title: Mapped[Optional["MetaDetection"]] = relationship(
+    sub_title: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Chapter.sub_title_id"
     )
 
     part_number_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    part_number: Mapped[Optional["MetaDetection"]] = relationship(
+    part_number: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Chapter.part_number_id"
     )
+
+
+article_authors_table = Table(
+    "article_authors_table",
+    Base.metadata,
+    Column("article_id", ForeignKey("articles.id"), index=True),
+    Column("detection_id", ForeignKey("detections.id"), index=True),
+)
 
 
 class Article(MyTableMixin, Base):
@@ -447,30 +546,25 @@ class Article(MyTableMixin, Base):
     page_index_end: Mapped[int] = mapped_column(nullable=False)
 
     title_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    title: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Article.title_id"
-    )
+    title: Mapped[Optional["Detection"]] = relationship(foreign_keys="Article.title_id")
 
-    author_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
-    )
-    author: Mapped[Optional["MetaDetection"]] = relationship(
-        foreign_keys="Article.author_id"
+    authors: WriteOnlyMapped[List["Detection"]] = relationship(
+        secondary=article_authors_table
     )
 
     abstract_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    abstract: Mapped[Optional["MetaDetection"]] = relationship(
+    abstract: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Article.abstract_id"
     )
 
     keywords_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("meta_detections.id"), index=True, nullable=True
+        ForeignKey("detections.id"), index=True, nullable=True
     )
-    keywords: Mapped[Optional["MetaDetection"]] = relationship(
+    keywords: Mapped[Optional["Detection"]] = relationship(
         foreign_keys="Article.keywords_id"
     )
 

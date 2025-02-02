@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -75,10 +75,37 @@ class BaseEntity(BaseModel):
 
 # DETECTION
 #################################################################
+class DetectionTypeNew(BaseModel):
+    id: UUID
+    name: str
+    color: str
+    display_name: str
+
+
+class DetectionType(DetectionTypeNew):
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
+
+    deleted: bool
+
+    class Config:
+        from_attributes = True
+
+
+class DetectionTypeUpdate(BaseModel):
+    id: UUID
+    name: Optional[str] = None
+    color: Optional[str] = None
+    display_color: Optional[str] = None
+
+    deleted: Optional[bool] = None
+
+
 class DetectionNew(BaseModel):
     id: UUID
 
-    type: str
+    type_id: UUID
     bbox: str
 
     confidence: Optional[float] = None
@@ -88,6 +115,7 @@ class Detection(DetectionNew):
     image_id: UUID
 
     annotated: bool = False
+    type: Optional[DetectionType] = None
 
     deleted: bool
 
@@ -208,36 +236,6 @@ class CollectionUpdate(BaseModel):
 #################################################################
 
 
-# MetaDetection
-#################################################################
-
-
-class MetaDetectionNew(BaseModel):
-    id: UUID
-    confidence: Optional[float] = None
-    value: str
-
-
-class MetaDetection(MetaDetectionNew):
-    created_date: datetime
-    last_change: datetime
-    last_access: datetime
-
-    deleted: bool = False
-
-    class Config:
-        from_attributes = True
-
-
-class MetaDetectionUpdate(BaseModel):
-    id: UUID
-    confidence: Optional[float] = None
-    value: Optional[str] = None
-
-    last_access: Optional[datetime] = None
-    deleted: Optional[bool] = None
-
-
 # PageTypeDetection
 #################################################################
 class PageTypeDetectionNew(BaseModel):
@@ -278,8 +276,8 @@ class TitleNew(BaseModel):
 
 class Title(TitleNew):
 
-    title: Optional[MetaDetection] = None
-    sub_title: Optional[MetaDetection] = None
+    title: Optional[Detection] = None
+    sub_title: Optional[Detection] = None
     collection: Optional[Collection] = None
     created_date: datetime
     last_change: datetime
@@ -316,36 +314,30 @@ class VolumeNew(BaseModel):
     sub_title_id: Optional[UUID] = None
     edition_id: Optional[UUID] = None
     place_term_id: Optional[UUID] = None
-    publisher_id: Optional[UUID] = None
-    manufacture_publisher_id: Optional[UUID] = None
-    manufacture_place_term_id: Optional[UUID] = None
-    author_id: Optional[UUID] = None
-    illustrator_id: Optional[UUID] = None
-    translator_id: Optional[UUID] = None
-    editor_id: Optional[UUID] = None
     series_name_id: Optional[UUID] = None
     series_number_id: Optional[UUID] = None
+
+    publishers: List[Detection] = []
+    manufacture_publishers: List[Detection] = []
+    manufacture_place_terms: List[Detection] = []
+    authors: List[Detection] = []
+    illustrators: List[Detection] = []
+    translators: List[Detection] = []
+    editors: List[Detection] = []
 
 
 class Volume(VolumeNew):
 
-    part_number: Optional[MetaDetection] = None
-    part_name: Optional[MetaDetection] = None
-    date_issued: Optional[MetaDetection] = None
+    part_number: Optional[Detection] = None
+    part_name: Optional[Detection] = None
+    date_issued: Optional[Detection] = None
 
-    title: Optional[MetaDetection] = None
-    sub_title: Optional[MetaDetection] = None
-    edition: Optional[MetaDetection] = None
-    place_term: Optional[MetaDetection] = None
-    publisher: Optional[MetaDetection] = None
-    manufacture_publisher: Optional[MetaDetection] = None
-    manufacture_place_term: Optional[MetaDetection] = None
-    author: Optional[MetaDetection] = None
-    illustrator: Optional[MetaDetection] = None
-    translator: Optional[MetaDetection] = None
-    editor: Optional[MetaDetection] = None
-    series_name: Optional[MetaDetection] = None
-    series_number: Optional[MetaDetection] = None
+    title: Optional[Detection] = None
+    sub_title: Optional[Detection] = None
+    edition: Optional[Detection] = None
+    place_term: Optional[Detection] = None
+    series_name: Optional[Detection] = None
+    series_number: Optional[Detection] = None
 
     created_date: datetime
     last_change: datetime
@@ -370,13 +362,13 @@ class VolumeUpdate(BaseModel):
     sub_title_id: Optional[UUID] = None
     edition_id: Optional[UUID] = None
     place_term_id: Optional[UUID] = None
-    publisher_id: Optional[UUID] = None
-    manufacture_publisher_id: Optional[UUID] = None
-    manufacture_place_term_id: Optional[UUID] = None
-    author_id: Optional[UUID] = None
-    illustrator_id: Optional[UUID] = None
-    translator_id: Optional[UUID] = None
-    editor_id: Optional[UUID] = None
+    publishers: Optional[List[Detection]] = None
+    manufacture_publishers: Optional[List[Detection]] = None
+    manufacture_place_terms: Optional[List[Detection]] = None
+    authors: Optional[List[Detection]] = None
+    illustrators: Optional[List[Detection]] = None
+    translators: Optional[List[Detection]] = None
+    editors: Optional[List[Detection]] = None
     series_name_id: Optional[UUID] = None
     series_number_id: Optional[UUID] = None
 
@@ -397,21 +389,19 @@ class IssueNew(BaseModel):
     title_id: Optional[UUID] = None
     sub_title_id: Optional[UUID] = None
     place_term_id: Optional[UUID] = None
-    publisher_id: Optional[UUID] = None
-    manufacture_id: Optional[UUID] = None
-    redaktor_id: Optional[UUID] = None
+
+    publishers: List[Detection] = []
+    manufactures: List[Detection] = []
+    redaktors: List[Detection] = []
 
 
 class Issue(IssueNew):
-    part_number: Optional[MetaDetection] = None
-    date_issued: Optional[MetaDetection] = None
+    part_number: Optional[Detection] = None
+    date_issued: Optional[Detection] = None
 
-    title: Optional[MetaDetection] = None
-    sub_title: Optional[MetaDetection] = None
-    place_term: Optional[MetaDetection] = None
-    publisher: Optional[MetaDetection] = None
-    manufacture: Optional[MetaDetection] = None
-    redaktor: Optional[MetaDetection] = None
+    title: Optional[Detection] = None
+    sub_title: Optional[Detection] = None
+    place_term: Optional[Detection] = None
 
     created_date: datetime
     last_change: datetime
@@ -434,9 +424,10 @@ class IssueUpdate(BaseModel):
     title_id: Optional[UUID] = None
     sub_title_id: Optional[UUID] = None
     place_term_id: Optional[UUID] = None
-    publisher_id: Optional[UUID] = None
-    manufacture_id: Optional[UUID] = None
-    redaktor_id: Optional[UUID] = None
+
+    publishers: Optional[List[Detection]] = None
+    manufactures: Optional[List[Detection]] = None
+    redaktors: Optional[List[Detection]] = None
 
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None
@@ -457,7 +448,7 @@ class PageNew(BaseModel):
 
 
 class Page(PageNew):
-    page_number: Optional[MetaDetection] = None
+    page_number: Optional[Detection] = None
     page_type: Optional[PageTypeDetection] = None
 
     created_date: datetime
@@ -502,9 +493,9 @@ class ChapterNew(BaseModel):
 
 class Chapter(ChapterNew):
     collection: Optional[Collection] = None
-    title: Optional[MetaDetection] = None
-    sub_title: Optional[MetaDetection] = None
-    part_number: Optional[MetaDetection] = None
+    title: Optional[Detection] = None
+    sub_title: Optional[Detection] = None
+    part_number: Optional[Detection] = None
 
     created_date: datetime
     last_change: datetime
@@ -542,16 +533,15 @@ class ArticleNew(BaseModel):
     page_index_end: Optional[int] = None
 
     title_id: Optional[UUID] = None
-    author_id: Optional[UUID] = None
+    authors: List[Detection] = []
     abstract_id: Optional[UUID] = None
     keywords_id: Optional[UUID] = None
 
 
 class Article(ArticleNew):
-    title: Optional[MetaDetection] = None
-    author: Optional[MetaDetection] = None
-    abstract: Optional[MetaDetection] = None
-    keywords: Optional[MetaDetection] = None
+    title: Optional[Detection] = None
+    abstract: Optional[Detection] = None
+    keywords: Optional[Detection] = None
 
     created_date: datetime
     last_change: datetime
@@ -571,7 +561,7 @@ class ArticleUpdate(BaseModel):
     page_index_end: Optional[int] = None
 
     title_id: Optional[UUID] = None
-    author_id: Optional[UUID] = None
+    authors: Optional[List[Detection]] = None
     abstract_id: Optional[UUID] = None
     keywords_id: Optional[UUID] = None
 

@@ -14,6 +14,10 @@ from db import model
 from metacheck.cruds import crud_collection, crud_general, crud_image
 from metacheck.database import get_async_session
 from metacheck.routes import collection_route
+from metacheck.routes.detection_type_routes import (
+    get_detection_types,
+    post_detection_type,
+)
 from metacheck.routes.image_routes import save_image, get_image
 from metacheck.schemas import base_objects
 from metacheck_common.config import config
@@ -76,8 +80,8 @@ async def get_collection_images(
     return await crud_collection.get_collection_images(db, collection_id)
 
 
-@collection_route.post("/import", tags=["Collection"])
-async def import_collection(
+@collection_route.post("/import_yolo", tags=["Import"])
+async def import_collection_yolo(
     file: UploadFile, db: AsyncSession = Depends(get_async_session)
 ):
     if "zip" not in file.content_type:
@@ -127,6 +131,8 @@ async def import_collection(
         images.sort()
         annotations.sort()
 
+        detection_types = await get_detection_types(db)
+
         # upload images
         for index, image in enumerate(images):
             image_id = uuid.uuid4()
@@ -154,6 +160,9 @@ async def import_collection(
                 y = float(y_normalized * image_height - height / 2)
 
                 bbox = f"{x};{y};{width};{height}"
+                if classes[class_id] not in detection_types:
+                    await post_detection_type()
+
                 detection = base_objects.DetectionNew(
                     id=uuid.uuid4(), type=classes[class_id], bbox=bbox
                 )
@@ -168,6 +177,17 @@ async def import_collection(
     except Exception as e:
         logger.exception(f"Failed to write file to disk. Path={zip_file_path}")
         raise HTTPException(status_code=500, detail="Failed to write file to disk.")
+
+
+@collection_route.post("/import_metakat", tags=["Import"])
+async def import_collection_metakat(
+    file: UploadFile, db: AsyncSession = Depends(get_async_session)
+):
+    if "json" not in file.content_type:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsuported file type - only json files are supported.",
+        )
 
 
 async def get_zip_path(collection_id: UUID):
