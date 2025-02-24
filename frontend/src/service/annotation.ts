@@ -4,7 +4,7 @@ import { Annotator } from 'src/service/annotator.ts';
 import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Container } from 'konva/lib/Container';
 import type { Node } from 'konva/lib/Node';
-import { useImageStore } from 'src/stores';
+import { DetectionType, useImageStore } from 'src/stores';
 import { Vector2d } from 'konva/lib/types';
 
 export class Annotation {
@@ -16,7 +16,8 @@ export class Annotation {
   height = 0;
   confidence = 0;
   annotated = false;
-  type = '';
+  type_id = '';
+  type = <DetectionType>{};
   created_date = Date.now().toString();
   last_change = Date.now().toString();
   last_access = Date.now().toString();
@@ -91,6 +92,7 @@ const stopEditAnnotationVolume = async (
     annotator.innerToolBox.updateAnnotation(currentAnnotation);
 
   annotator.innerToolBox.show(event.evt);
+  console.log('created anootoiaion: ', imageStore.annotations);
 };
 
 async function removeAnnotation({

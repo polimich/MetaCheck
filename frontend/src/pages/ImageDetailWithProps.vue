@@ -256,8 +256,6 @@ function addAlpha(color: string, opacity: number) {
         </v-layer>
       </v-stage>
     </div>
-  </div>
-  <div class="row">
     <q-btn @click="save" class="absolute top-0 right-0" icon="save">
       Save
     </q-btn>

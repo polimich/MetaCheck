@@ -33,3 +33,4 @@ export default store((/* { ssrContext } */) => {
 
 export * from './collection';
 export * from './image';
+export * from './detectionTypes';

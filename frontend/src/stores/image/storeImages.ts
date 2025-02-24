@@ -1,9 +1,14 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
-import { Bbox, Detection, DetectionType, Image } from 'src/stores';
+import { computed, ref } from 'vue';
+import {
+  Bbox,
+  Detection,
+  DetectionType,
+  DetectionUpdateDto,
+  Image,
+} from 'src/stores';
 import { axios, axiosErrorHandler } from 'src/api/index';
 import { Annotation } from 'src/service/annotation.ts';
-import { getAnnotationColor } from 'utils';
 
 export const useImageStore = defineStore('images', () => {
   const image = ref<Image>();
@@ -11,6 +16,12 @@ export const useImageStore = defineStore('images', () => {
   const loading = ref(false);
   const annotations = ref<Annotation[]>([]);
   const detectionTypes = ref<DetectionType[]>([]);
+
+  const getSortedAnnotations = computed(() => {
+    return annotations.value.toSorted((a, b) => {
+      return a.created_date > b.created_date ? -1 : 1;
+    });
+  });
 
   const init = () => {
     return;
@@ -31,7 +42,12 @@ export const useImageStore = defineStore('images', () => {
     loading.value = true;
     try {
       const { data } = await axios.get(`/image/detections/${imageId}`);
-      detections.value = data;
+
+      detections.value = await Promise.all(
+        data.map((detection: Detection) => loadDetectionType(detection)),
+      );
+
+      console.log(detections.value);
       annotations.value = detections.value?.map(detectionToAnnotation) || [];
       await loadDetectionTypes();
     } catch (e) {
@@ -39,6 +55,16 @@ export const useImageStore = defineStore('images', () => {
     } finally {
       loading.value = false;
     }
+  };
+
+  const loadDetectionType = async (detection: Detection) => {
+    try {
+      const { data } = await axios.get(`/detection_type/${detection.type_id}`);
+      detection.type = data;
+    } catch (e) {
+      axiosErrorHandler(e);
+    }
+    return detection;
   };
 
   const deleteDetection = async (detectionId: string) => {
@@ -83,8 +109,9 @@ export const useImageStore = defineStore('images', () => {
     annotation.last_access = detection.last_access;
     annotation.deleted = detection.deleted;
     annotation.image_id = detection.image_id;
+    annotation.type_id = detection.type_id;
     annotation.type = detection.type;
-    annotation.color = getAnnotationColor(detection.type);
+    annotation.color = detection.type.color;
     return annotation;
   };
 
@@ -93,9 +120,12 @@ export const useImageStore = defineStore('images', () => {
     return { x, y, width, height };
   };
 
-  const annotationsToDetections = (): Detection[] => {
-    const detections: Detection[] = [];
+  const annotationsToDetections = (): DetectionUpdateDto[] => {
+    const detections: DetectionUpdateDto[] = [];
     annotations.value.forEach((annotation) => {
+      //TODO: annotation type in new annotation
+      if (annotation.type_id === '')
+        annotation.type_id = detectionTypes.value[0].id;
       detections.push(annotationToDetection(annotation));
     });
     return detections;
@@ -105,7 +135,9 @@ export const useImageStore = defineStore('images', () => {
     return `${bbox.x};${bbox.y};${bbox.width};${bbox.height}`;
   };
 
-  const annotationToDetection = (annotation: Annotation): Detection => {
+  const annotationToDetection = (
+    annotation: Annotation,
+  ): DetectionUpdateDto => {
     const bbox: Bbox = {
       x: annotation.x,
       y: annotation.y,
@@ -115,7 +147,7 @@ export const useImageStore = defineStore('images', () => {
     return {
       id: annotation.id,
       image_id: annotation.image_id,
-      type: annotation.type,
+      type_id: annotation.type_id,
       bbox: objectToBbox(bbox),
       confidence: annotation.confidence,
       annotated: annotation.annotated,
@@ -129,10 +161,9 @@ export const useImageStore = defineStore('images', () => {
   const createOrUpdateDetections = async (imageId: string) => {
     loading.value = true;
     try {
-      await axios.post(
-        `/image/detections/${imageId}/create-or-update`,
-        annotationsToDetections(),
-      );
+      const data = annotationsToDetections();
+      console.log(data);
+      await axios.post(`/image/detections/${imageId}/create-or-update`, data);
     } catch (e) {
       axiosErrorHandler(e);
     } finally {
@@ -156,7 +187,7 @@ export const useImageStore = defineStore('images', () => {
   const loadDetectionTypes = async () => {
     loading.value = true;
     try {
-      const { data } = await axios.get('/detection_types');
+      const { data } = await axios.get('/detection_type');
       detectionTypes.value = data;
     } catch (e) {
       axiosErrorHandler(e);
@@ -177,5 +208,7 @@ export const useImageStore = defineStore('images', () => {
     deleteDetection,
     updateDetection,
     createDetection,
+
+    getSortedAnnotations,
   };
 });

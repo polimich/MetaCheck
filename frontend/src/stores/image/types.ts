@@ -31,7 +31,21 @@ export interface ImageAddDto {
 export interface Detection {
   id: string;
   image_id: string;
-  type: string;
+  type_id: string;
+  type: DetectionType;
+  bbox: string;
+  confidence: number;
+  annotated: boolean;
+  created_date: string;
+  last_change: string;
+  last_access: string;
+  deleted: boolean;
+}
+
+export interface DetectionUpdateDto {
+  id: string;
+  image_id: string;
+  type_id: string;
   bbox: string;
   confidence: number;
   annotated: boolean;
@@ -52,4 +66,5 @@ export interface DetectionType {
   id: string;
   name: string;
   color: string;
+  display_name: string;
 }
