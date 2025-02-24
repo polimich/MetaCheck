@@ -55,3 +55,11 @@ async def delete_detection_type(
 ):
     await crud_general.delete_obj(db, detection_type_id, model.DetectionType)
     return {"message": "Detection Type deleted."}
+
+
+async def get_detection_type_by_name(name: str, db):
+    detections = await get_detection_types(db)
+    for detection in detections:
+        if detection.name == name:
+            return detection
+    return None

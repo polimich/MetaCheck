@@ -56,6 +56,7 @@ async def create_image_detections(
 async def get_image_detections(
     db: AsyncSession, image_id: UUID, detection_ids: List[UUID] = None
 ) -> [base_objects.Detection]:
+
     try:
         async with db.begin():
             if detection_ids is None:

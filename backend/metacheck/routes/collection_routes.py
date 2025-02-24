@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import shutil
 import uuid
 import zipfile
@@ -17,6 +18,7 @@ from metacheck.routes import collection_route
 from metacheck.routes.detection_type_routes import (
     get_detection_types,
     post_detection_type,
+    get_detection_type_by_name,
 )
 from metacheck.routes.image_routes import save_image, get_image
 from metacheck.schemas import base_objects
@@ -131,8 +133,6 @@ async def import_collection_yolo(
         images.sort()
         annotations.sort()
 
-        detection_types = await get_detection_types(db)
-
         # upload images
         for index, image in enumerate(images):
             image_id = uuid.uuid4()
@@ -160,11 +160,23 @@ async def import_collection_yolo(
                 y = float(y_normalized * image_height - height / 2)
 
                 bbox = f"{x};{y};{width};{height}"
-                if classes[class_id] not in detection_types:
-                    await post_detection_type()
+                detection_types = await get_detection_types(db)
+                detection_types_names = [
+                    detection.name for detection in detection_types
+                ]
+                if classes[class_id] not in detection_types_names:
+                    new_detection_type = base_objects.DetectionTypeNew(
+                        id=uuid.uuid4(),
+                        name=classes[class_id],
+                        color=f"#{random.randint(0, 0xFFFFFF):06x}",
+                        display_name=classes[class_id].capitalize(),
+                    )
+                    await post_detection_type(new_detection_type, db)
+                    print(f"Added new detection type: {classes[class_id]}")
 
+                detection_type = await get_detection_type_by_name(classes[class_id], db)
                 detection = base_objects.DetectionNew(
-                    id=uuid.uuid4(), type=classes[class_id], bbox=bbox
+                    id=uuid.uuid4(), type_id=detection_type.id, bbox=bbox
                 )
                 detections.append(detection)
 

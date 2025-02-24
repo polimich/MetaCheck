@@ -115,7 +115,10 @@ class Detection(DetectionNew):
     image_id: UUID
 
     annotated: bool = False
-    type: Optional[DetectionType] = None
+
+    created_date: datetime
+    last_change: datetime
+    last_access: datetime
 
     deleted: bool
 
@@ -127,7 +130,7 @@ class DetectionUpdate(BaseModel):
     id: UUID
     image_id: Optional[UUID] = None
 
-    type: Optional[str] = None
+    type_id: Optional[UUID] = None
     bbox: Optional[str] = None
 
     deleted: Optional[bool] = None

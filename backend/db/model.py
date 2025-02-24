@@ -46,6 +46,9 @@ class DetectionType(MyTableMixin, Base):
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     color: Mapped[str] = mapped_column(String(7), nullable=False, default="")
     display_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    detections: Mapped[List["Detection"]] = relationship(
+        back_populates="type", foreign_keys="Detection.type_id"
+    )
 
 
 class Detection(MyTableMixin, Base):
@@ -55,10 +58,12 @@ class Detection(MyTableMixin, Base):
     )
     image: Mapped["Image"] = relationship(viewonly=True)
 
-    type_id: Mapped[str] = mapped_column(
+    type_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("detection_types.id"), nullable=False
     )
-    type: Mapped["DetectionType"] = relationship(viewonly=True)
+    type: Mapped["DetectionType"] = relationship(
+        back_populates="detections", foreign_keys="Detection.type_id"
+    )
     bbox: Mapped[str] = mapped_column(nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=True)
     annotated: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
