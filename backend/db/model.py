@@ -65,7 +65,7 @@ class Detection(MyTableMixin, Base):
         ForeignKey("detection_types.id"), nullable=False
     )
     type: Mapped["DetectionType"] = relationship(
-        back_populates="detections", foreign_keys="Detection.type_id"
+        back_populates="detections", foreign_keys="Detection.type_id", lazy="joined"
     )
     bbox: Mapped[str] = mapped_column(nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=True)

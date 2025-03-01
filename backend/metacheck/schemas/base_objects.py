@@ -113,7 +113,7 @@ class DetectionNew(BaseModel):
 
 class Detection(DetectionNew):
     image_id: UUID
-
+    type: DetectionType
     annotated: bool = False
 
     created_date: datetime

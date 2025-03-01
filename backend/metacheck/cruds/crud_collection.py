@@ -36,9 +36,9 @@ async def get_collection_with_all_metadata(
             db_collection = await db.scalar(
                 select(model.Collection)
                 .options(
-                    joinedload(model.Collection.images).joinedload(
-                        model.Image.detections
-                    ),
+                    joinedload(model.Collection.images)
+                    .joinedload(model.Image.detections)
+                    .joinedload(model.Detection.type),
                     joinedload(model.Collection.titles),
                     joinedload(model.Collection.volumes),
                     joinedload(model.Collection.issues),
@@ -50,13 +50,19 @@ async def get_collection_with_all_metadata(
             collection = base_objects.CollectionWithMetadata(
                 **model.orm2dict(db_collection)
             )
+            print(db_collection.images[0].detections[0].type.__str__())
             loaded_images = []
             for image in db_collection.images:
                 loaded_images.append(
                     base_objects.Image(
                         **model.orm2dict(image),
                         detections=[
-                            base_objects.Detection(**model.orm2dict(detection))
+                            base_objects.Detection(
+                                **model.orm2dict(detection),
+                                type=base_objects.DetectionType(
+                                    **model.orm2dict(detection.type)
+                                ),
+                            )
                             for detection in image.detections
                         ],
                     )
@@ -102,7 +108,7 @@ async def check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id:
             db_image = await db.execute(
                 select(model.Image).filter(model.Image.id == image_id)
             )
-            db_image = db_image.scalar_one()
+            db_image = db_image.unique().scalar_one()
             await db.execute(
                 update(model.Collection)
                 .where(

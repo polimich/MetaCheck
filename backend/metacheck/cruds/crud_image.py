@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import exc, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from db import model
 from metacheck.cruds.crud_aux import update_all
@@ -26,7 +27,7 @@ async def is_image_duplicate(db: AsyncSession, collection_id, img_hash):
                 .where(model.Image.deleted == False)
             )
             result = await db.execute(stm)
-            db_image = result.scalar_one_or_none()
+            db_image = result.unique().scalar_one_or_none()
             if not db_image:
                 return None
             return base_objects.Image.model_validate(db_image)
@@ -146,13 +147,18 @@ async def get_image(db: AsyncSession, image_id: UUID) -> base_objects.Image:
     try:
         async with db.begin():
             db_image = await db.scalar(
-                select(model.Image).filter(model.Image.id == image_id)
+                select(model.Image)
+                .options(
+                    joinedload(model.Image.detections).joinedload(model.Detection.type)
+                )
+                .filter(model.Image.id == image_id)
             )
             image = base_objects.Image(**model.orm2dict(db_image))
             image.detections = [
-                base_objects.Detection(**model.orm2dict(detection))
+                base_objects.Detection(**model.orm2dict(detection), type=detection.type)
                 for detection in db_image.detections
             ]
+
             return image
 
     except exc.SQLAlchemyError as e:
