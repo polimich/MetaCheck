@@ -3,8 +3,11 @@ import { defineStore } from 'pinia';
 import { axios, axiosErrorHandler } from 'src/api/index';
 import { Collection, CollectionAddDto } from './types';
 import { Image, ImageAddDto } from 'src/stores';
+import { useCollectionDataAccessStore } from 'stores/data-access';
 
 export const useCollectionStore = defineStore('collections', () => {
+  const collectionDA = useCollectionDataAccessStore();
+
   // State
   const collections = ref<Collection[]>([]);
   const images = ref<Image[]>([]);
@@ -96,14 +99,10 @@ export const useCollectionStore = defineStore('collections', () => {
 
   const loadImagesInCollection = async (collectionId: string) => {
     setLoading(true);
-    try {
-      const { data } = await axios.get(`collection/${collectionId}/images`);
-      images.value = data;
-    } catch (error) {
-      axiosErrorHandler(error);
-    } finally {
-      setLoading(false);
-    }
+    await collectionDA.loadCollection(collectionId);
+    images.value = collectionDA?.collection?.images as Image[];
+
+    setLoading(false);
   };
 
   const uploadImageToCollection = async (imageToAdd: ImageAddDto) => {
