@@ -19,6 +19,7 @@ from metacheck.schemas.base_objects import WorkState, PageType
 # converts ORM row object to dict
 orm2dict = lambda r: {c.name: getattr(r, c.name) for c in r.__table__.columns}
 
+
 # converts CORE row object to dict
 row2dict = lambda r: dict(r._mapping)
 
@@ -56,7 +57,9 @@ class Detection(MyTableMixin, Base):
     image_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("images.id"), index=True, nullable=False
     )
-    image: Mapped["Image"] = relationship(viewonly=True)
+    image: Mapped["Image"] = relationship(
+        back_populates="detections", foreign_keys="Detection.image_id"
+    )
 
     type_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("detection_types.id"), nullable=False
@@ -67,58 +70,6 @@ class Detection(MyTableMixin, Base):
     bbox: Mapped[str] = mapped_column(nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=True)
     annotated: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
-
-    # volumePublishers: WriteOnlyMapped[List["VolumePublishers"]] = relationship(
-    #     "Volume", secondary="volume_publishers", back_populates="detections"
-    # )
-    #
-    # volumeManufacturePublishers: WriteOnlyMapped[
-    #     List["VolumeManufacturePublishers"]
-    # ] = relationship(
-    #     "Volume",
-    #     secondary="volume_manufacture_publishers",
-    #     back_populates="detections",
-    # )
-    #
-    # volumeManufacturePlaceTerms: WriteOnlyMapped[
-    #     List["VolumeManufacturePlaceTerms"]
-    # ] = relationship(
-    #     "Volume",
-    #     secondary="volume_manufacture_place_terms",
-    #     back_populates="detections",
-    # )
-    #
-    # volumeAuthors: WriteOnlyMapped[List["VolumeAuthors"]] = relationship(
-    #     "Volume", secondary="volume_authors", back_populates="detections"
-    # )
-    #
-    # volumeIllustrators: WriteOnlyMapped[List["VolumeIllustrators"]] = relationship(
-    #     "Volume", secondary="volume_illustrators", back_populates="detections"
-    # )
-    #
-    # volumeTranslators: WriteOnlyMapped[List["VolumeTranslators"]] = relationship(
-    #     "Volume", secondary="volume_translators", back_populates="detections"
-    # )
-    #
-    # volumeEditors: WriteOnlyMapped[List["VolumeEditors"]] = relationship(
-    #     "Volume", secondary="volume_editors", back_populates="detections"
-    # )
-    #
-    # issuePublishers: WriteOnlyMapped[List["IssuePublishers"]] = relationship(
-    #     "Issue", secondary="issue_publishers", back_populates="detections"
-    # )
-    #
-    # issueManufacturers: WriteOnlyMapped[List["IssueManufacturers"]] = relationship(
-    #     "Issue", secondary="issue_manufactures", back_populates="detections"
-    # )
-    #
-    # issueRedaktors: WriteOnlyMapped[List["IssueRedaktors"]] = relationship(
-    #     "Issue", secondary="issue_redaktors", back_populates="detections"
-    # )
-    #
-    # articleAuthors: WriteOnlyMapped[List["ArticleAuthors"]] = relationship(
-    #     "Article", secondary="article_authors", back_populates="detections"
-    # )
 
     @property
     def np_bbox(self):
@@ -145,8 +96,8 @@ class Image(MyTableMixin, Base):
     collection: Mapped["Collection"] = relationship(
         back_populates="images", foreign_keys="Image.collection_id"
     )
-    detections: WriteOnlyMapped[List["Detection"]] = relationship(
-        back_populates="image", foreign_keys="Detection.image_id"
+    detections: Mapped[List["Detection"]] = relationship(
+        back_populates="image", foreign_keys="Detection.image_id", lazy="joined"
     )
     # pages: WriteOnlyMapped[List["Page"]] = relationship(
     #     back_populates="image", foreign_keys="Page.image_id"
@@ -166,22 +117,23 @@ class Image(MyTableMixin, Base):
 
 class Collection(MyTableMixin, Base):
     __tablename__ = "collections"
-    images: WriteOnlyMapped[List["Image"]] = relationship(
+    images: Mapped[List["Image"]] = relationship(
         back_populates="collection", foreign_keys="Image.collection_id"
     )
-    titles: WriteOnlyMapped[List["Title"]] = relationship(
+
+    titles: Mapped[List["Title"]] = relationship(
         back_populates="collection", foreign_keys="Title.collection_id"
     )
-    volumes: WriteOnlyMapped[List["Volume"]] = relationship(
+    volumes: Mapped[List["Volume"]] = relationship(
         back_populates="collection", foreign_keys="Volume.collection_id"
     )
-    issues: WriteOnlyMapped[List["Issue"]] = relationship(
+    issues: Mapped[List["Issue"]] = relationship(
         back_populates="collection", foreign_keys="Issue.collection_id"
     )
-    chapters: WriteOnlyMapped[List["Chapter"]] = relationship(
+    chapters: Mapped[List["Chapter"]] = relationship(
         back_populates="collection", foreign_keys="Chapter.collection_id"
     )
-    articles: WriteOnlyMapped[List["Article"]] = relationship(
+    articles: Mapped[List["Article"]] = relationship(
         back_populates="collection", foreign_keys="Article.collection_id"
     )
 

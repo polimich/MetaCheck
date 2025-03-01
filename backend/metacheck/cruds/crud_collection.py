@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import exc, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
 from db import model
 from metacheck.database import DBError
@@ -20,6 +21,73 @@ async def get_collection(
                 select(model.Collection).filter(model.Collection.id == collection_id)
             )
             collection = base_objects.Collection(**model.orm2dict(db_collection))
+            return collection
+
+    except exc.SQLAlchemyError as e:
+        logger.exception(f"Failed reading collection from database")
+        raise DBError(f"Failed reading collection from database") from e
+
+
+async def get_collection_with_all_metadata(
+    db: AsyncSession, collection_id: UUID
+) -> base_objects.CollectionWithMetadata:
+    try:
+        async with db.begin():
+            db_collection = await db.scalar(
+                select(model.Collection)
+                .options(
+                    joinedload(model.Collection.images).joinedload(
+                        model.Image.detections
+                    ),
+                    joinedload(model.Collection.titles),
+                    joinedload(model.Collection.volumes),
+                    joinedload(model.Collection.issues),
+                    joinedload(model.Collection.chapters),
+                    joinedload(model.Collection.articles),
+                )
+                .filter(model.Collection.id == collection_id)
+            )
+            collection = base_objects.CollectionWithMetadata(
+                **model.orm2dict(db_collection)
+            )
+            loaded_images = []
+            for image in db_collection.images:
+                loaded_images.append(
+                    base_objects.Image(
+                        **model.orm2dict(image),
+                        detections=[
+                            base_objects.Detection(**model.orm2dict(detection))
+                            for detection in image.detections
+                        ],
+                    )
+                )
+            collection.images = loaded_images
+
+            collection.titles = [
+                base_objects.Title(**model.orm2dict(title))
+                for title in db_collection.titles
+            ]
+
+            collection.volumes = [
+                base_objects.Volume(**model.orm2dict(volume))
+                for volume in db_collection.volumes
+            ]
+
+            collection.issues = [
+                base_objects.Issue(**model.orm2dict(issue))
+                for issue in db_collection.issues
+            ]
+
+            collection.chapters = [
+                base_objects.Chapter(**model.orm2dict(chapter))
+                for chapter in db_collection.chapters
+            ]
+
+            collection.articles = [
+                base_objects.Article(**model.orm2dict(article))
+                for article in db_collection.articles
+            ]
+
             return collection
 
     except exc.SQLAlchemyError as e:
@@ -101,7 +169,7 @@ async def get_collection_images(
             db_images = await db.execute(
                 select(model.Image).filter(model.Image.collection_id == collection_id)
             )
-            db_images = db_images.scalars().all()
+            db_images = db_images.scalars().unique().all()
             images = [
                 base_objects.Image(**model.orm2dict(image)) for image in db_images
             ]

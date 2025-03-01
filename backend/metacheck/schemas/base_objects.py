@@ -157,6 +157,8 @@ class Image(BaseModel):
 
     work_state: WorkState
 
+    detections: List[Detection] = []
+
     detection_count: int
     annotated_detection_count: int
 
@@ -220,6 +222,18 @@ class Collection(CollectionNew):
         from_attributes = True
 
 
+class CollectionWithMetadata(Collection):
+    images: List["Image"] = []
+    titles: List["Title"] = []
+    volumes: List["Volume"] = []
+    issues: List["Issue"] = []
+    chapters: List["Chapter"] = []
+    articles: List["Article"] = []
+
+    class Config:
+        from_attributes = True
+
+
 class CollectionUpdate(BaseModel):
     id: UUID
     preview_image_id: Optional[UUID] = None
@@ -248,7 +262,6 @@ class PageTypeDetectionNew(BaseModel):
 
 
 class PageTypeDetection(PageTypeDetectionNew):
-
     created_date: datetime
     last_change: datetime
     last_access: datetime
@@ -278,7 +291,6 @@ class TitleNew(BaseModel):
 
 
 class Title(TitleNew):
-
     title: Optional[Detection] = None
     sub_title: Optional[Detection] = None
     collection: Optional[Collection] = None
@@ -330,7 +342,6 @@ class VolumeNew(BaseModel):
 
 
 class Volume(VolumeNew):
-
     part_number: Optional[Detection] = None
     part_name: Optional[Detection] = None
     date_issued: Optional[Detection] = None

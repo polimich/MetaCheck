@@ -45,6 +45,13 @@ async def get_collection(
     return await crud_collection.get_collection(db, collection_id)
 
 
+@collection_route.get("/eager/{collection_id}", tags=["Collection"])
+async def get_collections_eager(
+    collection_id: UUID, db: AsyncSession = Depends(get_async_session)
+):
+    return await crud_collection.get_collection_with_all_metadata(db, collection_id)
+
+
 @collection_route.put("", tags=["Collection"])
 async def put_collection(
     collection_update: base_objects.CollectionUpdate,

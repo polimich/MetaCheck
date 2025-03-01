@@ -140,3 +140,21 @@ async def update_or_create_image_detections(
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed updating detections in database")
         raise DBError(f"Failed updating detections in database") from e
+
+
+async def get_image(db: AsyncSession, image_id: UUID) -> base_objects.Image:
+    try:
+        async with db.begin():
+            db_image = await db.scalar(
+                select(model.Image).filter(model.Image.id == image_id)
+            )
+            image = base_objects.Image(**model.orm2dict(db_image))
+            image.detections = [
+                base_objects.Detection(**model.orm2dict(detection))
+                for detection in db_image.detections
+            ]
+            return image
+
+    except exc.SQLAlchemyError as e:
+        logger.exception(f"Failed reading image from database")
+        raise DBError(f"Failed reading image from database") from e

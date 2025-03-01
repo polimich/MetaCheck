@@ -111,7 +111,7 @@ async def save_image(
 
 @image_route.get("/{image_id}", response_model=base_objects.Image, tags=["Image"])
 async def get_image(image_id: UUID, db: AsyncSession = Depends(get_async_session)):
-    return await crud_general.get(db, base_objects.Image, model.Image, image_id)
+    return await crud_image.get_image(db, image_id)
 
 
 @image_route.put("", tags=["Image"])
