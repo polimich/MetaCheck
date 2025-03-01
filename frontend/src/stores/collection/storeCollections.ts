@@ -3,10 +3,10 @@ import { defineStore } from 'pinia';
 import { axios, axiosErrorHandler } from 'src/api/index';
 import { Collection, CollectionAddDto } from './types';
 import { Image, ImageAddDto } from 'src/stores';
-import { useCollectionDataAccessStore } from 'stores/data-access';
+import { useCollectionDataAccess } from 'stores/data-access';
 
 export const useCollectionStore = defineStore('collections', () => {
-  const collectionDA = useCollectionDataAccessStore();
+  const collectionDA = useCollectionDataAccess();
 
   // State
   const collections = ref<Collection[]>([]);
@@ -61,7 +61,6 @@ export const useCollectionStore = defineStore('collections', () => {
   const editCollection = async (collection: Collection) => {
     setLoading(true);
     try {
-      console.log('Editing collection', collection);
       await axios.put(`collection/${collection.id}`, collection);
       await loadCollections(); // Reload collections after editing
     } catch (error) {

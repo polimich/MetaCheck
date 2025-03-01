@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia';
-import { CollectionDA } from './types.ts';
 import { ref } from 'vue';
 import { axios, axiosErrorHandler } from 'src/api';
+import { CollectionDA } from 'src/types';
 
-export const useCollectionDataAccessStore = defineStore(
+export const useCollectionDataAccess = defineStore(
   'collectionDataAccessStore',
   () => {
     const collection = ref<CollectionDA>();
@@ -23,6 +23,7 @@ export const useCollectionDataAccessStore = defineStore(
       try {
         const { data } = await axios.get(`/collection/eager/${collectionId}`);
         collection.value = data;
+        console.log(collection.value);
       } catch (e) {
         axiosErrorHandler(e);
       } finally {

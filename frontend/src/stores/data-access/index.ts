@@ -1,2 +1,1 @@
-export * from './collectionDataAccessStore';
-export * from './types';
+export * from './collectionDataAccess.ts';

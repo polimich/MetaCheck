@@ -1,26 +1,18 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
 import { ref } from 'vue';
-import {
-  Image,
-  ImageAddDto,
-  useCollectionStore,
-  useImageStore,
-} from 'src/stores';
+import { Image, ImageAddDto, useImageStore } from 'src/stores';
 import { getPreviewImage } from 'utils';
-import { useCollectionDataAccessStore } from 'stores/data-access';
+import { useCurrentCollectionState } from 'stores/frontend-state';
 
 const route = useRoute();
 const router = useRouter();
-const collectionStore = useCollectionStore();
-const collectionDAStore = useCollectionDataAccessStore();
 const imageStore = useImageStore();
+const currentCollection = useCurrentCollectionState();
 const collectionId = route.params.collectionId as string;
-collectionStore.loadImagesInCollection(collectionId);
-collectionDAStore.loadCollection(collectionId);
+currentCollection.loadCollection(collectionId);
 const grid = ref(true);
 const fileTypes = 'image/*';
-console.log(collectionDAStore.collection);
 
 const isAddOpen = ref(false);
 const imageToAdd = ref<ImageAddDto>({
@@ -39,7 +31,8 @@ const onRowClick = (_evt: Event, row: Image) => {
 };
 
 const handleUpload = async () => {
-  await collectionStore.uploadImageToCollection(imageToAdd.value);
+  console.log('handleUpload');
+  await currentCollection.uploadImageToCollection(imageToAdd.value);
 };
 const onReset = () => {
   imageToAdd.value.order = 0;
@@ -53,9 +46,9 @@ const onReset = () => {
       <q-table
         title="Images"
         :grid="grid"
-        :rows="collectionStore.images"
+        :rows="currentCollection.collection?.images || []"
         row-key="name"
-        :loading="collectionStore.loading"
+        :loading="currentCollection.loading"
         @row-click="onRowClick"
       >
         <template v-slot:top-right>
@@ -72,7 +65,7 @@ const onReset = () => {
             round
             color="primary"
             icon="add"
-            :disable="collectionStore.loading"
+            :disable="currentCollection.loading"
             @click="isAddOpen = true"
           />
           <q-dialog v-model="isAddOpen" @hide="onReset">
