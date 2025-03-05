@@ -92,8 +92,18 @@ export const useCurrentCollectionState = defineStore(
           return null;
         }
       } else {
+        setLoading(false);
         console.error('Collection not loaded');
         return null;
+      }
+    };
+
+    const reloadCollection = async () => {
+      if (collection.value)
+        await collectionDA.loadCollection(collection.value.id);
+      if (collectionDA.collection) {
+        collection.value = CollectionDAtoState(collectionDA.collection);
+        console.log('reloaded');
       }
     };
 
@@ -108,6 +118,7 @@ export const useCurrentCollectionState = defineStore(
       uploadImageToCollection,
       getImageById,
       imagesGetter,
+      reloadCollection,
     };
   },
 );

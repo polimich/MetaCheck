@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia';
-import { DetectionType } from 'src/stores';
 import { computed, ref } from 'vue';
 import { axios, axiosErrorHandler } from 'src/api';
+import { DetectionTypeState } from 'src/types';
 
 export const useDetectionTypesStore = defineStore('detectionTypes', () => {
-  const detectionTypes = ref<DetectionType[]>([]);
+  const detectionTypes = ref<DetectionTypeState[]>([]);
   const detectionTypesSelectOptions = computed(() => {
     return detectionTypes.value.map((dt) => ({
       value: dt.name,
@@ -23,7 +23,7 @@ export const useDetectionTypesStore = defineStore('detectionTypes', () => {
     loading.value = true;
     try {
       const { data } = await axios.get('/detection_type');
-      detectionTypes.value = data;
+      detectionTypes.value = data as DetectionTypeState[];
     } catch (e) {
       axiosErrorHandler(e);
     } finally {

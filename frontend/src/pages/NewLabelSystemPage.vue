@@ -10,8 +10,6 @@ const route = useRoute();
 const imageId = ref(route.params.imageId as string);
 const imageStore = useImageStore();
 const detectionTypesStore = useDetectionTypesStore();
-
-console.log(imageStore.annotations);
 </script>
 
 <template>
@@ -27,10 +25,10 @@ console.log(imageStore.annotations);
         <div>Label Editor</div>
         <q-scroll-area style="height: 100%; max-width: 100%">
           <AnnotationListItem
-            v-for="annotation in imageStore.getSortedAnnotations"
-            :annotation="annotation"
+            v-for="detection in imageStore.getSortedDetections"
+            :detection="detection"
             :options="detectionTypesStore.detectionTypesSelectOptions"
-            v-bind:key="annotation.id"
+            v-bind:key="detection.id"
           />
         </q-scroll-area>
       </div>

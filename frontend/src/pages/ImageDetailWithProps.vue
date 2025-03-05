@@ -7,7 +7,6 @@ import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Stage } from 'konva/lib/Stage';
 import {
   Annotator,
-  Annotation,
   enterAnnotatorBox,
   leaveAnnotatorBox,
 } from 'src/service/annotator.ts';
@@ -23,8 +22,7 @@ import {
   stopResizeAnnotation,
   leaveAnnotateRange,
 } from 'src/service/annotation.ts';
-import { useCurrentCollectionState } from 'stores/frontend-state';
-import { useCollectionDataAccess } from 'stores/data-access';
+import { DetectionState } from 'src/types';
 
 const props = defineProps({
   imageId: String,
@@ -32,8 +30,8 @@ const props = defineProps({
 
 const route = useRoute();
 const imageStore = useImageStore();
-const currentCollectionState = useCurrentCollectionState();
-const collectionDA = useCollectionDataAccess();
+// const currentCollectionState = useCurrentCollectionState();
+// const collectionDA = useCollectionDataAccess();
 const imageId = props.imageId ?? (route.params.imageId as string);
 const imageUrl = getRasterImage(imageId);
 
@@ -63,13 +61,15 @@ const init = async (): Promise<void> => {
   if (!isMounted.value) return;
   if (!dataLoaded.value) return;
   if (!annotatorBox.value) return;
-  await initAnnotator(annotatorBox.value, imageUrl, imageStore.annotations);
+  if (imageStore.detections) {
+    await initAnnotator(annotatorBox.value, imageUrl, imageStore.detections);
+  }
 };
 
 const initAnnotator = async (
   container: Element,
   url: string,
-  annotations: Annotation[],
+  annotations: DetectionState[],
 ): Promise<void> => {
   loading.value = true;
   await annotator.initImageSetting(container, url);
@@ -139,7 +139,7 @@ async function handleKeyDownEvent(event: KeyboardEvent) {
     case 'BACKSPACE':
     case 'DELETE':
     case 'DEL':
-      if (imageStore.annotations.length === 0) return;
+      if (imageStore.detections?.length === 0) return;
       if (annotator.innerToolBox.getAnnotationId() === '') return;
       await removeAnnotation({
         id: annotator.innerToolBox.getAnnotationId(),
@@ -160,7 +160,6 @@ onBeforeMount(async () => {
   dataLoaded.value = false;
   await imageStore.loadImage(imageId, route.params.collectionId as string);
   await imageStore.loadDetections(imageId);
-  console.log('imageStore.annotations', imageStore.detections);
   dataLoaded.value = true;
 });
 
@@ -179,17 +178,20 @@ watch(imageStore, async () => {
 });
 
 const save = async () => {
-  await imageStore.createOrUpdateDetections(imageId);
-  await imageStore.loadDetections(imageId);
+  imageStore.detections.forEach((detection) => {
+    console.log(detection.edited);
+  });
+  console.log(imageStore.detectionsToDelete);
+  await imageStore.saveImage();
+  // TODO: go through collectionState, find edited objects call individual endpoints to update, create, delete everything
+  // TODO: from collection from db and fe state
 };
 
 function addAlpha(color: string, opacity: number) {
   // coerce values so it is between 0 and 1.
-  var _opacity = Math.round(Math.min(Math.max(opacity ?? 1, 0), 1) * 255);
+  let _opacity = Math.round(Math.min(Math.max(opacity ?? 1, 0), 1) * 255);
   return color + _opacity.toString(16).toUpperCase();
 }
-
-const handleClickTest = () => {};
 </script>
 
 <template>
@@ -207,13 +209,13 @@ const handleClickTest = () => {};
         ref="stage"
         @mousedown="
           (event: KonvaPointerEvent) =>
-            startResizeAnnotation(event, annotator, imageStore.annotations)
+            startResizeAnnotation(event, annotator, imageStore.detections)
         "
       >
         <v-layer
           :config="annotator.layerConfig"
           @mousemove="
-            startEditAnnotationVolume(annotator, imageStore.annotations)
+            startEditAnnotationVolume(annotator, imageStore.detections)
           "
           @mouseup="
             (event: KonvaPointerEvent) =>
@@ -226,11 +228,11 @@ const handleClickTest = () => {};
           <v-image
             :config="annotator.imageConfig"
             @mousedown="
-              createAnnotation(annotator, imageId, imageStore.annotations)
+              createAnnotation(annotator, imageId, imageStore.detections)
             "
           />
           <v-group
-            v-for="item in imageStore.annotations"
+            v-for="item in imageStore.detections"
             :key="item.id"
             :config="{ name: item.id, visible: true }"
           >
@@ -247,15 +249,15 @@ const handleClickTest = () => {};
               }"
               @dragmove="
                 (event: KonvaPointerEvent) =>
-                  startDragAnnotation(event, annotator, imageStore.annotations)
+                  startDragAnnotation(event, annotator, imageStore.detections)
               "
               @dragend="
                 (event: KonvaPointerEvent) =>
-                  stopDragAnnotation(event, annotator, imageStore.annotations)
+                  stopDragAnnotation(event, annotator, imageStore.detections)
               "
               @transformend="
                 (event: KonvaPointerEvent) =>
-                  stopResizeAnnotation(event, annotator, imageStore.annotations)
+                  stopResizeAnnotation(event, annotator, imageStore.detections)
               "
             />
           </v-group>

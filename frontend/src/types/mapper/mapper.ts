@@ -16,6 +16,7 @@ import {
   ChapterState,
   CollectionState,
   DetectionState,
+  DetectionTypeState,
   ImageState,
   IssueState,
   PageState,
@@ -80,13 +81,36 @@ function ImageDAtoState(imageDA: ImageDA): ImageState {
 function DetectionDAtoState(detectionDA: DetectionDA): DetectionState {
   return {
     id: detectionDA.id,
-    bbox: detectionDA.bbox,
+    image_id: detectionDA.image_id,
+    ...bboxToObject(detectionDA.bbox),
     confidence: detectionDA.confidence,
     annotated: detectionDA.annotated,
-    detection_type: DetectionTypeDAtoState(detectionDA.type),
+    type_id: detectionDA.type_id,
+    type: DetectionTypeDAtoState(detectionDA.type),
+
+    created_date: detectionDA.created_date,
+    last_change: detectionDA.last_change,
+    last_access: detectionDA.last_access,
+    deleted: detectionDA.deleted,
+    color: detectionDA.type.color,
     edited: false,
   };
 }
+type Bbox = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+const bboxToObject = (bbox: string): Bbox => {
+  const [x, y, width, height] = bbox.split(';').map((v) => parseFloat(v));
+  return { x, y, width, height };
+};
+
+const objectToBbox = (bbox: Bbox): string => {
+  return `${bbox.x};${bbox.y};${bbox.width};${bbox.height}`;
+};
 
 function DetectionTypeDAtoState(detectionTypeDA: DetectionTypeDA) {
   return {
@@ -218,6 +242,43 @@ function ArticleDAtoState(articleDA: ArticleDA): ArticleState {
   };
 }
 
+function DetectionStateToDa(detectionState: DetectionState): DetectionDA {
+  return {
+    id: detectionState.id,
+    image_id: detectionState.image_id,
+    bbox: objectToBbox({
+      x: detectionState.x,
+      y: detectionState.y,
+      width: detectionState.width,
+      height: detectionState.height,
+    }),
+    confidence: detectionState.confidence,
+    annotated: detectionState.annotated,
+    type_id: detectionState.type_id,
+    type: DetectionTypeStateToDA(detectionState.type),
+
+    created_date: detectionState.created_date,
+    last_change: detectionState.last_change,
+    last_access: detectionState.last_access,
+    deleted: detectionState.deleted,
+  };
+}
+
+function DetectionTypeStateToDA(
+  detectionTypeState: DetectionTypeState,
+): DetectionTypeDA {
+  return {
+    id: detectionTypeState.id,
+    name: detectionTypeState.name,
+    color: detectionTypeState.color,
+    display_name: detectionTypeState.display_name,
+    created_date: '',
+    last_change: '',
+    last_access: '',
+    deleted: false,
+  };
+}
+
 export {
   CollectionDAtoState,
   ImageDAtoState,
@@ -229,4 +290,6 @@ export {
   IssueDAtoState,
   ChapterDAtoState,
   ArticleDAtoState,
+  //
+  DetectionStateToDa,
 };

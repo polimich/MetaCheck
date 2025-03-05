@@ -1,8 +1,8 @@
 import { Stage } from 'konva/lib/Stage';
 import { Layer } from 'konva/lib/Layer';
 import { Transformer } from 'konva/lib/shapes/Transformer';
-import { Annotation } from './annotation';
 import { UnwrapNestedRefs } from 'vue';
+import { DetectionState, newDetectionState } from 'src/types';
 class ImageInfo {
   element!: HTMLImageElement;
   width = 0;
@@ -11,13 +11,13 @@ class ImageInfo {
 
 class InnerToolBox {
   public boxStyle = 'display:none;';
-  private annotation = new Annotation();
+  private annotation = newDetectionState();
 
   public getAnnotationId(): string {
     return this.annotation.id;
   }
 
-  public updateAnnotation(annotation: Annotation): void {
+  public updateAnnotation(annotation: DetectionState): void {
     this.annotation = annotation;
   }
 
@@ -139,4 +139,4 @@ function leaveAnnotatorBox(annotator: UnwrapNestedRefs<Annotator> & object) {
   annotator.innerToolBox.hide();
 }
 
-export { Annotation, Annotator, enterAnnotatorBox, leaveAnnotatorBox };
+export { Annotator, enterAnnotatorBox, leaveAnnotatorBox };
