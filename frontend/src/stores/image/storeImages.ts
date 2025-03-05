@@ -1,18 +1,16 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import {
-  Bbox,
-  Detection,
-  DetectionType,
-  DetectionUpdateDto,
-  Image,
-} from 'src/stores';
+import { Bbox, DetectionType, DetectionUpdateDto } from 'src/stores';
 import { axios, axiosErrorHandler } from 'src/api/index';
 import { Annotation } from 'src/service/annotation.ts';
+import { DetectionState, ImageState } from 'src/types';
+import { useCurrentCollectionState } from 'stores/frontend-state';
 
 export const useImageStore = defineStore('images', () => {
-  const image = ref<Image>();
-  const detections = ref<Detection[]>();
+  const currentCollectionState = useCurrentCollectionState();
+
+  const image = ref<ImageState>();
+  const detections = ref<DetectionState[]>();
   const loading = ref(false);
   const annotations = ref<Annotation[]>([]);
   const detectionTypes = ref<DetectionType[]>([]);
@@ -26,45 +24,30 @@ export const useImageStore = defineStore('images', () => {
   const init = () => {
     return;
   };
-  const loadImage = async (imageId: string) => {
+  const loadImage = async (imageId: string, collectionId: string) => {
     loading.value = true;
-    try {
-      const { data } = await axios.get(`/image/${imageId}`);
-      image.value = data;
-    } catch (e) {
-      axiosErrorHandler(e);
-    } finally {
-      loading.value = false;
+    if (!currentCollectionState.loaded) {
+      await currentCollectionState.loadCollection(collectionId);
     }
+    const currentImage = currentCollectionState.getImageById(imageId);
+    if (currentImage) {
+      image.value = currentImage;
+    } else {
+      console.error('Image not found');
+    }
+    loading.value = false;
   };
 
   const loadDetections = async (imageId: string) => {
-    loading.value = true;
+    loading.value = true || imageId;
     try {
-      const { data } = await axios.get(`/image/detections/${imageId}`);
-
-      detections.value = await Promise.all(
-        data.map((detection: Detection) => loadDetectionType(detection)),
-      );
-
-      console.log(detections.value);
+      detections.value = image.value?.detections;
       annotations.value = detections.value?.map(detectionToAnnotation) || [];
-      await loadDetectionTypes();
     } catch (e) {
       axiosErrorHandler(e);
     } finally {
       loading.value = false;
     }
-  };
-
-  const loadDetectionType = async (detection: Detection) => {
-    try {
-      const { data } = await axios.get(`/detection_type/${detection.type_id}`);
-      detection.type = data;
-    } catch (e) {
-      axiosErrorHandler(e);
-    }
-    return detection;
   };
 
   const deleteDetection = async (detectionId: string) => {
@@ -94,7 +77,7 @@ export const useImageStore = defineStore('images', () => {
     }
   };
 
-  const detectionToAnnotation = (detection: Detection): Annotation => {
+  const detectionToAnnotation = (detection: DetectionState): Annotation => {
     const { x, y, width, height } = bboxToObject(detection.bbox);
     const annotation = new Annotation();
     annotation.id = detection.id;
@@ -102,16 +85,11 @@ export const useImageStore = defineStore('images', () => {
     annotation.y = y;
     annotation.width = width;
     annotation.height = height;
-    annotation.confidence = detection.confidence;
+    annotation.confidence = detection.confidence || 0;
     annotation.annotated = detection.annotated;
-    annotation.created_date = detection.created_date;
-    annotation.last_change = detection.last_change;
-    annotation.last_access = detection.last_access;
-    annotation.deleted = detection.deleted;
-    annotation.image_id = detection.image_id;
-    annotation.type_id = detection.type_id;
-    annotation.type = detection.type;
-    annotation.color = detection.type.color;
+    annotation.type = detection.detection_type;
+    annotation.color = detection.detection_type.color;
+    console.log(annotation);
     return annotation;
   };
 

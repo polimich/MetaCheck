@@ -15,6 +15,7 @@ export const useCurrentCollectionState = defineStore(
     const collection = ref<CollectionState>();
     const loading = ref(false);
     const edited = ref(false);
+    const loaded = ref(false);
 
     //
     const imagesGetter = computed(() => {
@@ -38,12 +39,13 @@ export const useCurrentCollectionState = defineStore(
 
     const loadCollection = async (collectionId: string) => {
       setLoading(true);
-      await collectionDA.loadCollection(collectionId);
-      if (collectionDA?.collection) {
-        collection.value = CollectionDAtoState(collectionDA.collection);
-        console.log(collection.value);
-      } else {
+      if (!collectionDA.loaded) {
+        await collectionDA.loadCollection(collectionId);
       }
+      if (collectionDA.collection) {
+        collection.value = CollectionDAtoState(collectionDA.collection);
+      }
+      loaded.value = true;
       setLoading(false);
     };
 
@@ -75,14 +77,36 @@ export const useCurrentCollectionState = defineStore(
       }
     };
 
+    const getImageById = (imageId: string) => {
+      setLoading(true);
+      if (collection.value && collection.value.images) {
+        const image = collection.value.images.find((i) => i.id === imageId);
+        if (image) {
+          setLoading(false);
+
+          return image;
+        } else {
+          setLoading(false);
+
+          console.error('Image not found');
+          return null;
+        }
+      } else {
+        console.error('Collection not loaded');
+        return null;
+      }
+    };
+
     return {
       collection,
       loading,
       edited,
+      loaded,
       setLoading,
       init,
       loadCollection,
       uploadImageToCollection,
+      getImageById,
       imagesGetter,
     };
   },

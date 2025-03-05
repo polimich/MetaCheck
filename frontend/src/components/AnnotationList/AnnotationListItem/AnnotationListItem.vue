@@ -16,7 +16,7 @@
                 async (val) => {
                   imageStore.annotations.find(
                     (annotation) => annotation.id === props.annotation.id,
-                  ).type_id = val.id;
+                  ).type = val.id;
                   await imageStore.createOrUpdateDetections(
                     imageStore.image.id,
                   );

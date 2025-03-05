@@ -20,7 +20,6 @@ const linksList: NavLinkProps[] = [
 ];
 
 const leftDrawerOpen = ref(false);
-console.log(leftDrawerOpen.value);
 
 function toggleLeftDrawer() {
   leftDrawerOpen.value = !leftDrawerOpen.value;

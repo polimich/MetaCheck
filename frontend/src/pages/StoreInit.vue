@@ -12,6 +12,7 @@ const imageStore = useImageStore();
 const detectionStore = useDetectionTypesStore();
 const collectionDA = useCollectionDataAccess();
 const currentCollection = useCurrentCollectionState();
+
 collectionStore.init();
 imageStore.init();
 detectionStore.init();

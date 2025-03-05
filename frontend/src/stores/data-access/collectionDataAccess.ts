@@ -9,6 +9,7 @@ export const useCollectionDataAccess = defineStore(
     const collection = ref<CollectionDA>();
 
     const loading = ref(false);
+    const loaded = ref(false);
 
     const setLoading = (isLoading: boolean) => {
       loading.value = isLoading;
@@ -23,7 +24,7 @@ export const useCollectionDataAccess = defineStore(
       try {
         const { data } = await axios.get(`/collection/eager/${collectionId}`);
         collection.value = data;
-        console.log(collection.value);
+        loaded.value = true;
       } catch (e) {
         axiosErrorHandler(e);
       } finally {
@@ -34,6 +35,7 @@ export const useCollectionDataAccess = defineStore(
     return {
       collection,
       loading,
+      loaded,
       setLoading,
       init,
       loadCollection,

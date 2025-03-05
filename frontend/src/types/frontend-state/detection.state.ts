@@ -8,6 +8,7 @@ export type DetectionState = BaseState & {
 };
 
 export type DetectionTypeState = BaseState & {
+  name: string;
   color: string;
   display_name: string;
 };

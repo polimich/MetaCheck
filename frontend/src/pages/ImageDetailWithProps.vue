@@ -23,6 +23,8 @@ import {
   stopResizeAnnotation,
   leaveAnnotateRange,
 } from 'src/service/annotation.ts';
+import { useCurrentCollectionState } from 'stores/frontend-state';
+import { useCollectionDataAccess } from 'stores/data-access';
 
 const props = defineProps({
   imageId: String,
@@ -30,6 +32,8 @@ const props = defineProps({
 
 const route = useRoute();
 const imageStore = useImageStore();
+const currentCollectionState = useCurrentCollectionState();
+const collectionDA = useCollectionDataAccess();
 const imageId = props.imageId ?? (route.params.imageId as string);
 const imageUrl = getRasterImage(imageId);
 
@@ -154,8 +158,9 @@ async function handleKeyDownEvent(event: KeyboardEvent) {
 // lifecycle
 onBeforeMount(async () => {
   dataLoaded.value = false;
-  await imageStore.loadImage(imageId);
+  await imageStore.loadImage(imageId, route.params.collectionId as string);
   await imageStore.loadDetections(imageId);
+  console.log('imageStore.annotations', imageStore.detections);
   dataLoaded.value = true;
 });
 
@@ -183,6 +188,8 @@ function addAlpha(color: string, opacity: number) {
   var _opacity = Math.round(Math.min(Math.max(opacity ?? 1, 0), 1) * 255);
   return color + _opacity.toString(16).toUpperCase();
 }
+
+const handleClickTest = () => {};
 </script>
 
 <template>

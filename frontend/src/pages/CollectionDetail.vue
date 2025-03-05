@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
 import { ref } from 'vue';
-import { Image, ImageAddDto, useImageStore } from 'src/stores';
+import { Image, ImageAddDto } from 'src/stores';
 import { getPreviewImage } from 'utils';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 
 const route = useRoute();
 const router = useRouter();
-const imageStore = useImageStore();
 const currentCollection = useCurrentCollectionState();
 const collectionId = route.params.collectionId as string;
 currentCollection.loadCollection(collectionId);
@@ -21,7 +20,6 @@ const imageToAdd = ref<ImageAddDto>({
   file: undefined,
 });
 const onRowClick = (_evt: Event, row: Image) => {
-  imageStore.loadImage(row.id);
   router.push({
     name: 'image',
     params: {

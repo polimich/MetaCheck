@@ -153,7 +153,7 @@ async function handleKeyDownEvent(event: KeyboardEvent) {
 // lifecycle
 onBeforeMount(async () => {
   dataLoaded.value = false;
-  await imageStore.loadImage(imageId);
+  await imageStore.loadImage(imageId, route.params.collectionId as string);
   await imageStore.loadDetections(imageId);
   dataLoaded.value = true;
 });
