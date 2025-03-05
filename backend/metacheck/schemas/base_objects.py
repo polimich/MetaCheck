@@ -129,6 +129,7 @@ class Detection(DetectionNew):
 class DetectionUpdate(BaseModel):
     id: UUID
     image_id: Optional[UUID] = None
+    annotated: Optional[bool] = None
 
     type_id: Optional[UUID] = None
     bbox: Optional[str] = None

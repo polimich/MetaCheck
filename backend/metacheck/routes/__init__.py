@@ -10,6 +10,7 @@ page_route = APIRouter()
 chapter_route = APIRouter()
 article_route = APIRouter()
 detection_type_route = APIRouter()
+detection_route = APIRouter()
 
 from .collection_routes import collection_route
 from .image_routes import image_route
@@ -20,3 +21,4 @@ from .page_routes import page_route
 from .chapter_routes import chapter_route
 from .issue_routes import issue_route
 from .detection_type_routes import detection_type_route
+from .detection_routes import detection_route

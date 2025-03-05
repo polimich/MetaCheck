@@ -19,6 +19,7 @@ from metacheck.routes import (
     chapter_route,
     article_route,
     detection_type_route,
+    detection_route,
 )
 from metacheck_common.config import config
 
@@ -64,6 +65,7 @@ app.include_router(page_route, prefix="/api/page")
 app.include_router(chapter_route, prefix="/api/chapter")
 app.include_router(article_route, prefix="/api/article")
 app.include_router(detection_type_route, prefix="/api/detection_type")
+app.include_router(detection_route, prefix="/api/detection")
 
 
 if os.path.isdir("metacheck/static"):
