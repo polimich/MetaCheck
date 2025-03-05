@@ -18,7 +18,6 @@ export type DetectionState = BaseState & {
   last_change: string;
   last_access: string;
   deleted: boolean;
-  color: string;
 };
 
 export type DetectionTypeState = BaseState & {
@@ -43,14 +42,13 @@ export const newDetectionState = (): DetectionState => {
     last_change: '',
     last_access: '',
     deleted: false,
-    color: '',
     edited: true,
   };
 };
 
 const newDetectionTypeState = (): DetectionTypeState => {
   return {
-    id: uuidv4(),
+    id: '',
     name: '',
     color: '',
     display_name: '',

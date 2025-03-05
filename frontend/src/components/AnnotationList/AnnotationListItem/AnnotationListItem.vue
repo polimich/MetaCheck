@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { DetectionState, DetectionTypeState } from 'src/types/frontend-state';
-import { ref, watch } from 'vue';
-import { useDetectionTypesStore, useImageStore } from 'src/stores';
+import { ref } from 'vue';
 
 const props = defineProps<{
   detection: DetectionState;
@@ -12,68 +11,55 @@ const props = defineProps<{
   }[];
 }>();
 
-const imageStore = useImageStore();
-const detectionTypesStore = useDetectionTypesStore();
+const detection = ref<DetectionState>(props.detection);
+const selectValue = ref({
+  value: detection.value.type.id,
+  label: detection.value.type.display_name,
+  id: detection.value.type.id,
+});
 
-const annotationType = ref(props.detection.type.name || null);
-const value = ref(props.detection.color || '');
-const confidence = ref(props.detection.confidence || 0);
-const annotated = ref(props.detection.annotated || false);
+const saveDetection = async () => {
+  console.log(detection.value);
+};
 
-const emit = defineEmits(['update:modelValue']);
-
-watch(
-  () => props.detection,
-  (newVal) => {
-    annotationType.value = newVal.type.name || null;
-    value.value = newVal.color || '';
-    confidence.value = newVal.confidence || 0;
-    annotated.value = newVal.annotated || false;
-  },
-  { deep: true, immediate: true },
-);
-
-const submit = () => {
-  emit('update:modelValue', {
-    annotationType: annotationType.value,
-    value: value.value,
-    confidence: confidence.value,
-    annotated: annotated.value,
-  });
-
-  imageStore.image.detections = imageStore.image.detections.map((detection) => {
-    if (detection.id === props.detection.id) {
-      return {
-        ...detection,
-        type: detectionTypesStore.detectionTypes.find(
-          (type) => type.name === annotationType.value,
-        ) as DetectionTypeState,
-        color: value.value,
-        confidence: confidence.value,
-        annotated: annotated.value,
-      };
-    }
-    return detection;
-  });
+const updateSelectValue = (value: {
+  value: string;
+  label: string;
+  id: string;
+  type: DetectionTypeState;
+}) => {
+  detection.value.type = value.type;
+  detection.value.type_id = value.id;
+  detection.value.edited = true;
 };
 </script>
 
 <template>
-  <q-card class="q-ma-sm" :style="{ backgroundColor: detection.color + '80' }">
+  <q-card
+    class="q-ma-sm"
+    :style="{ backgroundColor: detection.type.color + '80' }"
+  >
     <q-card-section>
-      <q-form @submit.prevent="submit">
+      <q-form @submit.prevent="saveDetection">
         <div class="row q-col-gutter-md">
           <q-select
-            v-model="annotationType"
+            v-model="selectValue"
             :options="options"
             label="Annotation Type"
             dense
             filled
             class="col"
+            @update:model-value="(value) => updateSelectValue(value)"
           />
-          <q-input v-model="value" label="Value" dense filled class="col" />
           <q-input
-            v-model="confidence"
+            v-model="detection.type.color"
+            label="Value"
+            dense
+            filled
+            class="col"
+          />
+          <q-input
+            v-model="detection.confidence"
             label="Confidence"
             type="number"
             dense
@@ -88,7 +74,11 @@ const submit = () => {
           />
         </div>
         <div class="row q-mt-md">
-          <q-toggle v-model="annotated" label="Annotated" class="col" />
+          <q-toggle
+            v-model="detection.annotated"
+            label="Annotated"
+            class="col"
+          />
           <q-btn
             label="Submit"
             type="submit"

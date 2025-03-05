@@ -7,9 +7,10 @@ export const useDetectionTypesStore = defineStore('detectionTypes', () => {
   const detectionTypes = ref<DetectionTypeState[]>([]);
   const detectionTypesSelectOptions = computed(() => {
     return detectionTypes.value.map((dt) => ({
-      value: dt.name,
+      value: dt.id,
       label: dt.display_name,
       id: dt.id,
+      type: dt,
     }));
   });
 
@@ -31,11 +32,25 @@ export const useDetectionTypesStore = defineStore('detectionTypes', () => {
     }
   };
 
+  const getTypeById = (id: string): DetectionTypeState => {
+    const type = detectionTypes.value.find((dt) => dt.id === id);
+    if (type) return type;
+
+    return {
+      id: '',
+      name: '',
+      color: '',
+      display_name: '',
+      edited: false,
+    };
+  };
+
   return {
     detectionTypes,
     detectionTypesSelectOptions,
     loading,
     init,
     loadDetectionTypes,
+    getTypeById,
   };
 });

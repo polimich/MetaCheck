@@ -14,9 +14,11 @@ export const useImageStore = defineStore('images', () => {
 
   const image = ref<ImageState>(newImageState());
   const detections = ref<DetectionState[]>([]);
+  const detectionIdsBackup = ref<string[]>([]);
   const loading = ref(false);
 
   const detectionsToDelete = ref<DetectionState[]>([]);
+  const detectionsToAdd = ref<DetectionState[]>([]);
 
   const getSortedDetections = computed(() => {
     return detections.value.toSorted((a, b) => {
@@ -45,6 +47,7 @@ export const useImageStore = defineStore('images', () => {
     loading.value = true || imageId;
     try {
       detections.value = image.value?.detections;
+      detectionIdsBackup.value = detections.value.map((d) => d.id);
     } catch (e) {
       console.error(e);
     } finally {
@@ -53,14 +56,34 @@ export const useImageStore = defineStore('images', () => {
   };
 
   const saveImage = async () => {
+    await createNewDetections();
     await updateAllDetections();
     await deleteDetections();
     await reloadImage();
   };
+  const createNewDetections = async () => {
+    detectionsToAdd.value = detections.value.filter(
+      (detection) => detectionIdsBackup.value.indexOf(detection.id) === -1,
+    );
+
+    for (const detection of detectionsToAdd.value) {
+      console.log('Creating detection', detection);
+      await createDetection(detection);
+    }
+  };
+
+  const createDetection = async (detection: DetectionState) => {
+    try {
+      await axios.post('/detection', DetectionStateToDa(detection));
+    } catch (e) {
+      axiosErrorHandler(e);
+    }
+  };
 
   const updateAllDetections = async () => {
     const detectionsToUpdate = detections.value.filter(
-      (detection) => detection.edited,
+      (detection) =>
+        detection.edited && detectionIdsBackup.value.includes(detection.id),
     );
     for (const detection of detectionsToUpdate) {
       await updateDetection(detection);

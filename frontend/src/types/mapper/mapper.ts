@@ -92,7 +92,6 @@ function DetectionDAtoState(detectionDA: DetectionDA): DetectionState {
     last_change: detectionDA.last_change,
     last_access: detectionDA.last_access,
     deleted: detectionDA.deleted,
-    color: detectionDA.type.color,
     edited: false,
   };
 }

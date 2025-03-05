@@ -241,11 +241,11 @@ function addAlpha(color: string, opacity: number) {
                 id: item.id,
                 x: item.x,
                 y: item.y,
-                stroke: item.color,
+                stroke: item.type.color,
                 width: item.width,
                 height: item.height,
                 draggable: true,
-                fill: addAlpha(item.color, 0.3),
+                fill: addAlpha(item.type.color, 0.3),
               }"
               @dragmove="
                 (event: KonvaPointerEvent) =>
