@@ -162,3 +162,6 @@ cython_debug/
 .idea/
 frontend/.idea
 backend/.idea
+output_samples/**/*.jpg
+
+.DS_Store

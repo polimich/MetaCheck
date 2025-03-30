@@ -1,0 +1,4738 @@
+{
+    "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+    "elements": [
+        {
+            "type": "title",
+            "periodical": false,
+            "id": "0accda90-9d76-11e9-bc42-5ef3fc9ae867",
+            "title": [
+                "V r\u00e1ji poh\u00e1dek",
+                0.8562233599067425,
+                "54e3a075-2619-48f1-889d-533bce10b7b6"
+            ],
+            "subTitle": [
+                "sb\u00edrka nejkr\u00e1sn\u011bj\u0161\u00edch poh\u00e1dek pro hodn\u00e9 d\u00edtky",
+                0.37048533168380493,
+                "71dbdde4-c1e5-4f43-ba2f-f20f08ca679d"
+            ]
+        },
+        {
+            "type": "volume",
+            "periodical": false,
+            "id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "parent_id": "0accda90-9d76-11e9-bc42-5ef3fc9ae867",
+            "partNumber": [
+                "1",
+                0.13234612978509808,
+                "722a9fe9-3b48-4161-8a7b-9196b3937ad5"
+            ],
+            "partName": null,
+            "dateIssued": [
+                "1908",
+                0.6917226532958554,
+                "ce529822-5376-48c9-b5d6-4bd2b6db8e29"
+            ],
+            "title": [
+                "V r\u00e1ji poh\u00e1dek",
+                0.9488694137970972,
+                "227fcc63-a0aa-4340-ba7d-8ca2ee8f9874"
+            ],
+            "subTitle": [
+                "sb\u00edrka nejkr\u00e1sn\u011bj\u0161\u00edch poh\u00e1dek pro hodn\u00e9 d\u00edtky",
+                0.40126329317842957,
+                "7c2e5d97-9255-4e2a-8d1f-becc11214c3e"
+            ],
+            "edition": null,
+            "placeTerm": [
+                "Praha-Karl\u00edn",
+                0.5512701261309295,
+                "fb4782b5-bbdb-4f85-95c4-3054488493b1"
+            ],
+            "publisher": [
+                [
+                    "Emil \u0160olc spole\u010dnost s r.o.",
+                    0.4670361777386651,
+                    "05d82207-7512-415b-9fff-02f9cd1bcb05"
+                ]
+            ],
+            "manufacturePublisher": null,
+            "manufacturePlaceTerm": null,
+            "author": null,
+            "illustrator": null,
+            "translator": null,
+            "editor": [
+                [
+                    "Nejedl\u00fd, Josef K.",
+                    0.12488554336486934,
+                    "c0039aef-ec9f-4bbe-bb2a-cc1cc04cfb01"
+                ]
+            ],
+            "seriesName": null,
+            "seriesNumber": null
+        },
+        {
+            "type": "page",
+            "id": "e556ac93-43d4-4c8f-bf6f-e8b7d7673b30",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 0,
+            "pageNumber": [
+                "[1a]",
+                0.6815731867239605,
+                "68c71954-0c8e-4e02-8d34-a417a457947d"
+            ],
+            "pageType": [
+                "FrontCover",
+                0.5713125330206554
+            ]
+        },
+        {
+            "type": "page",
+            "id": "543c6b4e-eee3-49b9-a59b-5d1947343fd3",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 1,
+            "pageNumber": [
+                "[1b]",
+                0.16487627314755704,
+                "cbb59376-a109-4116-bfdc-12172be8cf20"
+            ],
+            "pageType": [
+                "FrontEndSheet",
+                0.10149783711064342
+            ]
+        },
+        {
+            "type": "page",
+            "id": "931d606f-301e-4b04-a185-4baca4cb3dde",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 2,
+            "pageNumber": [
+                "[1c]",
+                0.9398964345949553,
+                "50c153a4-0bca-4b3b-aa3a-36509efe41ec"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6787691961746313
+            ]
+        },
+        {
+            "type": "page",
+            "id": "0a949986-ec07-4b42-88b2-3ab37a2a28f8",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 3,
+            "pageNumber": [
+                "[1d]",
+                0.1156264026804773,
+                "e8a015e5-3fcf-4daa-8655-d96f70e7bf1a"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.26185850128585875
+            ]
+        },
+        {
+            "type": "page",
+            "id": "89d4351e-142e-4af2-9d5e-84c89ef53017",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 4,
+            "pageNumber": [
+                "[1e]",
+                0.19281726491824702,
+                "e8dd4c93-b505-4bf3-ad41-64555d18f243"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5072661407881164
+            ]
+        },
+        {
+            "type": "page",
+            "id": "68575a23-f314-42ab-98e2-f7f5a9eb097a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 5,
+            "pageNumber": [
+                "[1f]",
+                0.1733713535264061,
+                "c06b628e-3385-4469-8f8c-ebda1d0eda4a"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4734542163616706
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 6,
+            "pageNumber": [
+                "[1g]",
+                0.40884361193133634,
+                "3566a077-bbbc-4ae6-ab40-a3eb5db1096f"
+            ],
+            "pageType": [
+                "TitlePage",
+                0.9305936660609035
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f8ffaaa6-9263-437c-bc6a-97cb00672e0b",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 7,
+            "pageNumber": [
+                "[1h]",
+                0.07510789232808135,
+                "4311232e-db36-407f-9026-bca918fde4af"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6703879145360768
+            ]
+        },
+        {
+            "type": "page",
+            "id": "d390fd77-311c-49f6-bd02-e871c8ccb606",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 8,
+            "pageNumber": [
+                "[1i]",
+                0.6460633118646839,
+                "214df113-9bd9-4671-a849-8158302f6c6e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6022610311828319
+            ]
+        },
+        {
+            "type": "page",
+            "id": "69a28b9b-adb2-41a7-9d93-bc6719cce65e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 9,
+            "pageNumber": [
+                "[1j]",
+                0.6631460420773233,
+                "b3cdbdb0-6ece-411c-8c8e-0b7136e2b060"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2035748752048704
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a3e7f76e-d04d-4403-9613-436dd1b7a8c7",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 10,
+            "pageNumber": [
+                "[1k]",
+                0.25239599148239855,
+                "73b5aae1-0f8d-4c18-94dd-392043907690"
+            ],
+            "pageType": [
+                "TableOfContents",
+                0.9051221204436121
+            ]
+        },
+        {
+            "type": "page",
+            "id": "0cafe11c-fb1d-4d26-ada3-31a685a53f28",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 11,
+            "pageNumber": [
+                "[1l]",
+                0.699411955476588,
+                "f520d1da-6b68-4f43-87d5-4980d09fa76e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9844075400437262
+            ]
+        },
+        {
+            "type": "page",
+            "id": "b4d21216-3759-4391-b6dd-7c5eb9995427",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 12,
+            "pageNumber": [
+                "1",
+                0.6571174316983972,
+                "da995e2f-c562-4b09-8799-04736fd143f6"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5403323296154007
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5742c260-8964-4a43-9de4-87434ac32d20",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 13,
+            "pageNumber": [
+                "2",
+                0.4061239825853361,
+                "c419cedd-4d72-44c0-acd3-11631650de07"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.977271797920247
+            ]
+        },
+        {
+            "type": "page",
+            "id": "bf8b7207-89be-4b50-a23e-3e042f7a590e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 14,
+            "pageNumber": [
+                "3",
+                0.9643571935501524,
+                "68ec89e5-f475-49dd-bb30-b3d41871b96d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6033081645487683
+            ]
+        },
+        {
+            "type": "page",
+            "id": "660586f7-357f-4c4a-a5b8-03b360f57d1b",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 15,
+            "pageNumber": [
+                "4",
+                0.33896501888225783,
+                "f244d315-94da-459c-8287-98c0a59a0cf0"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9134313741971828
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5e7f1855-0281-4a56-a3db-665015ec99d0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 16,
+            "pageNumber": [
+                "5",
+                0.7534182973054521,
+                "fb624e29-c4ec-493f-aded-3aebfaab2245"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6970490868100323
+            ]
+        },
+        {
+            "type": "page",
+            "id": "759e4838-3487-4ae8-80ba-46c933961138",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 17,
+            "pageNumber": [
+                "6",
+                0.4332677770776352,
+                "17a2f161-7e06-453f-baf3-0954e3c09c5c"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6987733065734631
+            ]
+        },
+        {
+            "type": "page",
+            "id": "944519de-6ef5-41fa-860e-e5a603c0a6f3",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 18,
+            "pageNumber": [
+                "7",
+                0.9103159288518726,
+                "6655dda3-569a-444d-84ef-4c770e6f923a"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8181117670858237
+            ]
+        },
+        {
+            "type": "page",
+            "id": "67b1b526-8cec-4bb0-adf8-692f24e531d0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 19,
+            "pageNumber": [
+                "8",
+                0.9804456624128948,
+                "b249bb16-c661-407a-8542-6c18b31a9b72"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.46676494137763436
+            ]
+        },
+        {
+            "type": "page",
+            "id": "422a693a-b0e0-42d6-9cdf-eec1c286dd53",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 20,
+            "pageNumber": [
+                "9",
+                0.02006101217147227,
+                "05f916f4-da2f-4981-8a70-c1b940710e72"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.661349693283692
+            ]
+        },
+        {
+            "type": "page",
+            "id": "427045f8-9afc-446f-af33-7a9608310432",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 21,
+            "pageNumber": [
+                "10",
+                0.7496354081739333,
+                "744dbbc5-a8ed-45df-a8a9-f3e369fda4af"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.002260276317012755
+            ]
+        },
+        {
+            "type": "page",
+            "id": "b3458163-3de6-4a7d-bb17-ae80d3e3e43c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 22,
+            "pageNumber": [
+                "11",
+                0.4414802323493462,
+                "01f90e4a-26d2-4f3c-8e76-19adeb3186d1"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.22668497658219677
+            ]
+        },
+        {
+            "type": "page",
+            "id": "b1bb4a41-8eb8-4d07-8e37-88efa7d26810",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 23,
+            "pageNumber": [
+                "12",
+                0.06452022137532187,
+                "f54bd1da-9f37-43af-ac85-c97d88296147"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.06728691659127228
+            ]
+        },
+        {
+            "type": "page",
+            "id": "11255f06-9e46-426b-ba55-b1b5e6af7035",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 24,
+            "pageNumber": [
+                "13",
+                0.9919867477587169,
+                "67164044-a2d3-4599-b2d7-2846aee9a365"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.31938794580524665
+            ]
+        },
+        {
+            "type": "page",
+            "id": "81d374bc-ebfb-4c9b-943d-bf803ef7ce41",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 25,
+            "pageNumber": [
+                "14",
+                0.7052321303687555,
+                "1876b4f3-cf9a-421b-a345-ae723b49ea0d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.502606132843929
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ed02a1b9-f2ed-4284-b93f-b4a263eb7791",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 26,
+            "pageNumber": [
+                "15",
+                0.69865670825893,
+                "2702f723-2c01-4447-9280-7a9089596b80"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.047157056279658716
+            ]
+        },
+        {
+            "type": "page",
+            "id": "2497a691-08f3-4190-915f-338cfe3ac7a8",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 27,
+            "pageNumber": [
+                "16",
+                0.5889478189672119,
+                "df63908e-f40f-4e55-a25e-dca4db1f6c90"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.131032384887403
+            ]
+        },
+        {
+            "type": "page",
+            "id": "bb8fc028-69d2-421d-97c0-902fe4804659",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 28,
+            "pageNumber": [
+                "[16a]",
+                0.5518711861193654,
+                "3d7b1fc1-2bae-49b7-875f-5104e1f3af5e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8010015334780105
+            ]
+        },
+        {
+            "type": "page",
+            "id": "315645fb-91e1-45f6-981f-5a618b135f11",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 29,
+            "pageNumber": [
+                "[16b]",
+                0.8403264332817109,
+                "63109d92-0c3a-4dda-8215-534b117a1855"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6135783460299307
+            ]
+        },
+        {
+            "type": "page",
+            "id": "534aaea3-caa2-4b4d-ba4e-6b12b9d714b7",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 30,
+            "pageNumber": [
+                "17",
+                0.20658023710092477,
+                "07e2431b-5c16-4597-bef0-496ccdbe2423"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.047872859021275915
+            ]
+        },
+        {
+            "type": "page",
+            "id": "e130612b-0639-4058-80fb-5e1e7d0a8f65",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 31,
+            "pageNumber": [
+                "18",
+                0.9216772565373719,
+                "c479e0a7-677f-4700-a7aa-f5bcd243d529"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9453261676353175
+            ]
+        },
+        {
+            "type": "page",
+            "id": "72684f68-eec4-49aa-8b4d-6c0f62360fe8",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 32,
+            "pageNumber": [
+                "19",
+                0.8213454311664942,
+                "68b1a91f-496d-4fc8-afac-a521163260d7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9972488658978371
+            ]
+        },
+        {
+            "type": "page",
+            "id": "9408595c-3aff-46d2-a30f-c61ae2c745da",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 33,
+            "pageNumber": [
+                "20",
+                0.5746232365209824,
+                "5c9b505a-f31d-491e-be7f-958e04546dc8"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6644944783547988
+            ]
+        },
+        {
+            "type": "page",
+            "id": "374fa069-42a4-4c22-b778-982e19f5f6a0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 34,
+            "pageNumber": [
+                "21",
+                0.5312528870657416,
+                "d402ee3c-129b-46f2-bc9d-0e5c18e6c475"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9455225895687923
+            ]
+        },
+        {
+            "type": "page",
+            "id": "4a00dc0a-d584-4592-a2cc-0ef1baecd99d",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 35,
+            "pageNumber": [
+                "22",
+                0.3042283514443228,
+                "fdbebd64-4801-4b33-b70a-bbb019bb4940"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.020142899556543137
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a69b7d4e-4950-42e9-af5f-9a464680c7f1",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 36,
+            "pageNumber": [
+                "23",
+                0.7370057940734365,
+                "f7fb7364-6a9b-4f47-a945-f45e61189ba7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.29513345108605427
+            ]
+        },
+        {
+            "type": "page",
+            "id": "2b8d6a71-d36b-4398-9fbc-48617abdec1f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 37,
+            "pageNumber": [
+                "24",
+                0.40141621795670546,
+                "9f76c236-f39e-4ac6-8549-c102929a47c8"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.901779804075419
+            ]
+        },
+        {
+            "type": "page",
+            "id": "28bb55e0-186b-48c0-a9f4-8e83082b09f7",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 38,
+            "pageNumber": [
+                "25",
+                0.5186256948420337,
+                "85c98510-e35f-432c-8b3c-2239c03f9f3b"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.08708014851427992
+            ]
+        },
+        {
+            "type": "page",
+            "id": "0017b97f-03fe-459f-8157-ccd28a9c0742",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 39,
+            "pageNumber": [
+                "26",
+                0.837867732153906,
+                "d0e519f2-6445-488e-b26f-53537de82693"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2655887573125417
+            ]
+        },
+        {
+            "type": "page",
+            "id": "09144528-d967-4c00-9c24-27a1b3d1bb12",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 40,
+            "pageNumber": [
+                "[26a]",
+                0.9169333263172442,
+                "0a45dd13-733e-4867-a4ea-56e3f6470b70"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.10461957284514767
+            ]
+        },
+        {
+            "type": "page",
+            "id": "b72896b2-89d3-4591-b4e5-890fc7547e9f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 41,
+            "pageNumber": [
+                "[26b]",
+                0.9477962626850507,
+                "9b78bcd3-dbbc-4b6d-8f72-9ef7b302faef"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7228739784160894
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f9bd5e07-4819-45d7-8889-b0674c4c03fa",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 42,
+            "pageNumber": [
+                "27",
+                0.6210929729997631,
+                "ab8853c3-8542-4e77-9635-8c65cc279b00"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.04223265728833736
+            ]
+        },
+        {
+            "type": "page",
+            "id": "e2303663-5dc9-42c9-a676-a0ef013460a2",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 43,
+            "pageNumber": [
+                "28",
+                0.691901617478665,
+                "85f4088a-ccfb-4103-ad8f-593c3063d5e7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9280060715334255
+            ]
+        },
+        {
+            "type": "page",
+            "id": "8cca232d-3990-4f3c-ac21-d79b0fb1ff9f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 44,
+            "pageNumber": [
+                "29",
+                0.4885969516938372,
+                "865cb8c1-2ad7-41eb-8a6e-227d5caf1a0d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9781537760581004
+            ]
+        },
+        {
+            "type": "page",
+            "id": "38d2065f-ca47-40cf-8be3-2e107ef5814a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 45,
+            "pageNumber": [
+                "30",
+                0.5531534851959652,
+                "42a685c0-3282-4dac-b329-a0737f25e62f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.025318441836536865
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ba1d6bed-104a-49e8-8e1e-32f9ea667be9",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 46,
+            "pageNumber": [
+                "31",
+                0.5061545438373487,
+                "8423cb0c-57b4-4d16-bb6a-f210dd704042"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5487891011133355
+            ]
+        },
+        {
+            "type": "page",
+            "id": "13c46bdb-efd8-43c5-9ae6-905c757cea62",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 47,
+            "pageNumber": [
+                "32",
+                0.6409018628372375,
+                "f587baef-dc5c-4f1c-b017-fbaa21aab92f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7258010993947069
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5fd63b9d-47af-416b-b7c2-edffff075920",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 48,
+            "pageNumber": [
+                "[32a]",
+                0.1119656340130083,
+                "2baa5d15-672a-4f49-9fe2-2aafef03d6dd"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.13326948764172475
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f1420723-410f-40f7-8f3c-7a25945e2c61",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 49,
+            "pageNumber": [
+                "[32b]",
+                0.9472171530718281,
+                "9c3ebf75-8d9c-461b-a957-3107ce26c5f5"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7180789768677283
+            ]
+        },
+        {
+            "type": "page",
+            "id": "bc465ccc-ece1-4c39-b44a-24562614eb50",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 50,
+            "pageNumber": [
+                "33",
+                0.011313342295164563,
+                "bb1daefc-09c8-4e2c-ae7a-54372c71b829"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5070517704246968
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f41070ac-07bc-4586-a7d9-a1bd7b3e7651",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 51,
+            "pageNumber": [
+                "34",
+                0.27602340203588394,
+                "a5a00540-3fb9-4f14-9e55-95b656cdfb96"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8461825034719697
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f47c97e7-20dc-4110-96ed-b73d68739f16",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 52,
+            "pageNumber": [
+                "35",
+                0.5548050951947716,
+                "8ca2a763-552c-4ebc-9102-c631d5f23bfc"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4697641367477018
+            ]
+        },
+        {
+            "type": "page",
+            "id": "620677a4-dd75-45f9-a630-ef173ff66301",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 53,
+            "pageNumber": [
+                "36",
+                0.6780454860782754,
+                "ec0867de-ee53-40fd-8c4d-e31f4887e68f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9925498403624355
+            ]
+        },
+        {
+            "type": "page",
+            "id": "905bfb8d-99de-4da5-b3e5-bf2785c8a8e0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 54,
+            "pageNumber": [
+                "37",
+                0.9431907468103989,
+                "22083fc1-28ca-4d99-8126-b79f5c360b15"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.260261331602368
+            ]
+        },
+        {
+            "type": "page",
+            "id": "25325e58-326f-4bf6-9485-5bafe891da12",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 55,
+            "pageNumber": [
+                "38",
+                0.08113499001465896,
+                "68110d5c-0af0-4595-bd1f-2f9078b3a294"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7241961320901436
+            ]
+        },
+        {
+            "type": "page",
+            "id": "fc419129-202f-47e3-a38f-dabe6f938f62",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 56,
+            "pageNumber": [
+                "39",
+                0.9686986769695879,
+                "f6c5fd3e-d5da-4fb0-8298-a63cc2b34eee"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5887835344284973
+            ]
+        },
+        {
+            "type": "page",
+            "id": "4b8aa356-ca9c-4f09-bb4f-f914f31979bf",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 57,
+            "pageNumber": [
+                "40",
+                0.4315295789570375,
+                "9996916e-71c9-4b0a-9ae2-330463421cff"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6303519764787117
+            ]
+        },
+        {
+            "type": "page",
+            "id": "0745532a-1427-4973-8396-f6d9cd23d5b7",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 58,
+            "pageNumber": [
+                "41",
+                0.11414746911708662,
+                "ab7f2193-3629-4186-9354-aa650b6777eb"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.44391064745433384
+            ]
+        },
+        {
+            "type": "page",
+            "id": "872c418f-3c2c-448e-abb3-d3dcd02d68dc",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 59,
+            "pageNumber": [
+                "42",
+                0.9957124606496328,
+                "d70537e3-0533-43ad-997e-ce0a24fcce5e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2611558728409914
+            ]
+        },
+        {
+            "type": "page",
+            "id": "67f75f98-e691-4355-b52f-65a9795b12bd",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 60,
+            "pageNumber": [
+                "43",
+                0.3806040228859894,
+                "f8d4afb9-5587-4208-8d4a-01724a6f34e4"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9299051390404657
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ae2e8536-744a-4c63-b703-9846656e921d",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 61,
+            "pageNumber": [
+                "44",
+                0.9867250221102697,
+                "ef40c526-1382-425d-8c81-5cac1f3a18d0"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5649834718812335
+            ]
+        },
+        {
+            "type": "page",
+            "id": "33c2ae90-9b5b-4792-9e65-471802413c44",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 62,
+            "pageNumber": [
+                "45",
+                0.5145391777219461,
+                "00a0cbe3-4b8c-464f-9d33-8b012a501c30"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7157500610525307
+            ]
+        },
+        {
+            "type": "page",
+            "id": "3cffe2af-333a-45f5-b654-3beb89b88fae",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 63,
+            "pageNumber": [
+                "46",
+                0.8321047879001962,
+                "866e8295-ce0d-4bf1-90d4-1aa9565a9f36"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.998344912666994
+            ]
+        },
+        {
+            "type": "page",
+            "id": "67cdc6a5-4d8f-4a1d-a77a-a8cc2b62f814",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 64,
+            "pageNumber": [
+                "47",
+                0.30248796823258195,
+                "af07d749-55b4-4713-b0ad-7bf3f5f72130"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9707437715177849
+            ]
+        },
+        {
+            "type": "page",
+            "id": "cd556050-8aba-4ba1-8223-0eed8a2fcdf6",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 65,
+            "pageNumber": [
+                "48",
+                0.9198830764486582,
+                "434b19f6-8e0b-4399-bbd4-be124feb5bd7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4978079571719035
+            ]
+        },
+        {
+            "type": "page",
+            "id": "63783a0c-aaa5-4dc3-bd4b-d7686a062b1d",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 66,
+            "pageNumber": [
+                "[48a]",
+                0.13003505530344006,
+                "e3de0270-5b1d-4387-9bc0-b5b4ab126e00"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.22079641603744848
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a4b37f5a-63bd-4719-bc09-f0a3a817bcc5",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 67,
+            "pageNumber": [
+                "[48b]",
+                0.2884099086902522,
+                "3f360af0-a62c-42ba-96ce-40ff91312eee"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9641568868086937
+            ]
+        },
+        {
+            "type": "page",
+            "id": "6c62e9f0-7323-4c0e-92d6-d0b06a3129d1",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 68,
+            "pageNumber": [
+                "49",
+                0.4111856120752868,
+                "8b9eed2e-74f1-48f9-b181-97104898adee"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9635758901668304
+            ]
+        },
+        {
+            "type": "page",
+            "id": "2774ca2f-f86d-48be-8681-958397801133",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 69,
+            "pageNumber": [
+                "50",
+                0.753387964963128,
+                "e851c821-e0af-4884-bc58-11a19dba1b20"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6032961314705606
+            ]
+        },
+        {
+            "type": "page",
+            "id": "2a034b55-ff87-42ae-99c0-cdfe8975387e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 70,
+            "pageNumber": [
+                "51",
+                0.1636284525910866,
+                "9c2b2445-92a3-4377-ac0a-5e126e15597d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.346451085491583
+            ]
+        },
+        {
+            "type": "page",
+            "id": "606d5c56-5a87-4a67-87ba-110601c06036",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 71,
+            "pageNumber": [
+                "52",
+                0.7958810898672477,
+                "60838e3d-ea34-41fd-a00a-a4b8ad22d0c6"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.3740078699911724
+            ]
+        },
+        {
+            "type": "page",
+            "id": "29d34354-b58b-43a1-8df3-44025b96463d",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 72,
+            "pageNumber": [
+                "53",
+                0.09339377025784512,
+                "9d455c9d-578c-4e74-9db5-e3a0851be960"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7204501450857207
+            ]
+        },
+        {
+            "type": "page",
+            "id": "7e20139b-ebfa-4204-ab7c-16b902bc9a58",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 73,
+            "pageNumber": [
+                "54",
+                0.5659106990123023,
+                "c96e77ba-b4d5-4cd6-94cc-3132f107db98"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2886462576236607
+            ]
+        },
+        {
+            "type": "page",
+            "id": "580447c0-95ae-46e4-ab4d-f51c25fb0247",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 74,
+            "pageNumber": [
+                "55",
+                0.7573476349386858,
+                "c92a5381-9356-448c-b9de-12360cc8442f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.561067903388926
+            ]
+        },
+        {
+            "type": "page",
+            "id": "527a424b-e4e6-4714-a121-9c28aa053ce9",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 75,
+            "pageNumber": [
+                "56",
+                0.4541346158206011,
+                "754c2800-f349-4466-ab89-a6ca2be79919"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.029353944123712172
+            ]
+        },
+        {
+            "type": "page",
+            "id": "8ccac6a1-b016-4a06-b357-c8d163f1c3a5",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 76,
+            "pageNumber": [
+                "57",
+                0.7649091898035832,
+                "fed7dab6-374d-464a-8b83-c96e935d3ea9"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7899304913389613
+            ]
+        },
+        {
+            "type": "page",
+            "id": "d323113b-d0dc-4179-9b91-e3457fc333d0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 77,
+            "pageNumber": [
+                "58",
+                0.6347324301484745,
+                "24ab8b76-7ddd-46d3-914f-9a3bbf362036"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6015799737964275
+            ]
+        },
+        {
+            "type": "page",
+            "id": "fe33353b-abbe-4133-ab1a-a0a142bfe1a4",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 78,
+            "pageNumber": [
+                "59",
+                0.2868426491455357,
+                "9faf215e-67ca-4276-8d58-c4bd6ea0a5e4"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.31075999671433396
+            ]
+        },
+        {
+            "type": "page",
+            "id": "9a62de0f-0f78-4fa7-915f-0416f86bcd6c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 79,
+            "pageNumber": [
+                "60",
+                0.9551319408912763,
+                "67b768e7-50f7-4123-9c54-115555e4626d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.20433254023814817
+            ]
+        },
+        {
+            "type": "page",
+            "id": "c99117de-41f4-4db0-9cf2-6162268671e8",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 80,
+            "pageNumber": [
+                "61",
+                0.7792585329915722,
+                "8af49609-d61d-40bd-8a8b-946a150d1395"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.11192781782077277
+            ]
+        },
+        {
+            "type": "page",
+            "id": "66895310-5444-459b-bee6-78e7035027f1",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 81,
+            "pageNumber": [
+                "62",
+                0.7054313310517901,
+                "d484de3e-54ad-40bf-8a2c-7e4bc1fa2eb2"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.013052257663590083
+            ]
+        },
+        {
+            "type": "page",
+            "id": "6d70ee0a-be26-43f4-9381-d09426f589cb",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 82,
+            "pageNumber": [
+                "63",
+                0.03699019187817121,
+                "a5b6d7b0-e09f-4165-9d64-9b61b29f430e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7630540588768953
+            ]
+        },
+        {
+            "type": "page",
+            "id": "9af8028e-28f4-4327-a286-5a0a7ff5ff50",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 83,
+            "pageNumber": [
+                "64",
+                0.023324003195607568,
+                "3c450986-33c1-4d02-a374-2b6c8460906c"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.16400605348133412
+            ]
+        },
+        {
+            "type": "page",
+            "id": "4f20f40b-8405-4d8f-a1aa-067e8bcb7b7e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 84,
+            "pageNumber": [
+                "[64a]",
+                0.8105204718782595,
+                "68230652-5619-434b-9023-39c159cf990c"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6163982458257957
+            ]
+        },
+        {
+            "type": "page",
+            "id": "baaeb6d6-64e7-4e76-bee0-3f0bc341e429",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 85,
+            "pageNumber": [
+                "[64b]",
+                0.4462958129773932,
+                "8b748cd3-48cc-471d-b025-43be18477673"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5096685340463898
+            ]
+        },
+        {
+            "type": "page",
+            "id": "36cef378-8aee-4621-9c9c-a5d1552ba861",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 86,
+            "pageNumber": [
+                "65",
+                0.24233131099664473,
+                "89c0813e-5e2b-4237-a4fd-42e5e5b8afbc"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.23599410786179564
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f268d07d-bb01-4da4-9b30-efbc16740802",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 87,
+            "pageNumber": [
+                "66",
+                0.9481515168437038,
+                "3af78a20-58e9-4a7d-8b9e-8bb8ce7f4d68"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.032933599011008674
+            ]
+        },
+        {
+            "type": "page",
+            "id": "d02bbbd8-d8ac-438a-9cef-078ab6bbde44",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 88,
+            "pageNumber": [
+                "67",
+                0.6183699770483111,
+                "6557a744-46e4-45cd-adda-a1643de267fa"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.38659821446057974
+            ]
+        },
+        {
+            "type": "page",
+            "id": "8f535db8-2ed1-4d55-83af-56f134f055da",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 89,
+            "pageNumber": [
+                "68",
+                0.6828212042325512,
+                "0736f4ab-08e5-43c8-add7-13c89e9cfccf"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.3522350471051663
+            ]
+        },
+        {
+            "type": "page",
+            "id": "2ba8e8e2-0c87-4e51-bed3-0b24949b6d86",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 90,
+            "pageNumber": [
+                "69",
+                0.8918529467609282,
+                "07d5203e-08f5-4d7f-b65a-e3465c38abd7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.010407423283404937
+            ]
+        },
+        {
+            "type": "page",
+            "id": "834abf78-9504-4d04-8609-7d9ecfd87757",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 91,
+            "pageNumber": [
+                "70",
+                0.13619060015599382,
+                "d1e0b3e7-2b39-4e1a-90b6-4b3824ee3d00"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.20647461786958798
+            ]
+        },
+        {
+            "type": "page",
+            "id": "3c3818bb-d89d-4fe0-a549-46d40b244d88",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 92,
+            "pageNumber": [
+                "71",
+                0.6837988032335557,
+                "d62e2c6f-7c49-452d-8cb1-a9c44883ea34"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9782567380399138
+            ]
+        },
+        {
+            "type": "page",
+            "id": "e5a90df1-1d32-4eb5-b7df-5b500c7af0b4",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 93,
+            "pageNumber": [
+                "72",
+                0.5587378802747569,
+                "a33380e4-6faf-45bd-aa8e-791813da0713"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7288263531653929
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5bafb0dc-819a-4d07-b472-b173e97a1195",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 94,
+            "pageNumber": [
+                "73",
+                0.16638431962452205,
+                "71051922-23e2-442a-a4d1-b736f5e3f343"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.045900812092102505
+            ]
+        },
+        {
+            "type": "page",
+            "id": "6fae8f25-c5ed-4a3e-ad60-d6340284814c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 95,
+            "pageNumber": [
+                "74",
+                0.9172021991511387,
+                "87d70dbf-e13a-47c8-bae3-9f4ea984700f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5933289289452717
+            ]
+        },
+        {
+            "type": "page",
+            "id": "c5a7d354-62ad-467f-95e9-27d231f58b19",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 96,
+            "pageNumber": [
+                "75",
+                0.29223000389643405,
+                "23862c39-2223-468e-9618-011f8b90e0b0"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6640162712080767
+            ]
+        },
+        {
+            "type": "page",
+            "id": "fe65f242-e02f-4d28-83e9-3dc33f1571bb",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 97,
+            "pageNumber": [
+                "76",
+                0.9513595281164742,
+                "d055cdd3-4a92-4008-ae02-29448b6c21a3"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9331109531775478
+            ]
+        },
+        {
+            "type": "page",
+            "id": "19fb3156-67dc-4ade-b532-3fd59949460b",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 98,
+            "pageNumber": [
+                "77",
+                0.18482427068927987,
+                "52452ea7-44e5-4b88-b026-e47a8fa67f08"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.991906895366835
+            ]
+        },
+        {
+            "type": "page",
+            "id": "16301c7e-960b-4077-97bb-16fd42957596",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 99,
+            "pageNumber": [
+                "78",
+                0.06839855832109887,
+                "431781de-dae4-40b4-8fa2-5d0046741b59"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4350344734169065
+            ]
+        },
+        {
+            "type": "page",
+            "id": "dccac628-92a1-4182-8536-534a0b93416f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 100,
+            "pageNumber": [
+                "79",
+                0.047097613725998855,
+                "fa6c8937-547b-4b9f-8666-dc6144fbab07"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.18339377807551338
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5ccebf5d-62b5-4054-8ec2-0e8a025f522c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 101,
+            "pageNumber": [
+                "80",
+                0.9496340011485817,
+                "620702df-d52d-4471-9904-a015fdd3a93e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9244106697583888
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f518bbf5-7ad9-4478-bbce-d49a2723a337",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 102,
+            "pageNumber": [
+                "[81]",
+                0.553464549879335,
+                "a64359e5-8dee-41c5-a71e-089af10abfe4"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.05678050929019007
+            ]
+        },
+        {
+            "type": "page",
+            "id": "1a051170-95d9-49a9-8f63-587d653b6f0e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 103,
+            "pageNumber": [
+                "[82]",
+                0.08096932531590639,
+                "20d940dc-0967-4ddf-8f18-df93cc13c80a"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9134959090338336
+            ]
+        },
+        {
+            "type": "page",
+            "id": "31f0f3f5-c701-4b58-8f61-2da2c024391a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 104,
+            "pageNumber": [
+                "[83]",
+                0.6374666921937236,
+                "947ef347-f127-4d73-abf6-3d9709eaf0e6"
+            ],
+            "pageType": [
+                "BackEndSheet",
+                0.34965069928785897
+            ]
+        },
+        {
+            "type": "page",
+            "id": "becb3c99-d242-433c-846a-db66caabf4f5",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "70b5aea0-6017-11e9-b8c0-005056827e52",
+            "pageIndex": 105,
+            "pageNumber": [
+                "[84]",
+                0.12204716108051372,
+                "7efe034b-b03c-4b66-9c62-b7dfb6bd0c62"
+            ],
+            "pageType": [
+                "BackCover",
+                0.9851983073036955
+            ]
+        },
+        {
+            "type": "volume",
+            "periodical": false,
+            "id": "b1713d50-a168-11e9-9209-005056827e51",
+            "parent_id": "0accda90-9d76-11e9-bc42-5ef3fc9ae867",
+            "partNumber": [
+                "2",
+                0.9500263879568523,
+                "26cbcb6f-3593-4b8d-8a64-0c7ebd80e2b5"
+            ],
+            "partName": null,
+            "dateIssued": [
+                "1908",
+                0.9252711938594279,
+                "6973d3ab-7295-4163-8b06-f7b38291c4a0"
+            ],
+            "title": [
+                "V r\u00e1ji poh\u00e1dek",
+                0.06562657856376719,
+                "0736825e-9994-4578-b72f-c94f73697fb7"
+            ],
+            "subTitle": [
+                "sb\u00edrka nejkr\u00e1sn\u011bj\u0161\u00edch poh\u00e1dek pro hodn\u00e9 d\u00edtky",
+                0.8586866411544684,
+                "082aabca-bfa1-4989-94a5-60cc639928fb"
+            ],
+            "edition": null,
+            "placeTerm": [
+                "Praha-Karl\u00edn",
+                0.21011152798497734,
+                "6949e7ea-8507-4012-94df-e5e10676569c"
+            ],
+            "publisher": [
+                [
+                    "Emil \u0160olc spole\u010dnost s r.o.",
+                    0.27837781142529794,
+                    "6c941023-9b49-4bb6-8d61-c28eb200b241"
+                ]
+            ],
+            "manufacturePublisher": null,
+            "manufacturePlaceTerm": null,
+            "author": null,
+            "illustrator": null,
+            "translator": null,
+            "editor": [
+                [
+                    "Nejedl\u00fd, Josef K.",
+                    0.19437203613692444,
+                    "38f808a0-745d-4808-918c-c0f097314ae2"
+                ]
+            ],
+            "seriesName": null,
+            "seriesNumber": null
+        },
+        {
+            "type": "page",
+            "id": "0ee5be65-cb50-42d4-b0ed-0f2ac15e5fb7",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 0,
+            "pageNumber": [
+                "[1a]",
+                0.15316591497651932,
+                "7d340f1c-9a85-4ce1-bda8-7674718f8df3"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.822250311257209
+            ]
+        },
+        {
+            "type": "page",
+            "id": "457a9e71-0417-4b23-be7a-419476fe6948",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 1,
+            "pageNumber": [
+                "[1b]",
+                0.0165776680561438,
+                "9afe0547-79da-442d-a7d0-ed3c4ab5a96b"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6170216949564158
+            ]
+        },
+        {
+            "type": "page",
+            "id": "d026c847-d2a6-49d6-8a74-b1a11ece8177",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 2,
+            "pageNumber": [
+                "[1c]",
+                0.5562389572728903,
+                "a15d24b6-45f6-4a97-a26e-4e650050d4d9"
+            ],
+            "pageType": [
+                "TableOfContents",
+                0.08257160411410636
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f33bd322-f8d8-40bd-975d-1e6a3ae0fcad",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 3,
+            "pageNumber": [
+                "[1d]",
+                0.048935580385023325,
+                "8af38250-9320-4343-bcef-91fcab958152"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7185392072045691
+            ]
+        },
+        {
+            "type": "page",
+            "id": "363c170b-cad1-46c7-a697-9f618eddb643",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 4,
+            "pageNumber": [
+                "1",
+                0.6338303007034826,
+                "d26a2cfc-821a-41ea-8d57-05caa02c52a7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4147061416148582
+            ]
+        },
+        {
+            "type": "page",
+            "id": "6c4372f6-dee2-422d-9a34-96f2f09f23e2",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 5,
+            "pageNumber": [
+                "2",
+                0.8933341056918075,
+                "46c02784-ee17-4c1a-96ae-86de2b747884"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6527029047100217
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f06abf41-0354-4be6-9ac1-a65862267028",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 6,
+            "pageNumber": [
+                "3",
+                0.5762602565697305,
+                "e1cf9b3b-cdf2-4022-970b-335bc1206ce4"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5911621852602826
+            ]
+        },
+        {
+            "type": "page",
+            "id": "31ae9888-7247-42e1-ba24-ad336336b60b",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 7,
+            "pageNumber": [
+                "4",
+                0.6274755157699721,
+                "a6b22a87-65bf-4c9b-927d-6b87f32cf25e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4965598203791223
+            ]
+        },
+        {
+            "type": "page",
+            "id": "7113b48f-432d-4009-9c01-0a65813eb829",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 8,
+            "pageNumber": [
+                "5",
+                0.7322977545902044,
+                "a2e5f32a-5710-48cd-b431-3ff82eedf8d5"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6130910866469648
+            ]
+        },
+        {
+            "type": "page",
+            "id": "c91ce484-227a-4d96-9437-bb85334ee0bd",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 9,
+            "pageNumber": [
+                "6",
+                0.254330228439527,
+                "b35f0239-c787-4c58-98d6-7f6a77a88f7f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.06723527893273573
+            ]
+        },
+        {
+            "type": "page",
+            "id": "70c5bfb1-4295-447b-8a70-a786e53696a8",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 10,
+            "pageNumber": [
+                "7",
+                0.632853089875049,
+                "fdf80297-472f-4305-b767-0966f7e9395f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6987034410719467
+            ]
+        },
+        {
+            "type": "page",
+            "id": "3c8f76d3-9131-4041-a4cd-9ee0532aaedd",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 11,
+            "pageNumber": [
+                "8",
+                0.9176343387464706,
+                "9d9bf8b8-e93a-40ea-989e-97a4fa44f452"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.19854324716027183
+            ]
+        },
+        {
+            "type": "page",
+            "id": "6764994f-2c86-4910-a42c-118d1a6af208",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 12,
+            "pageNumber": [
+                "[8a]",
+                0.19076629987797444,
+                "c764fe56-e843-4b23-a744-bfb347a76188"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.1220406590401496
+            ]
+        },
+        {
+            "type": "page",
+            "id": "9651e92a-141a-4d78-8e99-9ce58bdcdf8c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 13,
+            "pageNumber": [
+                "[8b]",
+                0.9863675355466356,
+                "6322a0e3-11e8-49e1-b49f-6198dd52a2e7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8550069169261711
+            ]
+        },
+        {
+            "type": "page",
+            "id": "175cc9f8-2217-4427-8ddc-9c75c29ad688",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 14,
+            "pageNumber": [
+                "9",
+                0.11994572508750267,
+                "cb01fa87-4ee3-4165-aa39-b67119b87d09"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4939725742179424
+            ]
+        },
+        {
+            "type": "page",
+            "id": "6af80070-3858-4bb1-9637-0fd8f7cb7cfe",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 15,
+            "pageNumber": [
+                "10",
+                0.23082029583507735,
+                "64310d9a-d8d2-44a0-8d55-89143476a1ae"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.28200206586310883
+            ]
+        },
+        {
+            "type": "page",
+            "id": "02e55030-b9a6-4011-8dce-ab6b136223bb",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 16,
+            "pageNumber": [
+                "11",
+                0.5244992329913125,
+                "7d4e3dd3-3281-4c43-96d4-5e31e83e6460"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7108426151595756
+            ]
+        },
+        {
+            "type": "page",
+            "id": "4c6d34d4-3adb-4119-a848-4819868be16e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 17,
+            "pageNumber": [
+                "12",
+                0.2012801122329141,
+                "bfad5f67-72ef-4f94-9f29-6905f4859792"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.807152051363801
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f0584537-79d5-40c2-929c-ada357ee1481",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 18,
+            "pageNumber": [
+                "13",
+                0.144199121388342,
+                "fe26a8bf-a25d-4a52-a6a4-0f033738d1c4"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.32195075723812205
+            ]
+        },
+        {
+            "type": "page",
+            "id": "560b59f4-8d7f-4a8a-9125-45267b004236",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 19,
+            "pageNumber": [
+                "14",
+                0.03763726452694549,
+                "e3759594-7c86-476d-922d-6a6be24e53a2"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.811668367938487
+            ]
+        },
+        {
+            "type": "page",
+            "id": "6b97d15a-5f50-4ef5-aa65-9f176b1131af",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 20,
+            "pageNumber": [
+                "15",
+                0.1827117324624038,
+                "33b2f202-a403-4b0e-b285-518b5670e282"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6978806037235666
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a4cb0551-5801-47f3-831e-1988f0d8d911",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 21,
+            "pageNumber": [
+                "16",
+                0.9292092022179883,
+                "4603e269-aa5d-474d-8852-65d875db2973"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.475967279944689
+            ]
+        },
+        {
+            "type": "page",
+            "id": "427a4fe6-5b6b-4c81-8a97-0982409f78c3",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 22,
+            "pageNumber": [
+                "[16a]",
+                0.0014334825764977799,
+                "c03959e2-f824-41a1-8bb4-6293e4bbcae2"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.979886598820287
+            ]
+        },
+        {
+            "type": "page",
+            "id": "d8817f5a-f5be-4167-954a-2fa24e52454d",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 23,
+            "pageNumber": [
+                "[16b]",
+                0.380619212191855,
+                "a9d5686d-399a-4864-a2f9-746d6f0c72a3"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9455076779830813
+            ]
+        },
+        {
+            "type": "page",
+            "id": "0a5a6b7e-d38b-423a-8a44-bed25e1cf633",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 24,
+            "pageNumber": [
+                "17",
+                0.18698152164825388,
+                "d704eaa6-f1ab-42f7-b18e-412252c210f7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7591120066132584
+            ]
+        },
+        {
+            "type": "page",
+            "id": "962840f2-744b-4463-81ec-c5cbd74fbc6a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 25,
+            "pageNumber": [
+                "18",
+                0.3214738289301714,
+                "a16525b1-b957-4fd0-80ad-d733075b7794"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.37690081496179817
+            ]
+        },
+        {
+            "type": "page",
+            "id": "98a28396-1e63-49aa-a710-dabe5cbc03e6",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 26,
+            "pageNumber": [
+                "19",
+                0.1642730738510535,
+                "f5ad38db-6cf1-4176-a9e9-d37b178ece3e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8635104632164067
+            ]
+        },
+        {
+            "type": "page",
+            "id": "093e6bb4-16d1-4ddb-a55d-45ac1dc12946",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 27,
+            "pageNumber": [
+                "20",
+                0.12205937426243607,
+                "b77d3e4d-dbcb-4f32-a50f-a6428d138d29"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6121316285755997
+            ]
+        },
+        {
+            "type": "page",
+            "id": "8877b6e5-0af9-44d8-80a4-c9fb69b0e24f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 28,
+            "pageNumber": [
+                "21",
+                0.8884438519768266,
+                "dd51df71-591c-4975-96ef-5a6e818d3879"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5771757283451195
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5d30c193-d243-4361-8291-546487585974",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 29,
+            "pageNumber": [
+                "22",
+                0.06261793305009389,
+                "2a9cbe42-b529-4f67-b4fd-aab4b0c986f4"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.712613539865175
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ba684f3d-5786-4581-9ab9-552bc6c57d9f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 30,
+            "pageNumber": [
+                "23",
+                0.6350463390344929,
+                "ff3da19e-5f21-4ce0-a3bb-3014f3ef8e6a"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.011664083284326998
+            ]
+        },
+        {
+            "type": "page",
+            "id": "42dae352-d363-4316-8025-cda7d391b5cc",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 31,
+            "pageNumber": [
+                "24",
+                0.4265288291861463,
+                "3df94006-c9f1-4386-ac9a-5e49b358bf4d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.375620297892199
+            ]
+        },
+        {
+            "type": "page",
+            "id": "cf3687e6-3a1f-497e-9cb3-f77c4a547102",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 32,
+            "pageNumber": [
+                "25",
+                0.9127852922799575,
+                "b6e792cc-0188-4dad-83d3-55aae5f74c29"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5328868913816828
+            ]
+        },
+        {
+            "type": "page",
+            "id": "700ffe2d-f78f-48ec-a803-f18e8e0850a1",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 33,
+            "pageNumber": [
+                "26",
+                0.10733804987217033,
+                "8cb68bae-d70f-40b9-8bdb-4de678ace98d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9037371314058686
+            ]
+        },
+        {
+            "type": "page",
+            "id": "b0a7c7b9-db2d-4879-93c5-f88edd7cb2d4",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 34,
+            "pageNumber": [
+                "27",
+                0.43329026747714916,
+                "d226942e-f28b-4b5b-8824-8dd32429d418"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4085130642250049
+            ]
+        },
+        {
+            "type": "page",
+            "id": "1d392098-5268-42cc-a88f-838f9e1e2e26",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 35,
+            "pageNumber": [
+                "28",
+                0.5435544348942536,
+                "ece449c1-f40b-4f34-a85c-02beb783f562"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8283028308730884
+            ]
+        },
+        {
+            "type": "page",
+            "id": "086be575-d7bc-46c1-afa9-1d28fdb76f0c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 36,
+            "pageNumber": [
+                "29",
+                0.24687487898622296,
+                "b4af85fd-aae4-4dd0-b7ed-fba3dc1173cf"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.18481981872946174
+            ]
+        },
+        {
+            "type": "page",
+            "id": "8802e447-a940-4103-9366-a8c0b9f213ee",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 37,
+            "pageNumber": [
+                "30",
+                0.6276519808319274,
+                "7295f936-4e93-46dd-a5dd-7bece6d8ef05"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.31242884901226453
+            ]
+        },
+        {
+            "type": "page",
+            "id": "c50e027a-be91-44d2-84f0-e0f83cb404b3",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 38,
+            "pageNumber": [
+                "31",
+                0.4301803198446621,
+                "d5923eec-e0f4-43bc-a7f0-c0d65eead086"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.3197613832020788
+            ]
+        },
+        {
+            "type": "page",
+            "id": "721529ef-f862-4dd8-9fb6-a946eba64730",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 39,
+            "pageNumber": [
+                "32",
+                0.4751896622899928,
+                "b1674af2-c93d-4237-8d97-8c4f1cde60ec"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.10953739672433604
+            ]
+        },
+        {
+            "type": "page",
+            "id": "9b0308e9-9617-4606-8bd2-7db1bf841b9c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 40,
+            "pageNumber": [
+                "[32a]",
+                0.12540066126555727,
+                "5bceaa80-00b0-473e-bc81-e44456232643"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.06653732521111289
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a0e6fce1-ec21-4462-a515-088614f706c0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 41,
+            "pageNumber": [
+                "[32b]",
+                0.9829870441162208,
+                "8ac210f7-2180-459c-a814-225043c05a35"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9035019223539743
+            ]
+        },
+        {
+            "type": "page",
+            "id": "80b1f269-5619-401c-9e9a-4d60c11f55d5",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 42,
+            "pageNumber": [
+                "33",
+                0.46116433930943646,
+                "d01d700b-e6b3-42e8-a107-6b6ac1d14ee8"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.19083915119111639
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5b92ffa0-6abb-445c-a4fa-7587681fa93b",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 43,
+            "pageNumber": [
+                "34",
+                0.9180155530237186,
+                "22a18f6d-1328-47b7-ab2b-095c0f2cbf69"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2825591313368584
+            ]
+        },
+        {
+            "type": "page",
+            "id": "319c542c-6c4c-404e-bf9f-393a0e2d137a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 44,
+            "pageNumber": [
+                "35",
+                0.6158104939260992,
+                "ab87d45d-4623-463d-a41f-aeb2ac20c2dd"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8627593313012987
+            ]
+        },
+        {
+            "type": "page",
+            "id": "efc8d7b3-060b-4753-bdb7-a0c8ed12a7fe",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 45,
+            "pageNumber": [
+                "36",
+                0.48925728247955647,
+                "43bf0cfb-26db-42be-a25d-752434b4c14f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.10819633978830745
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ac97cd94-38ab-4c58-92cc-43a588243db0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 46,
+            "pageNumber": [
+                "37",
+                0.8249864964606888,
+                "9607dc7b-55b0-4140-a09c-138119eccc03"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.07798878531217035
+            ]
+        },
+        {
+            "type": "page",
+            "id": "2fcb8780-8d0c-4678-b80d-e98f000204cf",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 47,
+            "pageNumber": [
+                "38",
+                0.8249275902304102,
+                "5f5fd3ea-70ec-4736-8ce2-e40bc9e36cf0"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9715658687158868
+            ]
+        },
+        {
+            "type": "page",
+            "id": "b40c63f9-8f9f-4321-9eb9-679ba6bc1a94",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 48,
+            "pageNumber": [
+                "39",
+                0.5707140526191387,
+                "fb8ffb5e-97ce-43ec-a133-cfacd458e9ac"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4753983815719174
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ef76b5d4-7c2e-4851-bf4c-6dbbd030d013",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 49,
+            "pageNumber": [
+                "40",
+                0.9279377378796764,
+                "f6d29728-b39a-4268-b41b-32f18641554b"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.3281799736754585
+            ]
+        },
+        {
+            "type": "page",
+            "id": "514dec21-38fd-469f-9051-5642f0a89dc2",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 50,
+            "pageNumber": [
+                "41",
+                0.3997154067117844,
+                "05564200-968a-4b11-8d23-17c0cb142f03"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.24269543655144632
+            ]
+        },
+        {
+            "type": "page",
+            "id": "896337a6-8674-4fc6-9e02-07eee21dc09f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 51,
+            "pageNumber": [
+                "42",
+                0.6415799300996307,
+                "0130aaa9-e4b2-4fd9-a83a-56e06e157b4d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9157881297444098
+            ]
+        },
+        {
+            "type": "page",
+            "id": "4df904d5-72cc-4b4a-b70f-cee284a8b402",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 52,
+            "pageNumber": [
+                "43",
+                0.3567369030931302,
+                "01531a60-40f2-4150-9f1f-41a4254d14c7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7566328159333282
+            ]
+        },
+        {
+            "type": "page",
+            "id": "590e7928-116a-4b44-893f-1eef8bf811c0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 53,
+            "pageNumber": [
+                "44",
+                0.3324352912921045,
+                "c1eb4900-9417-46f2-817f-9a82f7d2a996"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.3199442572336143
+            ]
+        },
+        {
+            "type": "page",
+            "id": "b7723796-6de4-489c-89c1-914094e48147",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 54,
+            "pageNumber": [
+                "45",
+                0.5005304546849597,
+                "dbaa46f3-5882-4ab0-abc2-fffb9e767825"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5247263437676891
+            ]
+        },
+        {
+            "type": "page",
+            "id": "411788b4-b9e4-462e-9660-740c79673b4d",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 55,
+            "pageNumber": [
+                "46",
+                0.894135761407769,
+                "32eecde5-7b9f-4e6f-97a6-466392648833"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.716014335463429
+            ]
+        },
+        {
+            "type": "page",
+            "id": "646251de-cc55-4e21-9de6-3fb2e69e8ee6",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 56,
+            "pageNumber": [
+                "47",
+                0.4819634628166739,
+                "908cf59f-f3cb-4e30-894a-1dae32b403b7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6836537023383877
+            ]
+        },
+        {
+            "type": "page",
+            "id": "268ddc29-cc96-4b96-be74-484f2b9f19f0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 57,
+            "pageNumber": [
+                "48",
+                0.23491780337309076,
+                "d1d95c0a-4dec-48d9-b090-d5596ecb65d1"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.22272859401170297
+            ]
+        },
+        {
+            "type": "page",
+            "id": "694c1483-29a5-4f2d-af92-8c3e52305666",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 58,
+            "pageNumber": [
+                "[48a]",
+                0.33069635899923167,
+                "3771342f-2907-4d5b-b617-b758758a7511"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.798855034928557
+            ]
+        },
+        {
+            "type": "page",
+            "id": "704a2e5e-cd71-45cd-a12e-776074c89dab",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 59,
+            "pageNumber": [
+                "[48b]",
+                0.3041500759837733,
+                "93dffe4e-efbe-4b90-ab41-d972fcd9971f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8987138104205376
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a234b4b7-91d5-4a7c-a0ea-9f724857c2ba",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 60,
+            "pageNumber": [
+                "49",
+                0.8465062314500452,
+                "96bb3f12-326f-40c7-8f39-238c090d3f06"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7201052915221148
+            ]
+        },
+        {
+            "type": "page",
+            "id": "8e61e9ea-f2d8-4f7b-bf5d-7809fcb62f00",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 61,
+            "pageNumber": [
+                "50",
+                0.29823787964481296,
+                "2a1e0cd3-5c52-4ef5-b61a-d7cf01e5954f"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5457439556211529
+            ]
+        },
+        {
+            "type": "page",
+            "id": "2f53d60b-0443-4603-b328-9b9b48d6721e",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 62,
+            "pageNumber": [
+                "51",
+                0.22241290951542125,
+                "a5077ee4-c559-41f2-9bd4-00a08ea667ab"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.36763415543284494
+            ]
+        },
+        {
+            "type": "page",
+            "id": "70991327-a6a3-46ff-bf07-5c5abfef40ab",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 63,
+            "pageNumber": [
+                "52",
+                0.528356698708996,
+                "3e96ef9c-e807-4f4a-aad6-19aa39e624a6"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6802447597697465
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f2d80113-f64c-4fae-913b-868b6762eaf8",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 64,
+            "pageNumber": [
+                "53",
+                0.7230485828783918,
+                "e326ac08-7e3f-49ec-8fe5-49334493158e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5033279036262059
+            ]
+        },
+        {
+            "type": "page",
+            "id": "0bfab464-07f0-4406-ac02-299f8cffc91a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 65,
+            "pageNumber": [
+                "54",
+                0.9659947489169336,
+                "9be521c6-5349-490f-838c-b7676860016d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.1287605474753658
+            ]
+        },
+        {
+            "type": "page",
+            "id": "12c4b4ea-d1d0-431a-86e7-2718d0e1fa6a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 66,
+            "pageNumber": [
+                "55",
+                0.7995437561265281,
+                "79ed8f0a-99d9-46a5-ad15-f2f08d30f4ea"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6296075050125353
+            ]
+        },
+        {
+            "type": "page",
+            "id": "d9681599-69c5-4bcc-b228-3f798721ac29",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 67,
+            "pageNumber": [
+                "56",
+                0.37933402908867764,
+                "1bd80ade-593c-4ca2-a4dd-3aa79fb42792"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4364006517943071
+            ]
+        },
+        {
+            "type": "page",
+            "id": "7ac48ea9-7174-4012-8182-8a1041fa0a2c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 68,
+            "pageNumber": [
+                "[56a]",
+                0.7418725680861957,
+                "db9501ad-59b7-4a6d-a66b-578b668a83e7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.4220516424058892
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5655616f-d186-4a09-a616-9fa3a735319f",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 69,
+            "pageNumber": [
+                "[56b]",
+                0.4832991669470267,
+                "67995cd3-55ea-4c3f-a720-92be5776f866"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2603570938952182
+            ]
+        },
+        {
+            "type": "page",
+            "id": "5a3044de-a6c0-4d50-983e-2f7c8aef0e5c",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 70,
+            "pageNumber": [
+                "57",
+                0.25051868722372916,
+                "8d0e71d8-c48e-49e4-9eef-ec2ebe2906e5"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.06075192269592222
+            ]
+        },
+        {
+            "type": "page",
+            "id": "84758765-7a35-4336-bc7f-392338072439",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 71,
+            "pageNumber": [
+                "58",
+                0.479091975422956,
+                "33e90869-95b3-4131-a2ca-c137f8036555"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9187944081245092
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a5084ba9-b60b-4601-82fd-319512d24ecf",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 72,
+            "pageNumber": [
+                "59",
+                0.8901427870034624,
+                "e7bd3255-2656-426e-a64c-375a82abbb59"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9432485297882169
+            ]
+        },
+        {
+            "type": "page",
+            "id": "689261fb-5483-44cf-8e09-a8e65be33abd",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 73,
+            "pageNumber": [
+                "60",
+                0.2866555204337946,
+                "3274d07c-ed1a-413b-8af8-233abff1d03e"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.024720798015741452
+            ]
+        },
+        {
+            "type": "page",
+            "id": "920d74a8-d833-4e84-9bbe-df1452fd5322",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 74,
+            "pageNumber": [
+                "61",
+                0.4554402178041581,
+                "2af84493-d269-4ada-b958-25d4d143df90"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.20912607503166347
+            ]
+        },
+        {
+            "type": "page",
+            "id": "8b647a2c-80b5-4339-9cbf-f122817fceab",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 75,
+            "pageNumber": [
+                "62",
+                0.3355580524210796,
+                "55b59a5f-d414-4aa7-992f-997f991b19f8"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2720064705852999
+            ]
+        },
+        {
+            "type": "page",
+            "id": "1ce3e1df-b929-4b4d-a390-811857e69795",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 76,
+            "pageNumber": [
+                "63",
+                0.6898232700897108,
+                "cf88bd44-6897-446f-9c08-ff28e1c6c178"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.33275168253875054
+            ]
+        },
+        {
+            "type": "page",
+            "id": "79800265-d556-401d-8613-3d0df42f17b3",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 77,
+            "pageNumber": [
+                "64",
+                0.12439305140334067,
+                "fd349865-46d2-4000-ab30-2fdcd88f39f6"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8834968853088154
+            ]
+        },
+        {
+            "type": "page",
+            "id": "82451008-fb4a-4efa-bf23-5e1a443ace49",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 78,
+            "pageNumber": [
+                "[64a]",
+                0.07577474016464181,
+                "f3416182-daf6-4c05-a165-a766540239bc"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.7584559591248636
+            ]
+        },
+        {
+            "type": "page",
+            "id": "4553c6e2-5eba-4b7b-946b-91eb4f6e6aef",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 79,
+            "pageNumber": [
+                "[64b]",
+                0.6284799389503496,
+                "2c1903a5-1af7-496e-8043-d26bf46ebfb7"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.03420789128059276
+            ]
+        },
+        {
+            "type": "page",
+            "id": "c74ddd2c-b18c-4289-b7d6-3339ce4ce4f6",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 80,
+            "pageNumber": [
+                "65",
+                0.363639196273001,
+                "2dd95eaf-c9ff-4779-8fd6-ad24f1449554"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8955018001005406
+            ]
+        },
+        {
+            "type": "page",
+            "id": "032f37fb-da4d-4e22-af45-0ad900b0325a",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 81,
+            "pageNumber": [
+                "66",
+                0.4258195063975422,
+                "62a97978-1f42-4618-8e85-1a14ec8d53ef"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5585331803907673
+            ]
+        },
+        {
+            "type": "page",
+            "id": "33c6c655-e575-44f6-b769-ad4ebed60fa1",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 82,
+            "pageNumber": [
+                "67",
+                0.9640172640664401,
+                "83d64f3c-c7ed-493a-8bb4-70c2830d4285"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.39102862131825045
+            ]
+        },
+        {
+            "type": "page",
+            "id": "4d67d90f-3bbc-44f5-a5e8-1d04cd8c9b86",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 83,
+            "pageNumber": [
+                "68",
+                0.38818262144111204,
+                "823bc8c4-d352-485f-a9e6-eef9741e7062"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.6006986977411674
+            ]
+        },
+        {
+            "type": "page",
+            "id": "d08ecd03-13ea-4ec6-8e30-932373048720",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 84,
+            "pageNumber": [
+                "69",
+                0.17793770115049135,
+                "e4781435-ace5-4655-ae66-189131367a0b"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5799545252843841
+            ]
+        },
+        {
+            "type": "page",
+            "id": "bf7da912-27e0-4e37-a89e-d99f4c352cf0",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 85,
+            "pageNumber": [
+                "70",
+                0.9217862959167861,
+                "03e57eb5-49f7-426e-abb3-7770e99ce403"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.22714914628595018
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ed11b1ad-abc3-46c3-b1db-ba665dd4bb89",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 86,
+            "pageNumber": [
+                "71",
+                0.008195264342428898,
+                "9c3243d7-e8f5-49b8-aaf0-3e484f21a28d"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.25758788913601116
+            ]
+        },
+        {
+            "type": "page",
+            "id": "7b5e4a5c-7a86-4a0d-908e-353b6939caac",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 87,
+            "pageNumber": [
+                "72",
+                0.30350979552105073,
+                "6d955675-51e8-4665-8c43-05c536a1ab99"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.5842667299003335
+            ]
+        },
+        {
+            "type": "page",
+            "id": "9fc87407-923e-4f82-b9d3-f7e983c534a5",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 88,
+            "pageNumber": [
+                "73",
+                0.34364317710174774,
+                "f4ac679d-a2bb-4d38-baa8-657c5f13cd87"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8263731163571063
+            ]
+        },
+        {
+            "type": "page",
+            "id": "a6ac0e3e-c200-4490-9514-e2b3e49ede48",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 89,
+            "pageNumber": [
+                "74",
+                0.9536946672285588,
+                "a0d6915c-dca1-4131-ab5a-45574bca6c41"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.05245338468713345
+            ]
+        },
+        {
+            "type": "page",
+            "id": "3bcf61ce-a132-419b-a120-8e0efed55caf",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 90,
+            "pageNumber": [
+                "75",
+                0.27536184105254635,
+                "800d9c23-4110-427f-88f6-05832f8754a3"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.8575305565799269
+            ]
+        },
+        {
+            "type": "page",
+            "id": "e91e2f2a-c287-4602-95b8-3084d04797f1",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 91,
+            "pageNumber": [
+                "76",
+                0.5775482288752929,
+                "a0854008-06a9-4396-a5d5-fe1d7dd07f79"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.04435773587087588
+            ]
+        },
+        {
+            "type": "page",
+            "id": "de89f606-251e-4ff3-89df-e9387cd1e489",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 92,
+            "pageNumber": [
+                "77",
+                0.8552594891590479,
+                "66bac902-a4e6-4fed-8ead-3fb4a4e386f4"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2470130833552444
+            ]
+        },
+        {
+            "type": "page",
+            "id": "f1ebbf84-ef6d-4654-94a9-fabd16a97ed6",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 93,
+            "pageNumber": [
+                "78",
+                0.7226280129746485,
+                "0253c36c-8c05-477e-b676-2170a4cbeb82"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.21210361493495034
+            ]
+        },
+        {
+            "type": "page",
+            "id": "e5587616-5d00-4027-b64f-9d99beef8f61",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 94,
+            "pageNumber": [
+                "79",
+                0.07760707119325072,
+                "a26d3083-d9a2-4e62-9154-25671a29bae3"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.9139613308526604
+            ]
+        },
+        {
+            "type": "page",
+            "id": "ef463730-f621-4f8d-b7d1-a69ef0d0e3d8",
+            "batch_id": "8571411c-8266-4a0d-89bb-665d825ddb86",
+            "parent_id": "b1713d50-a168-11e9-9209-005056827e51",
+            "pageIndex": 95,
+            "pageNumber": [
+                "80",
+                0.853040306065965,
+                "b2fd9c5c-123e-4fd9-b40c-2126856ef226"
+            ],
+            "pageType": [
+                "NormalPage",
+                0.2298772846725935
+            ]
+        }
+    ],
+    "detection_to_page_mapping": {
+        "227fcc63-a0aa-4340-ba7d-8ca2ee8f9874": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+        "7c2e5d97-9255-4e2a-8d1f-becc11214c3e": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+        "722a9fe9-3b48-4161-8a7b-9196b3937ad5": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+        "ce529822-5376-48c9-b5d6-4bd2b6db8e29": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+        "fb4782b5-bbdb-4f85-95c4-3054488493b1": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+        "05d82207-7512-415b-9fff-02f9cd1bcb05": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+        "c0039aef-ec9f-4bbe-bb2a-cc1cc04cfb01": "ef5e3b68-c748-47d7-a9b7-b00aa479026e",
+        "da995e2f-c562-4b09-8799-04736fd143f6": "b4d21216-3759-4391-b6dd-7c5eb9995427",
+        "c419cedd-4d72-44c0-acd3-11631650de07": "5742c260-8964-4a43-9de4-87434ac32d20",
+        "68ec89e5-f475-49dd-bb30-b3d41871b96d": "bf8b7207-89be-4b50-a23e-3e042f7a590e",
+        "f244d315-94da-459c-8287-98c0a59a0cf0": "660586f7-357f-4c4a-a5b8-03b360f57d1b",
+        "fb624e29-c4ec-493f-aded-3aebfaab2245": "5e7f1855-0281-4a56-a3db-665015ec99d0",
+        "17a2f161-7e06-453f-baf3-0954e3c09c5c": "759e4838-3487-4ae8-80ba-46c933961138",
+        "6655dda3-569a-444d-84ef-4c770e6f923a": "944519de-6ef5-41fa-860e-e5a603c0a6f3",
+        "b249bb16-c661-407a-8542-6c18b31a9b72": "67b1b526-8cec-4bb0-adf8-692f24e531d0",
+        "05f916f4-da2f-4981-8a70-c1b940710e72": "422a693a-b0e0-42d6-9cdf-eec1c286dd53",
+        "744dbbc5-a8ed-45df-a8a9-f3e369fda4af": "427045f8-9afc-446f-af33-7a9608310432",
+        "01f90e4a-26d2-4f3c-8e76-19adeb3186d1": "b3458163-3de6-4a7d-bb17-ae80d3e3e43c",
+        "f54bd1da-9f37-43af-ac85-c97d88296147": "b1bb4a41-8eb8-4d07-8e37-88efa7d26810",
+        "67164044-a2d3-4599-b2d7-2846aee9a365": "11255f06-9e46-426b-ba55-b1b5e6af7035",
+        "1876b4f3-cf9a-421b-a345-ae723b49ea0d": "81d374bc-ebfb-4c9b-943d-bf803ef7ce41",
+        "2702f723-2c01-4447-9280-7a9089596b80": "ed02a1b9-f2ed-4284-b93f-b4a263eb7791",
+        "df63908e-f40f-4e55-a25e-dca4db1f6c90": "2497a691-08f3-4190-915f-338cfe3ac7a8",
+        "07e2431b-5c16-4597-bef0-496ccdbe2423": "534aaea3-caa2-4b4d-ba4e-6b12b9d714b7",
+        "c479e0a7-677f-4700-a7aa-f5bcd243d529": "e130612b-0639-4058-80fb-5e1e7d0a8f65",
+        "68b1a91f-496d-4fc8-afac-a521163260d7": "72684f68-eec4-49aa-8b4d-6c0f62360fe8",
+        "5c9b505a-f31d-491e-be7f-958e04546dc8": "9408595c-3aff-46d2-a30f-c61ae2c745da",
+        "d402ee3c-129b-46f2-bc9d-0e5c18e6c475": "374fa069-42a4-4c22-b778-982e19f5f6a0",
+        "fdbebd64-4801-4b33-b70a-bbb019bb4940": "4a00dc0a-d584-4592-a2cc-0ef1baecd99d",
+        "f7fb7364-6a9b-4f47-a945-f45e61189ba7": "a69b7d4e-4950-42e9-af5f-9a464680c7f1",
+        "9f76c236-f39e-4ac6-8549-c102929a47c8": "2b8d6a71-d36b-4398-9fbc-48617abdec1f",
+        "85c98510-e35f-432c-8b3c-2239c03f9f3b": "28bb55e0-186b-48c0-a9f4-8e83082b09f7",
+        "d0e519f2-6445-488e-b26f-53537de82693": "0017b97f-03fe-459f-8157-ccd28a9c0742",
+        "ab8853c3-8542-4e77-9635-8c65cc279b00": "f9bd5e07-4819-45d7-8889-b0674c4c03fa",
+        "85f4088a-ccfb-4103-ad8f-593c3063d5e7": "e2303663-5dc9-42c9-a676-a0ef013460a2",
+        "865cb8c1-2ad7-41eb-8a6e-227d5caf1a0d": "8cca232d-3990-4f3c-ac21-d79b0fb1ff9f",
+        "42a685c0-3282-4dac-b329-a0737f25e62f": "38d2065f-ca47-40cf-8be3-2e107ef5814a",
+        "8423cb0c-57b4-4d16-bb6a-f210dd704042": "ba1d6bed-104a-49e8-8e1e-32f9ea667be9",
+        "f587baef-dc5c-4f1c-b017-fbaa21aab92f": "13c46bdb-efd8-43c5-9ae6-905c757cea62",
+        "bb1daefc-09c8-4e2c-ae7a-54372c71b829": "bc465ccc-ece1-4c39-b44a-24562614eb50",
+        "a5a00540-3fb9-4f14-9e55-95b656cdfb96": "f41070ac-07bc-4586-a7d9-a1bd7b3e7651",
+        "8ca2a763-552c-4ebc-9102-c631d5f23bfc": "f47c97e7-20dc-4110-96ed-b73d68739f16",
+        "ec0867de-ee53-40fd-8c4d-e31f4887e68f": "620677a4-dd75-45f9-a630-ef173ff66301",
+        "22083fc1-28ca-4d99-8126-b79f5c360b15": "905bfb8d-99de-4da5-b3e5-bf2785c8a8e0",
+        "68110d5c-0af0-4595-bd1f-2f9078b3a294": "25325e58-326f-4bf6-9485-5bafe891da12",
+        "f6c5fd3e-d5da-4fb0-8298-a63cc2b34eee": "fc419129-202f-47e3-a38f-dabe6f938f62",
+        "9996916e-71c9-4b0a-9ae2-330463421cff": "4b8aa356-ca9c-4f09-bb4f-f914f31979bf",
+        "ab7f2193-3629-4186-9354-aa650b6777eb": "0745532a-1427-4973-8396-f6d9cd23d5b7",
+        "d70537e3-0533-43ad-997e-ce0a24fcce5e": "872c418f-3c2c-448e-abb3-d3dcd02d68dc",
+        "f8d4afb9-5587-4208-8d4a-01724a6f34e4": "67f75f98-e691-4355-b52f-65a9795b12bd",
+        "ef40c526-1382-425d-8c81-5cac1f3a18d0": "ae2e8536-744a-4c63-b703-9846656e921d",
+        "00a0cbe3-4b8c-464f-9d33-8b012a501c30": "33c2ae90-9b5b-4792-9e65-471802413c44",
+        "866e8295-ce0d-4bf1-90d4-1aa9565a9f36": "3cffe2af-333a-45f5-b654-3beb89b88fae",
+        "af07d749-55b4-4713-b0ad-7bf3f5f72130": "67cdc6a5-4d8f-4a1d-a77a-a8cc2b62f814",
+        "434b19f6-8e0b-4399-bbd4-be124feb5bd7": "cd556050-8aba-4ba1-8223-0eed8a2fcdf6",
+        "8b9eed2e-74f1-48f9-b181-97104898adee": "6c62e9f0-7323-4c0e-92d6-d0b06a3129d1",
+        "e851c821-e0af-4884-bc58-11a19dba1b20": "2774ca2f-f86d-48be-8681-958397801133",
+        "9c2b2445-92a3-4377-ac0a-5e126e15597d": "2a034b55-ff87-42ae-99c0-cdfe8975387e",
+        "60838e3d-ea34-41fd-a00a-a4b8ad22d0c6": "606d5c56-5a87-4a67-87ba-110601c06036",
+        "9d455c9d-578c-4e74-9db5-e3a0851be960": "29d34354-b58b-43a1-8df3-44025b96463d",
+        "c96e77ba-b4d5-4cd6-94cc-3132f107db98": "7e20139b-ebfa-4204-ab7c-16b902bc9a58",
+        "c92a5381-9356-448c-b9de-12360cc8442f": "580447c0-95ae-46e4-ab4d-f51c25fb0247",
+        "754c2800-f349-4466-ab89-a6ca2be79919": "527a424b-e4e6-4714-a121-9c28aa053ce9",
+        "fed7dab6-374d-464a-8b83-c96e935d3ea9": "8ccac6a1-b016-4a06-b357-c8d163f1c3a5",
+        "24ab8b76-7ddd-46d3-914f-9a3bbf362036": "d323113b-d0dc-4179-9b91-e3457fc333d0",
+        "9faf215e-67ca-4276-8d58-c4bd6ea0a5e4": "fe33353b-abbe-4133-ab1a-a0a142bfe1a4",
+        "67b768e7-50f7-4123-9c54-115555e4626d": "9a62de0f-0f78-4fa7-915f-0416f86bcd6c",
+        "8af49609-d61d-40bd-8a8b-946a150d1395": "c99117de-41f4-4db0-9cf2-6162268671e8",
+        "d484de3e-54ad-40bf-8a2c-7e4bc1fa2eb2": "66895310-5444-459b-bee6-78e7035027f1",
+        "a5b6d7b0-e09f-4165-9d64-9b61b29f430e": "6d70ee0a-be26-43f4-9381-d09426f589cb",
+        "3c450986-33c1-4d02-a374-2b6c8460906c": "9af8028e-28f4-4327-a286-5a0a7ff5ff50",
+        "89c0813e-5e2b-4237-a4fd-42e5e5b8afbc": "36cef378-8aee-4621-9c9c-a5d1552ba861",
+        "3af78a20-58e9-4a7d-8b9e-8bb8ce7f4d68": "f268d07d-bb01-4da4-9b30-efbc16740802",
+        "6557a744-46e4-45cd-adda-a1643de267fa": "d02bbbd8-d8ac-438a-9cef-078ab6bbde44",
+        "0736f4ab-08e5-43c8-add7-13c89e9cfccf": "8f535db8-2ed1-4d55-83af-56f134f055da",
+        "07d5203e-08f5-4d7f-b65a-e3465c38abd7": "2ba8e8e2-0c87-4e51-bed3-0b24949b6d86",
+        "d1e0b3e7-2b39-4e1a-90b6-4b3824ee3d00": "834abf78-9504-4d04-8609-7d9ecfd87757",
+        "d62e2c6f-7c49-452d-8cb1-a9c44883ea34": "3c3818bb-d89d-4fe0-a549-46d40b244d88",
+        "a33380e4-6faf-45bd-aa8e-791813da0713": "e5a90df1-1d32-4eb5-b7df-5b500c7af0b4",
+        "71051922-23e2-442a-a4d1-b736f5e3f343": "5bafb0dc-819a-4d07-b472-b173e97a1195",
+        "87d70dbf-e13a-47c8-bae3-9f4ea984700f": "6fae8f25-c5ed-4a3e-ad60-d6340284814c",
+        "23862c39-2223-468e-9618-011f8b90e0b0": "c5a7d354-62ad-467f-95e9-27d231f58b19",
+        "d055cdd3-4a92-4008-ae02-29448b6c21a3": "fe65f242-e02f-4d28-83e9-3dc33f1571bb",
+        "52452ea7-44e5-4b88-b026-e47a8fa67f08": "19fb3156-67dc-4ade-b532-3fd59949460b",
+        "431781de-dae4-40b4-8fa2-5d0046741b59": "16301c7e-960b-4077-97bb-16fd42957596",
+        "fa6c8937-547b-4b9f-8666-dc6144fbab07": "dccac628-92a1-4182-8536-534a0b93416f",
+        "620702df-d52d-4471-9904-a015fdd3a93e": "5ccebf5d-62b5-4054-8ec2-0e8a025f522c",
+        "d26a2cfc-821a-41ea-8d57-05caa02c52a7": "363c170b-cad1-46c7-a697-9f618eddb643",
+        "46c02784-ee17-4c1a-96ae-86de2b747884": "6c4372f6-dee2-422d-9a34-96f2f09f23e2",
+        "e1cf9b3b-cdf2-4022-970b-335bc1206ce4": "f06abf41-0354-4be6-9ac1-a65862267028",
+        "a6b22a87-65bf-4c9b-927d-6b87f32cf25e": "31ae9888-7247-42e1-ba24-ad336336b60b",
+        "a2e5f32a-5710-48cd-b431-3ff82eedf8d5": "7113b48f-432d-4009-9c01-0a65813eb829",
+        "b35f0239-c787-4c58-98d6-7f6a77a88f7f": "c91ce484-227a-4d96-9437-bb85334ee0bd",
+        "fdf80297-472f-4305-b767-0966f7e9395f": "70c5bfb1-4295-447b-8a70-a786e53696a8",
+        "9d9bf8b8-e93a-40ea-989e-97a4fa44f452": "3c8f76d3-9131-4041-a4cd-9ee0532aaedd",
+        "cb01fa87-4ee3-4165-aa39-b67119b87d09": "175cc9f8-2217-4427-8ddc-9c75c29ad688",
+        "64310d9a-d8d2-44a0-8d55-89143476a1ae": "6af80070-3858-4bb1-9637-0fd8f7cb7cfe",
+        "7d4e3dd3-3281-4c43-96d4-5e31e83e6460": "02e55030-b9a6-4011-8dce-ab6b136223bb",
+        "bfad5f67-72ef-4f94-9f29-6905f4859792": "4c6d34d4-3adb-4119-a848-4819868be16e",
+        "fe26a8bf-a25d-4a52-a6a4-0f033738d1c4": "f0584537-79d5-40c2-929c-ada357ee1481",
+        "e3759594-7c86-476d-922d-6a6be24e53a2": "560b59f4-8d7f-4a8a-9125-45267b004236",
+        "33b2f202-a403-4b0e-b285-518b5670e282": "6b97d15a-5f50-4ef5-aa65-9f176b1131af",
+        "4603e269-aa5d-474d-8852-65d875db2973": "a4cb0551-5801-47f3-831e-1988f0d8d911",
+        "d704eaa6-f1ab-42f7-b18e-412252c210f7": "0a5a6b7e-d38b-423a-8a44-bed25e1cf633",
+        "a16525b1-b957-4fd0-80ad-d733075b7794": "962840f2-744b-4463-81ec-c5cbd74fbc6a",
+        "f5ad38db-6cf1-4176-a9e9-d37b178ece3e": "98a28396-1e63-49aa-a710-dabe5cbc03e6",
+        "b77d3e4d-dbcb-4f32-a50f-a6428d138d29": "093e6bb4-16d1-4ddb-a55d-45ac1dc12946",
+        "dd51df71-591c-4975-96ef-5a6e818d3879": "8877b6e5-0af9-44d8-80a4-c9fb69b0e24f",
+        "2a9cbe42-b529-4f67-b4fd-aab4b0c986f4": "5d30c193-d243-4361-8291-546487585974",
+        "ff3da19e-5f21-4ce0-a3bb-3014f3ef8e6a": "ba684f3d-5786-4581-9ab9-552bc6c57d9f",
+        "3df94006-c9f1-4386-ac9a-5e49b358bf4d": "42dae352-d363-4316-8025-cda7d391b5cc",
+        "b6e792cc-0188-4dad-83d3-55aae5f74c29": "cf3687e6-3a1f-497e-9cb3-f77c4a547102",
+        "8cb68bae-d70f-40b9-8bdb-4de678ace98d": "700ffe2d-f78f-48ec-a803-f18e8e0850a1",
+        "d226942e-f28b-4b5b-8824-8dd32429d418": "b0a7c7b9-db2d-4879-93c5-f88edd7cb2d4",
+        "ece449c1-f40b-4f34-a85c-02beb783f562": "1d392098-5268-42cc-a88f-838f9e1e2e26",
+        "b4af85fd-aae4-4dd0-b7ed-fba3dc1173cf": "086be575-d7bc-46c1-afa9-1d28fdb76f0c",
+        "7295f936-4e93-46dd-a5dd-7bece6d8ef05": "8802e447-a940-4103-9366-a8c0b9f213ee",
+        "d5923eec-e0f4-43bc-a7f0-c0d65eead086": "c50e027a-be91-44d2-84f0-e0f83cb404b3",
+        "b1674af2-c93d-4237-8d97-8c4f1cde60ec": "721529ef-f862-4dd8-9fb6-a946eba64730",
+        "d01d700b-e6b3-42e8-a107-6b6ac1d14ee8": "80b1f269-5619-401c-9e9a-4d60c11f55d5",
+        "22a18f6d-1328-47b7-ab2b-095c0f2cbf69": "5b92ffa0-6abb-445c-a4fa-7587681fa93b",
+        "ab87d45d-4623-463d-a41f-aeb2ac20c2dd": "319c542c-6c4c-404e-bf9f-393a0e2d137a",
+        "43bf0cfb-26db-42be-a25d-752434b4c14f": "efc8d7b3-060b-4753-bdb7-a0c8ed12a7fe",
+        "9607dc7b-55b0-4140-a09c-138119eccc03": "ac97cd94-38ab-4c58-92cc-43a588243db0",
+        "5f5fd3ea-70ec-4736-8ce2-e40bc9e36cf0": "2fcb8780-8d0c-4678-b80d-e98f000204cf",
+        "fb8ffb5e-97ce-43ec-a133-cfacd458e9ac": "b40c63f9-8f9f-4321-9eb9-679ba6bc1a94",
+        "f6d29728-b39a-4268-b41b-32f18641554b": "ef76b5d4-7c2e-4851-bf4c-6dbbd030d013",
+        "05564200-968a-4b11-8d23-17c0cb142f03": "514dec21-38fd-469f-9051-5642f0a89dc2",
+        "0130aaa9-e4b2-4fd9-a83a-56e06e157b4d": "896337a6-8674-4fc6-9e02-07eee21dc09f",
+        "01531a60-40f2-4150-9f1f-41a4254d14c7": "4df904d5-72cc-4b4a-b70f-cee284a8b402",
+        "c1eb4900-9417-46f2-817f-9a82f7d2a996": "590e7928-116a-4b44-893f-1eef8bf811c0",
+        "dbaa46f3-5882-4ab0-abc2-fffb9e767825": "b7723796-6de4-489c-89c1-914094e48147",
+        "32eecde5-7b9f-4e6f-97a6-466392648833": "411788b4-b9e4-462e-9660-740c79673b4d",
+        "908cf59f-f3cb-4e30-894a-1dae32b403b7": "646251de-cc55-4e21-9de6-3fb2e69e8ee6",
+        "d1d95c0a-4dec-48d9-b090-d5596ecb65d1": "268ddc29-cc96-4b96-be74-484f2b9f19f0",
+        "96bb3f12-326f-40c7-8f39-238c090d3f06": "a234b4b7-91d5-4a7c-a0ea-9f724857c2ba",
+        "2a1e0cd3-5c52-4ef5-b61a-d7cf01e5954f": "8e61e9ea-f2d8-4f7b-bf5d-7809fcb62f00",
+        "a5077ee4-c559-41f2-9bd4-00a08ea667ab": "2f53d60b-0443-4603-b328-9b9b48d6721e",
+        "3e96ef9c-e807-4f4a-aad6-19aa39e624a6": "70991327-a6a3-46ff-bf07-5c5abfef40ab",
+        "e326ac08-7e3f-49ec-8fe5-49334493158e": "f2d80113-f64c-4fae-913b-868b6762eaf8",
+        "9be521c6-5349-490f-838c-b7676860016d": "0bfab464-07f0-4406-ac02-299f8cffc91a",
+        "79ed8f0a-99d9-46a5-ad15-f2f08d30f4ea": "12c4b4ea-d1d0-431a-86e7-2718d0e1fa6a",
+        "1bd80ade-593c-4ca2-a4dd-3aa79fb42792": "d9681599-69c5-4bcc-b228-3f798721ac29",
+        "8d0e71d8-c48e-49e4-9eef-ec2ebe2906e5": "5a3044de-a6c0-4d50-983e-2f7c8aef0e5c",
+        "33e90869-95b3-4131-a2ca-c137f8036555": "84758765-7a35-4336-bc7f-392338072439",
+        "e7bd3255-2656-426e-a64c-375a82abbb59": "a5084ba9-b60b-4601-82fd-319512d24ecf",
+        "3274d07c-ed1a-413b-8af8-233abff1d03e": "689261fb-5483-44cf-8e09-a8e65be33abd",
+        "2af84493-d269-4ada-b958-25d4d143df90": "920d74a8-d833-4e84-9bbe-df1452fd5322",
+        "55b59a5f-d414-4aa7-992f-997f991b19f8": "8b647a2c-80b5-4339-9cbf-f122817fceab",
+        "cf88bd44-6897-446f-9c08-ff28e1c6c178": "1ce3e1df-b929-4b4d-a390-811857e69795",
+        "fd349865-46d2-4000-ab30-2fdcd88f39f6": "79800265-d556-401d-8613-3d0df42f17b3",
+        "2dd95eaf-c9ff-4779-8fd6-ad24f1449554": "c74ddd2c-b18c-4289-b7d6-3339ce4ce4f6",
+        "62a97978-1f42-4618-8e85-1a14ec8d53ef": "032f37fb-da4d-4e22-af45-0ad900b0325a",
+        "83d64f3c-c7ed-493a-8bb4-70c2830d4285": "33c6c655-e575-44f6-b769-ad4ebed60fa1",
+        "823bc8c4-d352-485f-a9e6-eef9741e7062": "4d67d90f-3bbc-44f5-a5e8-1d04cd8c9b86",
+        "e4781435-ace5-4655-ae66-189131367a0b": "d08ecd03-13ea-4ec6-8e30-932373048720",
+        "03e57eb5-49f7-426e-abb3-7770e99ce403": "bf7da912-27e0-4e37-a89e-d99f4c352cf0",
+        "9c3243d7-e8f5-49b8-aaf0-3e484f21a28d": "ed11b1ad-abc3-46c3-b1db-ba665dd4bb89",
+        "6d955675-51e8-4665-8c43-05c536a1ab99": "7b5e4a5c-7a86-4a0d-908e-353b6939caac",
+        "f4ac679d-a2bb-4d38-baa8-657c5f13cd87": "9fc87407-923e-4f82-b9d3-f7e983c534a5",
+        "a0d6915c-dca1-4131-ab5a-45574bca6c41": "a6ac0e3e-c200-4490-9514-e2b3e49ede48",
+        "800d9c23-4110-427f-88f6-05832f8754a3": "3bcf61ce-a132-419b-a120-8e0efed55caf",
+        "a0854008-06a9-4396-a5d5-fe1d7dd07f79": "e91e2f2a-c287-4602-95b8-3084d04797f1",
+        "66bac902-a4e6-4fed-8ead-3fb4a4e386f4": "de89f606-251e-4ff3-89df-e9387cd1e489",
+        "0253c36c-8c05-477e-b676-2170a4cbeb82": "f1ebbf84-ef6d-4654-94a9-fabd16a97ed6",
+        "a26d3083-d9a2-4e62-9154-25671a29bae3": "e5587616-5d00-4027-b64f-9d99beef8f61",
+        "b2fd9c5c-123e-4fd9-b40c-2126856ef226": "ef463730-f621-4f8d-b7d1-a69ef0d0e3d8"
+    },
+    "page_to_alto_mapping": null,
+    "page_to_image_mapping": {
+        "e556ac93-43d4-4c8f-bf6f-e8b7d7673b30": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:e556ac93-43d4-4c8f-bf6f-e8b7d7673b30.jpg",
+        "543c6b4e-eee3-49b9-a59b-5d1947343fd3": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:543c6b4e-eee3-49b9-a59b-5d1947343fd3.jpg",
+        "931d606f-301e-4b04-a185-4baca4cb3dde": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:931d606f-301e-4b04-a185-4baca4cb3dde.jpg",
+        "0a949986-ec07-4b42-88b2-3ab37a2a28f8": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:0a949986-ec07-4b42-88b2-3ab37a2a28f8.jpg",
+        "89d4351e-142e-4af2-9d5e-84c89ef53017": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:89d4351e-142e-4af2-9d5e-84c89ef53017.jpg",
+        "68575a23-f314-42ab-98e2-f7f5a9eb097a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:68575a23-f314-42ab-98e2-f7f5a9eb097a.jpg",
+        "ef5e3b68-c748-47d7-a9b7-b00aa479026e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:ef5e3b68-c748-47d7-a9b7-b00aa479026e.jpg",
+        "f8ffaaa6-9263-437c-bc6a-97cb00672e0b": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:f8ffaaa6-9263-437c-bc6a-97cb00672e0b.jpg",
+        "d390fd77-311c-49f6-bd02-e871c8ccb606": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:d390fd77-311c-49f6-bd02-e871c8ccb606.jpg",
+        "69a28b9b-adb2-41a7-9d93-bc6719cce65e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:69a28b9b-adb2-41a7-9d93-bc6719cce65e.jpg",
+        "a3e7f76e-d04d-4403-9613-436dd1b7a8c7": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:a3e7f76e-d04d-4403-9613-436dd1b7a8c7.jpg",
+        "0cafe11c-fb1d-4d26-ada3-31a685a53f28": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:0cafe11c-fb1d-4d26-ada3-31a685a53f28.jpg",
+        "b4d21216-3759-4391-b6dd-7c5eb9995427": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:b4d21216-3759-4391-b6dd-7c5eb9995427.jpg",
+        "5742c260-8964-4a43-9de4-87434ac32d20": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:5742c260-8964-4a43-9de4-87434ac32d20.jpg",
+        "bf8b7207-89be-4b50-a23e-3e042f7a590e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:bf8b7207-89be-4b50-a23e-3e042f7a590e.jpg",
+        "660586f7-357f-4c4a-a5b8-03b360f57d1b": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:660586f7-357f-4c4a-a5b8-03b360f57d1b.jpg",
+        "5e7f1855-0281-4a56-a3db-665015ec99d0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:5e7f1855-0281-4a56-a3db-665015ec99d0.jpg",
+        "759e4838-3487-4ae8-80ba-46c933961138": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:759e4838-3487-4ae8-80ba-46c933961138.jpg",
+        "944519de-6ef5-41fa-860e-e5a603c0a6f3": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:944519de-6ef5-41fa-860e-e5a603c0a6f3.jpg",
+        "67b1b526-8cec-4bb0-adf8-692f24e531d0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:67b1b526-8cec-4bb0-adf8-692f24e531d0.jpg",
+        "422a693a-b0e0-42d6-9cdf-eec1c286dd53": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:422a693a-b0e0-42d6-9cdf-eec1c286dd53.jpg",
+        "427045f8-9afc-446f-af33-7a9608310432": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:427045f8-9afc-446f-af33-7a9608310432.jpg",
+        "b3458163-3de6-4a7d-bb17-ae80d3e3e43c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:b3458163-3de6-4a7d-bb17-ae80d3e3e43c.jpg",
+        "b1bb4a41-8eb8-4d07-8e37-88efa7d26810": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:b1bb4a41-8eb8-4d07-8e37-88efa7d26810.jpg",
+        "11255f06-9e46-426b-ba55-b1b5e6af7035": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:11255f06-9e46-426b-ba55-b1b5e6af7035.jpg",
+        "81d374bc-ebfb-4c9b-943d-bf803ef7ce41": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:81d374bc-ebfb-4c9b-943d-bf803ef7ce41.jpg",
+        "ed02a1b9-f2ed-4284-b93f-b4a263eb7791": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:ed02a1b9-f2ed-4284-b93f-b4a263eb7791.jpg",
+        "2497a691-08f3-4190-915f-338cfe3ac7a8": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:2497a691-08f3-4190-915f-338cfe3ac7a8.jpg",
+        "bb8fc028-69d2-421d-97c0-902fe4804659": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:bb8fc028-69d2-421d-97c0-902fe4804659.jpg",
+        "315645fb-91e1-45f6-981f-5a618b135f11": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:315645fb-91e1-45f6-981f-5a618b135f11.jpg",
+        "534aaea3-caa2-4b4d-ba4e-6b12b9d714b7": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:534aaea3-caa2-4b4d-ba4e-6b12b9d714b7.jpg",
+        "e130612b-0639-4058-80fb-5e1e7d0a8f65": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:e130612b-0639-4058-80fb-5e1e7d0a8f65.jpg",
+        "72684f68-eec4-49aa-8b4d-6c0f62360fe8": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:72684f68-eec4-49aa-8b4d-6c0f62360fe8.jpg",
+        "9408595c-3aff-46d2-a30f-c61ae2c745da": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:9408595c-3aff-46d2-a30f-c61ae2c745da.jpg",
+        "374fa069-42a4-4c22-b778-982e19f5f6a0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:374fa069-42a4-4c22-b778-982e19f5f6a0.jpg",
+        "4a00dc0a-d584-4592-a2cc-0ef1baecd99d": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:4a00dc0a-d584-4592-a2cc-0ef1baecd99d.jpg",
+        "a69b7d4e-4950-42e9-af5f-9a464680c7f1": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:a69b7d4e-4950-42e9-af5f-9a464680c7f1.jpg",
+        "2b8d6a71-d36b-4398-9fbc-48617abdec1f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:2b8d6a71-d36b-4398-9fbc-48617abdec1f.jpg",
+        "28bb55e0-186b-48c0-a9f4-8e83082b09f7": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:28bb55e0-186b-48c0-a9f4-8e83082b09f7.jpg",
+        "0017b97f-03fe-459f-8157-ccd28a9c0742": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:0017b97f-03fe-459f-8157-ccd28a9c0742.jpg",
+        "09144528-d967-4c00-9c24-27a1b3d1bb12": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:09144528-d967-4c00-9c24-27a1b3d1bb12.jpg",
+        "b72896b2-89d3-4591-b4e5-890fc7547e9f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:b72896b2-89d3-4591-b4e5-890fc7547e9f.jpg",
+        "f9bd5e07-4819-45d7-8889-b0674c4c03fa": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:f9bd5e07-4819-45d7-8889-b0674c4c03fa.jpg",
+        "e2303663-5dc9-42c9-a676-a0ef013460a2": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:e2303663-5dc9-42c9-a676-a0ef013460a2.jpg",
+        "8cca232d-3990-4f3c-ac21-d79b0fb1ff9f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:8cca232d-3990-4f3c-ac21-d79b0fb1ff9f.jpg",
+        "38d2065f-ca47-40cf-8be3-2e107ef5814a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:38d2065f-ca47-40cf-8be3-2e107ef5814a.jpg",
+        "ba1d6bed-104a-49e8-8e1e-32f9ea667be9": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:ba1d6bed-104a-49e8-8e1e-32f9ea667be9.jpg",
+        "13c46bdb-efd8-43c5-9ae6-905c757cea62": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:13c46bdb-efd8-43c5-9ae6-905c757cea62.jpg",
+        "5fd63b9d-47af-416b-b7c2-edffff075920": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:5fd63b9d-47af-416b-b7c2-edffff075920.jpg",
+        "f1420723-410f-40f7-8f3c-7a25945e2c61": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:f1420723-410f-40f7-8f3c-7a25945e2c61.jpg",
+        "bc465ccc-ece1-4c39-b44a-24562614eb50": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:bc465ccc-ece1-4c39-b44a-24562614eb50.jpg",
+        "f41070ac-07bc-4586-a7d9-a1bd7b3e7651": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:f41070ac-07bc-4586-a7d9-a1bd7b3e7651.jpg",
+        "f47c97e7-20dc-4110-96ed-b73d68739f16": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:f47c97e7-20dc-4110-96ed-b73d68739f16.jpg",
+        "620677a4-dd75-45f9-a630-ef173ff66301": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:620677a4-dd75-45f9-a630-ef173ff66301.jpg",
+        "905bfb8d-99de-4da5-b3e5-bf2785c8a8e0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:905bfb8d-99de-4da5-b3e5-bf2785c8a8e0.jpg",
+        "25325e58-326f-4bf6-9485-5bafe891da12": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:25325e58-326f-4bf6-9485-5bafe891da12.jpg",
+        "fc419129-202f-47e3-a38f-dabe6f938f62": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:fc419129-202f-47e3-a38f-dabe6f938f62.jpg",
+        "4b8aa356-ca9c-4f09-bb4f-f914f31979bf": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:4b8aa356-ca9c-4f09-bb4f-f914f31979bf.jpg",
+        "0745532a-1427-4973-8396-f6d9cd23d5b7": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:0745532a-1427-4973-8396-f6d9cd23d5b7.jpg",
+        "872c418f-3c2c-448e-abb3-d3dcd02d68dc": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:872c418f-3c2c-448e-abb3-d3dcd02d68dc.jpg",
+        "67f75f98-e691-4355-b52f-65a9795b12bd": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:67f75f98-e691-4355-b52f-65a9795b12bd.jpg",
+        "ae2e8536-744a-4c63-b703-9846656e921d": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:ae2e8536-744a-4c63-b703-9846656e921d.jpg",
+        "33c2ae90-9b5b-4792-9e65-471802413c44": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:33c2ae90-9b5b-4792-9e65-471802413c44.jpg",
+        "3cffe2af-333a-45f5-b654-3beb89b88fae": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:3cffe2af-333a-45f5-b654-3beb89b88fae.jpg",
+        "67cdc6a5-4d8f-4a1d-a77a-a8cc2b62f814": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:67cdc6a5-4d8f-4a1d-a77a-a8cc2b62f814.jpg",
+        "cd556050-8aba-4ba1-8223-0eed8a2fcdf6": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:cd556050-8aba-4ba1-8223-0eed8a2fcdf6.jpg",
+        "63783a0c-aaa5-4dc3-bd4b-d7686a062b1d": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:63783a0c-aaa5-4dc3-bd4b-d7686a062b1d.jpg",
+        "a4b37f5a-63bd-4719-bc09-f0a3a817bcc5": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:a4b37f5a-63bd-4719-bc09-f0a3a817bcc5.jpg",
+        "6c62e9f0-7323-4c0e-92d6-d0b06a3129d1": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:6c62e9f0-7323-4c0e-92d6-d0b06a3129d1.jpg",
+        "2774ca2f-f86d-48be-8681-958397801133": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:2774ca2f-f86d-48be-8681-958397801133.jpg",
+        "2a034b55-ff87-42ae-99c0-cdfe8975387e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:2a034b55-ff87-42ae-99c0-cdfe8975387e.jpg",
+        "606d5c56-5a87-4a67-87ba-110601c06036": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:606d5c56-5a87-4a67-87ba-110601c06036.jpg",
+        "29d34354-b58b-43a1-8df3-44025b96463d": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:29d34354-b58b-43a1-8df3-44025b96463d.jpg",
+        "7e20139b-ebfa-4204-ab7c-16b902bc9a58": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:7e20139b-ebfa-4204-ab7c-16b902bc9a58.jpg",
+        "580447c0-95ae-46e4-ab4d-f51c25fb0247": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:580447c0-95ae-46e4-ab4d-f51c25fb0247.jpg",
+        "527a424b-e4e6-4714-a121-9c28aa053ce9": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:527a424b-e4e6-4714-a121-9c28aa053ce9.jpg",
+        "8ccac6a1-b016-4a06-b357-c8d163f1c3a5": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:8ccac6a1-b016-4a06-b357-c8d163f1c3a5.jpg",
+        "d323113b-d0dc-4179-9b91-e3457fc333d0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:d323113b-d0dc-4179-9b91-e3457fc333d0.jpg",
+        "fe33353b-abbe-4133-ab1a-a0a142bfe1a4": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:fe33353b-abbe-4133-ab1a-a0a142bfe1a4.jpg",
+        "9a62de0f-0f78-4fa7-915f-0416f86bcd6c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:9a62de0f-0f78-4fa7-915f-0416f86bcd6c.jpg",
+        "c99117de-41f4-4db0-9cf2-6162268671e8": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:c99117de-41f4-4db0-9cf2-6162268671e8.jpg",
+        "66895310-5444-459b-bee6-78e7035027f1": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:66895310-5444-459b-bee6-78e7035027f1.jpg",
+        "6d70ee0a-be26-43f4-9381-d09426f589cb": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:6d70ee0a-be26-43f4-9381-d09426f589cb.jpg",
+        "9af8028e-28f4-4327-a286-5a0a7ff5ff50": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:9af8028e-28f4-4327-a286-5a0a7ff5ff50.jpg",
+        "4f20f40b-8405-4d8f-a1aa-067e8bcb7b7e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:4f20f40b-8405-4d8f-a1aa-067e8bcb7b7e.jpg",
+        "baaeb6d6-64e7-4e76-bee0-3f0bc341e429": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:baaeb6d6-64e7-4e76-bee0-3f0bc341e429.jpg",
+        "36cef378-8aee-4621-9c9c-a5d1552ba861": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:36cef378-8aee-4621-9c9c-a5d1552ba861.jpg",
+        "f268d07d-bb01-4da4-9b30-efbc16740802": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:f268d07d-bb01-4da4-9b30-efbc16740802.jpg",
+        "d02bbbd8-d8ac-438a-9cef-078ab6bbde44": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:d02bbbd8-d8ac-438a-9cef-078ab6bbde44.jpg",
+        "8f535db8-2ed1-4d55-83af-56f134f055da": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:8f535db8-2ed1-4d55-83af-56f134f055da.jpg",
+        "2ba8e8e2-0c87-4e51-bed3-0b24949b6d86": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:2ba8e8e2-0c87-4e51-bed3-0b24949b6d86.jpg",
+        "834abf78-9504-4d04-8609-7d9ecfd87757": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:834abf78-9504-4d04-8609-7d9ecfd87757.jpg",
+        "3c3818bb-d89d-4fe0-a549-46d40b244d88": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:3c3818bb-d89d-4fe0-a549-46d40b244d88.jpg",
+        "e5a90df1-1d32-4eb5-b7df-5b500c7af0b4": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:e5a90df1-1d32-4eb5-b7df-5b500c7af0b4.jpg",
+        "5bafb0dc-819a-4d07-b472-b173e97a1195": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:5bafb0dc-819a-4d07-b472-b173e97a1195.jpg",
+        "6fae8f25-c5ed-4a3e-ad60-d6340284814c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:6fae8f25-c5ed-4a3e-ad60-d6340284814c.jpg",
+        "c5a7d354-62ad-467f-95e9-27d231f58b19": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:c5a7d354-62ad-467f-95e9-27d231f58b19.jpg",
+        "fe65f242-e02f-4d28-83e9-3dc33f1571bb": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:fe65f242-e02f-4d28-83e9-3dc33f1571bb.jpg",
+        "19fb3156-67dc-4ade-b532-3fd59949460b": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:19fb3156-67dc-4ade-b532-3fd59949460b.jpg",
+        "16301c7e-960b-4077-97bb-16fd42957596": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:16301c7e-960b-4077-97bb-16fd42957596.jpg",
+        "dccac628-92a1-4182-8536-534a0b93416f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:dccac628-92a1-4182-8536-534a0b93416f.jpg",
+        "5ccebf5d-62b5-4054-8ec2-0e8a025f522c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:5ccebf5d-62b5-4054-8ec2-0e8a025f522c.jpg",
+        "f518bbf5-7ad9-4478-bbce-d49a2723a337": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:f518bbf5-7ad9-4478-bbce-d49a2723a337.jpg",
+        "1a051170-95d9-49a9-8f63-587d653b6f0e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:1a051170-95d9-49a9-8f63-587d653b6f0e.jpg",
+        "31f0f3f5-c701-4b58-8f61-2da2c024391a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:31f0f3f5-c701-4b58-8f61-2da2c024391a.jpg",
+        "becb3c99-d242-433c-846a-db66caabf4f5": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/70b5aea0-6017-11e9-b8c0-005056827e52.images/uuid:becb3c99-d242-433c-846a-db66caabf4f5.jpg",
+        "0ee5be65-cb50-42d4-b0ed-0f2ac15e5fb7": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:0ee5be65-cb50-42d4-b0ed-0f2ac15e5fb7.jpg",
+        "457a9e71-0417-4b23-be7a-419476fe6948": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:457a9e71-0417-4b23-be7a-419476fe6948.jpg",
+        "d026c847-d2a6-49d6-8a74-b1a11ece8177": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:d026c847-d2a6-49d6-8a74-b1a11ece8177.jpg",
+        "f33bd322-f8d8-40bd-975d-1e6a3ae0fcad": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:f33bd322-f8d8-40bd-975d-1e6a3ae0fcad.jpg",
+        "363c170b-cad1-46c7-a697-9f618eddb643": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:363c170b-cad1-46c7-a697-9f618eddb643.jpg",
+        "6c4372f6-dee2-422d-9a34-96f2f09f23e2": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:6c4372f6-dee2-422d-9a34-96f2f09f23e2.jpg",
+        "f06abf41-0354-4be6-9ac1-a65862267028": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:f06abf41-0354-4be6-9ac1-a65862267028.jpg",
+        "31ae9888-7247-42e1-ba24-ad336336b60b": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:31ae9888-7247-42e1-ba24-ad336336b60b.jpg",
+        "7113b48f-432d-4009-9c01-0a65813eb829": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:7113b48f-432d-4009-9c01-0a65813eb829.jpg",
+        "c91ce484-227a-4d96-9437-bb85334ee0bd": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:c91ce484-227a-4d96-9437-bb85334ee0bd.jpg",
+        "70c5bfb1-4295-447b-8a70-a786e53696a8": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:70c5bfb1-4295-447b-8a70-a786e53696a8.jpg",
+        "3c8f76d3-9131-4041-a4cd-9ee0532aaedd": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:3c8f76d3-9131-4041-a4cd-9ee0532aaedd.jpg",
+        "6764994f-2c86-4910-a42c-118d1a6af208": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:6764994f-2c86-4910-a42c-118d1a6af208.jpg",
+        "9651e92a-141a-4d78-8e99-9ce58bdcdf8c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:9651e92a-141a-4d78-8e99-9ce58bdcdf8c.jpg",
+        "175cc9f8-2217-4427-8ddc-9c75c29ad688": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:175cc9f8-2217-4427-8ddc-9c75c29ad688.jpg",
+        "6af80070-3858-4bb1-9637-0fd8f7cb7cfe": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:6af80070-3858-4bb1-9637-0fd8f7cb7cfe.jpg",
+        "02e55030-b9a6-4011-8dce-ab6b136223bb": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:02e55030-b9a6-4011-8dce-ab6b136223bb.jpg",
+        "4c6d34d4-3adb-4119-a848-4819868be16e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:4c6d34d4-3adb-4119-a848-4819868be16e.jpg",
+        "f0584537-79d5-40c2-929c-ada357ee1481": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:f0584537-79d5-40c2-929c-ada357ee1481.jpg",
+        "560b59f4-8d7f-4a8a-9125-45267b004236": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:560b59f4-8d7f-4a8a-9125-45267b004236.jpg",
+        "6b97d15a-5f50-4ef5-aa65-9f176b1131af": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:6b97d15a-5f50-4ef5-aa65-9f176b1131af.jpg",
+        "a4cb0551-5801-47f3-831e-1988f0d8d911": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:a4cb0551-5801-47f3-831e-1988f0d8d911.jpg",
+        "427a4fe6-5b6b-4c81-8a97-0982409f78c3": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:427a4fe6-5b6b-4c81-8a97-0982409f78c3.jpg",
+        "d8817f5a-f5be-4167-954a-2fa24e52454d": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:d8817f5a-f5be-4167-954a-2fa24e52454d.jpg",
+        "0a5a6b7e-d38b-423a-8a44-bed25e1cf633": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:0a5a6b7e-d38b-423a-8a44-bed25e1cf633.jpg",
+        "962840f2-744b-4463-81ec-c5cbd74fbc6a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:962840f2-744b-4463-81ec-c5cbd74fbc6a.jpg",
+        "98a28396-1e63-49aa-a710-dabe5cbc03e6": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:98a28396-1e63-49aa-a710-dabe5cbc03e6.jpg",
+        "093e6bb4-16d1-4ddb-a55d-45ac1dc12946": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:093e6bb4-16d1-4ddb-a55d-45ac1dc12946.jpg",
+        "8877b6e5-0af9-44d8-80a4-c9fb69b0e24f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:8877b6e5-0af9-44d8-80a4-c9fb69b0e24f.jpg",
+        "5d30c193-d243-4361-8291-546487585974": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:5d30c193-d243-4361-8291-546487585974.jpg",
+        "ba684f3d-5786-4581-9ab9-552bc6c57d9f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:ba684f3d-5786-4581-9ab9-552bc6c57d9f.jpg",
+        "42dae352-d363-4316-8025-cda7d391b5cc": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:42dae352-d363-4316-8025-cda7d391b5cc.jpg",
+        "cf3687e6-3a1f-497e-9cb3-f77c4a547102": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:cf3687e6-3a1f-497e-9cb3-f77c4a547102.jpg",
+        "700ffe2d-f78f-48ec-a803-f18e8e0850a1": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:700ffe2d-f78f-48ec-a803-f18e8e0850a1.jpg",
+        "b0a7c7b9-db2d-4879-93c5-f88edd7cb2d4": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:b0a7c7b9-db2d-4879-93c5-f88edd7cb2d4.jpg",
+        "1d392098-5268-42cc-a88f-838f9e1e2e26": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:1d392098-5268-42cc-a88f-838f9e1e2e26.jpg",
+        "086be575-d7bc-46c1-afa9-1d28fdb76f0c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:086be575-d7bc-46c1-afa9-1d28fdb76f0c.jpg",
+        "8802e447-a940-4103-9366-a8c0b9f213ee": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:8802e447-a940-4103-9366-a8c0b9f213ee.jpg",
+        "c50e027a-be91-44d2-84f0-e0f83cb404b3": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:c50e027a-be91-44d2-84f0-e0f83cb404b3.jpg",
+        "721529ef-f862-4dd8-9fb6-a946eba64730": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:721529ef-f862-4dd8-9fb6-a946eba64730.jpg",
+        "9b0308e9-9617-4606-8bd2-7db1bf841b9c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:9b0308e9-9617-4606-8bd2-7db1bf841b9c.jpg",
+        "a0e6fce1-ec21-4462-a515-088614f706c0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:a0e6fce1-ec21-4462-a515-088614f706c0.jpg",
+        "80b1f269-5619-401c-9e9a-4d60c11f55d5": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:80b1f269-5619-401c-9e9a-4d60c11f55d5.jpg",
+        "5b92ffa0-6abb-445c-a4fa-7587681fa93b": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:5b92ffa0-6abb-445c-a4fa-7587681fa93b.jpg",
+        "319c542c-6c4c-404e-bf9f-393a0e2d137a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:319c542c-6c4c-404e-bf9f-393a0e2d137a.jpg",
+        "efc8d7b3-060b-4753-bdb7-a0c8ed12a7fe": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:efc8d7b3-060b-4753-bdb7-a0c8ed12a7fe.jpg",
+        "ac97cd94-38ab-4c58-92cc-43a588243db0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:ac97cd94-38ab-4c58-92cc-43a588243db0.jpg",
+        "2fcb8780-8d0c-4678-b80d-e98f000204cf": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:2fcb8780-8d0c-4678-b80d-e98f000204cf.jpg",
+        "b40c63f9-8f9f-4321-9eb9-679ba6bc1a94": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:b40c63f9-8f9f-4321-9eb9-679ba6bc1a94.jpg",
+        "ef76b5d4-7c2e-4851-bf4c-6dbbd030d013": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:ef76b5d4-7c2e-4851-bf4c-6dbbd030d013.jpg",
+        "514dec21-38fd-469f-9051-5642f0a89dc2": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:514dec21-38fd-469f-9051-5642f0a89dc2.jpg",
+        "896337a6-8674-4fc6-9e02-07eee21dc09f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:896337a6-8674-4fc6-9e02-07eee21dc09f.jpg",
+        "4df904d5-72cc-4b4a-b70f-cee284a8b402": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:4df904d5-72cc-4b4a-b70f-cee284a8b402.jpg",
+        "590e7928-116a-4b44-893f-1eef8bf811c0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:590e7928-116a-4b44-893f-1eef8bf811c0.jpg",
+        "b7723796-6de4-489c-89c1-914094e48147": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:b7723796-6de4-489c-89c1-914094e48147.jpg",
+        "411788b4-b9e4-462e-9660-740c79673b4d": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:411788b4-b9e4-462e-9660-740c79673b4d.jpg",
+        "646251de-cc55-4e21-9de6-3fb2e69e8ee6": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:646251de-cc55-4e21-9de6-3fb2e69e8ee6.jpg",
+        "268ddc29-cc96-4b96-be74-484f2b9f19f0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:268ddc29-cc96-4b96-be74-484f2b9f19f0.jpg",
+        "694c1483-29a5-4f2d-af92-8c3e52305666": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:694c1483-29a5-4f2d-af92-8c3e52305666.jpg",
+        "704a2e5e-cd71-45cd-a12e-776074c89dab": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:704a2e5e-cd71-45cd-a12e-776074c89dab.jpg",
+        "a234b4b7-91d5-4a7c-a0ea-9f724857c2ba": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:a234b4b7-91d5-4a7c-a0ea-9f724857c2ba.jpg",
+        "8e61e9ea-f2d8-4f7b-bf5d-7809fcb62f00": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:8e61e9ea-f2d8-4f7b-bf5d-7809fcb62f00.jpg",
+        "2f53d60b-0443-4603-b328-9b9b48d6721e": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:2f53d60b-0443-4603-b328-9b9b48d6721e.jpg",
+        "70991327-a6a3-46ff-bf07-5c5abfef40ab": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:70991327-a6a3-46ff-bf07-5c5abfef40ab.jpg",
+        "f2d80113-f64c-4fae-913b-868b6762eaf8": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:f2d80113-f64c-4fae-913b-868b6762eaf8.jpg",
+        "0bfab464-07f0-4406-ac02-299f8cffc91a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:0bfab464-07f0-4406-ac02-299f8cffc91a.jpg",
+        "12c4b4ea-d1d0-431a-86e7-2718d0e1fa6a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:12c4b4ea-d1d0-431a-86e7-2718d0e1fa6a.jpg",
+        "d9681599-69c5-4bcc-b228-3f798721ac29": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:d9681599-69c5-4bcc-b228-3f798721ac29.jpg",
+        "7ac48ea9-7174-4012-8182-8a1041fa0a2c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:7ac48ea9-7174-4012-8182-8a1041fa0a2c.jpg",
+        "5655616f-d186-4a09-a616-9fa3a735319f": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:5655616f-d186-4a09-a616-9fa3a735319f.jpg",
+        "5a3044de-a6c0-4d50-983e-2f7c8aef0e5c": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:5a3044de-a6c0-4d50-983e-2f7c8aef0e5c.jpg",
+        "84758765-7a35-4336-bc7f-392338072439": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:84758765-7a35-4336-bc7f-392338072439.jpg",
+        "a5084ba9-b60b-4601-82fd-319512d24ecf": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:a5084ba9-b60b-4601-82fd-319512d24ecf.jpg",
+        "689261fb-5483-44cf-8e09-a8e65be33abd": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:689261fb-5483-44cf-8e09-a8e65be33abd.jpg",
+        "920d74a8-d833-4e84-9bbe-df1452fd5322": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:920d74a8-d833-4e84-9bbe-df1452fd5322.jpg",
+        "8b647a2c-80b5-4339-9cbf-f122817fceab": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:8b647a2c-80b5-4339-9cbf-f122817fceab.jpg",
+        "1ce3e1df-b929-4b4d-a390-811857e69795": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:1ce3e1df-b929-4b4d-a390-811857e69795.jpg",
+        "79800265-d556-401d-8613-3d0df42f17b3": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:79800265-d556-401d-8613-3d0df42f17b3.jpg",
+        "82451008-fb4a-4efa-bf23-5e1a443ace49": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:82451008-fb4a-4efa-bf23-5e1a443ace49.jpg",
+        "4553c6e2-5eba-4b7b-946b-91eb4f6e6aef": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:4553c6e2-5eba-4b7b-946b-91eb4f6e6aef.jpg",
+        "c74ddd2c-b18c-4289-b7d6-3339ce4ce4f6": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:c74ddd2c-b18c-4289-b7d6-3339ce4ce4f6.jpg",
+        "032f37fb-da4d-4e22-af45-0ad900b0325a": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:032f37fb-da4d-4e22-af45-0ad900b0325a.jpg",
+        "33c6c655-e575-44f6-b769-ad4ebed60fa1": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:33c6c655-e575-44f6-b769-ad4ebed60fa1.jpg",
+        "4d67d90f-3bbc-44f5-a5e8-1d04cd8c9b86": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:4d67d90f-3bbc-44f5-a5e8-1d04cd8c9b86.jpg",
+        "d08ecd03-13ea-4ec6-8e30-932373048720": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:d08ecd03-13ea-4ec6-8e30-932373048720.jpg",
+        "bf7da912-27e0-4e37-a89e-d99f4c352cf0": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:bf7da912-27e0-4e37-a89e-d99f4c352cf0.jpg",
+        "ed11b1ad-abc3-46c3-b1db-ba665dd4bb89": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:ed11b1ad-abc3-46c3-b1db-ba665dd4bb89.jpg",
+        "7b5e4a5c-7a86-4a0d-908e-353b6939caac": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:7b5e4a5c-7a86-4a0d-908e-353b6939caac.jpg",
+        "9fc87407-923e-4f82-b9d3-f7e983c534a5": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:9fc87407-923e-4f82-b9d3-f7e983c534a5.jpg",
+        "a6ac0e3e-c200-4490-9514-e2b3e49ede48": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:a6ac0e3e-c200-4490-9514-e2b3e49ede48.jpg",
+        "3bcf61ce-a132-419b-a120-8e0efed55caf": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:3bcf61ce-a132-419b-a120-8e0efed55caf.jpg",
+        "e91e2f2a-c287-4602-95b8-3084d04797f1": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:e91e2f2a-c287-4602-95b8-3084d04797f1.jpg",
+        "de89f606-251e-4ff3-89df-e9387cd1e489": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:de89f606-251e-4ff3-89df-e9387cd1e489.jpg",
+        "f1ebbf84-ef6d-4654-94a9-fabd16a97ed6": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:f1ebbf84-ef6d-4654-94a9-fabd16a97ed6.jpg",
+        "e5587616-5d00-4027-b64f-9d99beef8f61": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:e5587616-5d00-4027-b64f-9d99beef8f61.jpg",
+        "ef463730-f621-4f8d-b7d1-a69ef0d0e3d8": "/mnt/matylda0/ihradis/digiknihovna_public/mzk/b1713d50-a168-11e9-9209-005056827e51.images/uuid:ef463730-f621-4f8d-b7d1-a69ef0d0e3d8.jpg"
+    },
+    "detection_to_bbox": {
+        "227fcc63-a0aa-4340-ba7d-8ca2ee8f9874": [
+            1193,
+            1589,
+            201,
+            58
+        ],
+        "7c2e5d97-9255-4e2a-8d1f-becc11214c3e": [
+            995,
+            511,
+            62,
+            64
+        ],
+        "722a9fe9-3b48-4161-8a7b-9196b3937ad5": [
+            20,
+            1229,
+            107,
+            61
+        ],
+        "ce529822-5376-48c9-b5d6-4bd2b6db8e29": [
+            151,
+            264,
+            257,
+            69
+        ],
+        "fb4782b5-bbdb-4f85-95c4-3054488493b1": [
+            205,
+            317,
+            190,
+            63
+        ],
+        "05d82207-7512-415b-9fff-02f9cd1bcb05": [
+            16,
+            627,
+            213,
+            59
+        ],
+        "c0039aef-ec9f-4bbe-bb2a-cc1cc04cfb01": [
+            1195,
+            1695,
+            206,
+            62
+        ],
+        "da995e2f-c562-4b09-8799-04736fd143f6": [
+            869,
+            676,
+            283,
+            50
+        ],
+        "c419cedd-4d72-44c0-acd3-11631650de07": [
+            715,
+            641,
+            240,
+            54
+        ],
+        "68ec89e5-f475-49dd-bb30-b3d41871b96d": [
+            69,
+            688,
+            237,
+            62
+        ],
+        "f244d315-94da-459c-8287-98c0a59a0cf0": [
+            507,
+            738,
+            279,
+            56
+        ],
+        "fb624e29-c4ec-493f-aded-3aebfaab2245": [
+            574,
+            864,
+            197,
+            56
+        ],
+        "17a2f161-7e06-453f-baf3-0954e3c09c5c": [
+            737,
+            1742,
+            266,
+            57
+        ],
+        "6655dda3-569a-444d-84ef-4c770e6f923a": [
+            620,
+            79,
+            130,
+            59
+        ],
+        "b249bb16-c661-407a-8542-6c18b31a9b72": [
+            748,
+            540,
+            81,
+            62
+        ],
+        "05f916f4-da2f-4981-8a70-c1b940710e72": [
+            486,
+            1795,
+            225,
+            60
+        ],
+        "744dbbc5-a8ed-45df-a8a9-f3e369fda4af": [
+            1166,
+            1823,
+            132,
+            52
+        ],
+        "01f90e4a-26d2-4f3c-8e76-19adeb3186d1": [
+            114,
+            1272,
+            242,
+            65
+        ],
+        "f54bd1da-9f37-43af-ac85-c97d88296147": [
+            1047,
+            1117,
+            138,
+            54
+        ],
+        "67164044-a2d3-4599-b2d7-2846aee9a365": [
+            931,
+            1372,
+            116,
+            59
+        ],
+        "1876b4f3-cf9a-421b-a345-ae723b49ea0d": [
+            979,
+            449,
+            177,
+            58
+        ],
+        "2702f723-2c01-4447-9280-7a9089596b80": [
+            754,
+            531,
+            85,
+            57
+        ],
+        "df63908e-f40f-4e55-a25e-dca4db1f6c90": [
+            292,
+            964,
+            54,
+            60
+        ],
+        "07e2431b-5c16-4597-bef0-496ccdbe2423": [
+            162,
+            302,
+            101,
+            59
+        ],
+        "c479e0a7-677f-4700-a7aa-f5bcd243d529": [
+            990,
+            582,
+            158,
+            61
+        ],
+        "68b1a91f-496d-4fc8-afac-a521163260d7": [
+            828,
+            72,
+            142,
+            57
+        ],
+        "5c9b505a-f31d-491e-be7f-958e04546dc8": [
+            19,
+            425,
+            169,
+            69
+        ],
+        "d402ee3c-129b-46f2-bc9d-0e5c18e6c475": [
+            768,
+            95,
+            151,
+            59
+        ],
+        "fdbebd64-4801-4b33-b70a-bbb019bb4940": [
+            808,
+            1347,
+            198,
+            54
+        ],
+        "f7fb7364-6a9b-4f47-a945-f45e61189ba7": [
+            1020,
+            969,
+            288,
+            69
+        ],
+        "9f76c236-f39e-4ac6-8549-c102929a47c8": [
+            41,
+            617,
+            149,
+            69
+        ],
+        "85c98510-e35f-432c-8b3c-2239c03f9f3b": [
+            715,
+            1466,
+            183,
+            63
+        ],
+        "d0e519f2-6445-488e-b26f-53537de82693": [
+            507,
+            1888,
+            118,
+            54
+        ],
+        "ab8853c3-8542-4e77-9635-8c65cc279b00": [
+            520,
+            1042,
+            199,
+            54
+        ],
+        "85f4088a-ccfb-4103-ad8f-593c3063d5e7": [
+            659,
+            1154,
+            259,
+            51
+        ],
+        "865cb8c1-2ad7-41eb-8a6e-227d5caf1a0d": [
+            511,
+            1144,
+            274,
+            52
+        ],
+        "42a685c0-3282-4dac-b329-a0737f25e62f": [
+            5,
+            464,
+            253,
+            62
+        ],
+        "8423cb0c-57b4-4d16-bb6a-f210dd704042": [
+            761,
+            1572,
+            101,
+            56
+        ],
+        "f587baef-dc5c-4f1c-b017-fbaa21aab92f": [
+            63,
+            1218,
+            68,
+            61
+        ],
+        "bb1daefc-09c8-4e2c-ae7a-54372c71b829": [
+            35,
+            717,
+            158,
+            69
+        ],
+        "a5a00540-3fb9-4f14-9e55-95b656cdfb96": [
+            912,
+            399,
+            258,
+            55
+        ],
+        "8ca2a763-552c-4ebc-9102-c631d5f23bfc": [
+            142,
+            232,
+            142,
+            53
+        ],
+        "ec0867de-ee53-40fd-8c4d-e31f4887e68f": [
+            513,
+            505,
+            201,
+            60
+        ],
+        "22083fc1-28ca-4d99-8126-b79f5c360b15": [
+            710,
+            873,
+            153,
+            61
+        ],
+        "68110d5c-0af0-4595-bd1f-2f9078b3a294": [
+            1107,
+            93,
+            263,
+            61
+        ],
+        "f6c5fd3e-d5da-4fb0-8298-a63cc2b34eee": [
+            241,
+            1125,
+            231,
+            67
+        ],
+        "9996916e-71c9-4b0a-9ae2-330463421cff": [
+            264,
+            546,
+            136,
+            56
+        ],
+        "ab7f2193-3629-4186-9354-aa650b6777eb": [
+            1102,
+            252,
+            278,
+            50
+        ],
+        "d70537e3-0533-43ad-997e-ce0a24fcce5e": [
+            588,
+            1674,
+            261,
+            53
+        ],
+        "f8d4afb9-5587-4208-8d4a-01724a6f34e4": [
+            481,
+            1598,
+            53,
+            60
+        ],
+        "ef40c526-1382-425d-8c81-5cac1f3a18d0": [
+            542,
+            896,
+            118,
+            65
+        ],
+        "00a0cbe3-4b8c-464f-9d33-8b012a501c30": [
+            694,
+            200,
+            66,
+            56
+        ],
+        "866e8295-ce0d-4bf1-90d4-1aa9565a9f36": [
+            1038,
+            1757,
+            244,
+            64
+        ],
+        "af07d749-55b4-4713-b0ad-7bf3f5f72130": [
+            869,
+            821,
+            215,
+            61
+        ],
+        "434b19f6-8e0b-4399-bbd4-be124feb5bd7": [
+            709,
+            1247,
+            272,
+            62
+        ],
+        "8b9eed2e-74f1-48f9-b181-97104898adee": [
+            979,
+            1275,
+            176,
+            64
+        ],
+        "e851c821-e0af-4884-bc58-11a19dba1b20": [
+            204,
+            272,
+            201,
+            68
+        ],
+        "9c2b2445-92a3-4377-ac0a-5e126e15597d": [
+            414,
+            1822,
+            246,
+            61
+        ],
+        "60838e3d-ea34-41fd-a00a-a4b8ad22d0c6": [
+            963,
+            1934,
+            94,
+            66
+        ],
+        "9d455c9d-578c-4e74-9db5-e3a0851be960": [
+            1039,
+            1056,
+            256,
+            56
+        ],
+        "c96e77ba-b4d5-4cd6-94cc-3132f107db98": [
+            1077,
+            1623,
+            101,
+            62
+        ],
+        "c92a5381-9356-448c-b9de-12360cc8442f": [
+            121,
+            26,
+            162,
+            64
+        ],
+        "754c2800-f349-4466-ab89-a6ca2be79919": [
+            356,
+            1720,
+            176,
+            55
+        ],
+        "fed7dab6-374d-464a-8b83-c96e935d3ea9": [
+            442,
+            1952,
+            199,
+            69
+        ],
+        "24ab8b76-7ddd-46d3-914f-9a3bbf362036": [
+            1031,
+            294,
+            107,
+            68
+        ],
+        "9faf215e-67ca-4276-8d58-c4bd6ea0a5e4": [
+            462,
+            41,
+            254,
+            67
+        ],
+        "67b768e7-50f7-4123-9c54-115555e4626d": [
+            638,
+            1500,
+            238,
+            69
+        ],
+        "8af49609-d61d-40bd-8a8b-946a150d1395": [
+            118,
+            204,
+            296,
+            58
+        ],
+        "d484de3e-54ad-40bf-8a2c-7e4bc1fa2eb2": [
+            1127,
+            1161,
+            244,
+            56
+        ],
+        "a5b6d7b0-e09f-4165-9d64-9b61b29f430e": [
+            1047,
+            1840,
+            99,
+            64
+        ],
+        "3c450986-33c1-4d02-a374-2b6c8460906c": [
+            123,
+            486,
+            140,
+            64
+        ],
+        "89c0813e-5e2b-4237-a4fd-42e5e5b8afbc": [
+            1062,
+            1554,
+            161,
+            66
+        ],
+        "3af78a20-58e9-4a7d-8b9e-8bb8ce7f4d68": [
+            664,
+            693,
+            264,
+            52
+        ],
+        "6557a744-46e4-45cd-adda-a1643de267fa": [
+            1060,
+            505,
+            285,
+            66
+        ],
+        "0736f4ab-08e5-43c8-add7-13c89e9cfccf": [
+            905,
+            381,
+            249,
+            58
+        ],
+        "07d5203e-08f5-4d7f-b65a-e3465c38abd7": [
+            469,
+            1782,
+            239,
+            54
+        ],
+        "d1e0b3e7-2b39-4e1a-90b6-4b3824ee3d00": [
+            299,
+            837,
+            294,
+            53
+        ],
+        "d62e2c6f-7c49-452d-8cb1-a9c44883ea34": [
+            868,
+            1872,
+            126,
+            68
+        ],
+        "a33380e4-6faf-45bd-aa8e-791813da0713": [
+            21,
+            1963,
+            277,
+            59
+        ],
+        "71051922-23e2-442a-a4d1-b736f5e3f343": [
+            1054,
+            1421,
+            231,
+            59
+        ],
+        "87d70dbf-e13a-47c8-bae3-9f4ea984700f": [
+            1180,
+            1149,
+            50,
+            53
+        ],
+        "23862c39-2223-468e-9618-011f8b90e0b0": [
+            834,
+            1582,
+            181,
+            51
+        ],
+        "d055cdd3-4a92-4008-ae02-29448b6c21a3": [
+            802,
+            1840,
+            246,
+            56
+        ],
+        "52452ea7-44e5-4b88-b026-e47a8fa67f08": [
+            1185,
+            1037,
+            108,
+            68
+        ],
+        "431781de-dae4-40b4-8fa2-5d0046741b59": [
+            739,
+            767,
+            246,
+            65
+        ],
+        "fa6c8937-547b-4b9f-8666-dc6144fbab07": [
+            1002,
+            379,
+            207,
+            60
+        ],
+        "620702df-d52d-4471-9904-a015fdd3a93e": [
+            814,
+            1967,
+            168,
+            65
+        ],
+        "d26a2cfc-821a-41ea-8d57-05caa02c52a7": [
+            1184,
+            1845,
+            174,
+            66
+        ],
+        "46c02784-ee17-4c1a-96ae-86de2b747884": [
+            225,
+            1209,
+            190,
+            52
+        ],
+        "e1cf9b3b-cdf2-4022-970b-335bc1206ce4": [
+            789,
+            986,
+            79,
+            68
+        ],
+        "a6b22a87-65bf-4c9b-927d-6b87f32cf25e": [
+            616,
+            1385,
+            246,
+            50
+        ],
+        "a2e5f32a-5710-48cd-b431-3ff82eedf8d5": [
+            1048,
+            1617,
+            212,
+            55
+        ],
+        "b35f0239-c787-4c58-98d6-7f6a77a88f7f": [
+            106,
+            1220,
+            104,
+            65
+        ],
+        "fdf80297-472f-4305-b767-0966f7e9395f": [
+            1166,
+            1758,
+            135,
+            56
+        ],
+        "9d9bf8b8-e93a-40ea-989e-97a4fa44f452": [
+            811,
+            1545,
+            293,
+            57
+        ],
+        "cb01fa87-4ee3-4165-aa39-b67119b87d09": [
+            1121,
+            1028,
+            127,
+            67
+        ],
+        "64310d9a-d8d2-44a0-8d55-89143476a1ae": [
+            1176,
+            470,
+            119,
+            52
+        ],
+        "7d4e3dd3-3281-4c43-96d4-5e31e83e6460": [
+            1017,
+            1220,
+            225,
+            58
+        ],
+        "bfad5f67-72ef-4f94-9f29-6905f4859792": [
+            831,
+            1047,
+            193,
+            53
+        ],
+        "fe26a8bf-a25d-4a52-a6a4-0f033738d1c4": [
+            58,
+            304,
+            229,
+            66
+        ],
+        "e3759594-7c86-476d-922d-6a6be24e53a2": [
+            363,
+            1749,
+            69,
+            54
+        ],
+        "33b2f202-a403-4b0e-b285-518b5670e282": [
+            56,
+            1216,
+            229,
+            56
+        ],
+        "4603e269-aa5d-474d-8852-65d875db2973": [
+            43,
+            466,
+            62,
+            66
+        ],
+        "d704eaa6-f1ab-42f7-b18e-412252c210f7": [
+            995,
+            548,
+            83,
+            60
+        ],
+        "a16525b1-b957-4fd0-80ad-d733075b7794": [
+            976,
+            1770,
+            260,
+            52
+        ],
+        "f5ad38db-6cf1-4176-a9e9-d37b178ece3e": [
+            1081,
+            820,
+            210,
+            53
+        ],
+        "b77d3e4d-dbcb-4f32-a50f-a6428d138d29": [
+            297,
+            1300,
+            288,
+            64
+        ],
+        "dd51df71-591c-4975-96ef-5a6e818d3879": [
+            1013,
+            1683,
+            255,
+            65
+        ],
+        "2a9cbe42-b529-4f67-b4fd-aab4b0c986f4": [
+            49,
+            432,
+            233,
+            60
+        ],
+        "ff3da19e-5f21-4ce0-a3bb-3014f3ef8e6a": [
+            617,
+            193,
+            229,
+            58
+        ],
+        "3df94006-c9f1-4386-ac9a-5e49b358bf4d": [
+            956,
+            1180,
+            109,
+            51
+        ],
+        "b6e792cc-0188-4dad-83d3-55aae5f74c29": [
+            886,
+            561,
+            165,
+            58
+        ],
+        "8cb68bae-d70f-40b9-8bdb-4de678ace98d": [
+            506,
+            1515,
+            193,
+            61
+        ],
+        "d226942e-f28b-4b5b-8824-8dd32429d418": [
+            257,
+            198,
+            279,
+            68
+        ],
+        "ece449c1-f40b-4f34-a85c-02beb783f562": [
+            1021,
+            684,
+            262,
+            67
+        ],
+        "b4af85fd-aae4-4dd0-b7ed-fba3dc1173cf": [
+            1191,
+            107,
+            196,
+            66
+        ],
+        "7295f936-4e93-46dd-a5dd-7bece6d8ef05": [
+            530,
+            1074,
+            179,
+            63
+        ],
+        "d5923eec-e0f4-43bc-a7f0-c0d65eead086": [
+            424,
+            621,
+            92,
+            67
+        ],
+        "b1674af2-c93d-4237-8d97-8c4f1cde60ec": [
+            1110,
+            783,
+            105,
+            59
+        ],
+        "d01d700b-e6b3-42e8-a107-6b6ac1d14ee8": [
+            717,
+            1278,
+            230,
+            69
+        ],
+        "22a18f6d-1328-47b7-ab2b-095c0f2cbf69": [
+            367,
+            1149,
+            298,
+            59
+        ],
+        "ab87d45d-4623-463d-a41f-aeb2ac20c2dd": [
+            1057,
+            907,
+            67,
+            53
+        ],
+        "43bf0cfb-26db-42be-a25d-752434b4c14f": [
+            827,
+            725,
+            81,
+            69
+        ],
+        "9607dc7b-55b0-4140-a09c-138119eccc03": [
+            99,
+            317,
+            79,
+            66
+        ],
+        "5f5fd3ea-70ec-4736-8ce2-e40bc9e36cf0": [
+            1186,
+            1387,
+            154,
+            56
+        ],
+        "fb8ffb5e-97ce-43ec-a133-cfacd458e9ac": [
+            1134,
+            216,
+            269,
+            54
+        ],
+        "f6d29728-b39a-4268-b41b-32f18641554b": [
+            164,
+            1330,
+            125,
+            64
+        ],
+        "05564200-968a-4b11-8d23-17c0cb142f03": [
+            232,
+            304,
+            254,
+            62
+        ],
+        "0130aaa9-e4b2-4fd9-a83a-56e06e157b4d": [
+            696,
+            1583,
+            81,
+            64
+        ],
+        "01531a60-40f2-4150-9f1f-41a4254d14c7": [
+            277,
+            1809,
+            88,
+            55
+        ],
+        "c1eb4900-9417-46f2-817f-9a82f7d2a996": [
+            1103,
+            347,
+            238,
+            57
+        ],
+        "dbaa46f3-5882-4ab0-abc2-fffb9e767825": [
+            1139,
+            1111,
+            218,
+            65
+        ],
+        "32eecde5-7b9f-4e6f-97a6-466392648833": [
+            986,
+            1450,
+            238,
+            66
+        ],
+        "908cf59f-f3cb-4e30-894a-1dae32b403b7": [
+            996,
+            284,
+            102,
+            52
+        ],
+        "d1d95c0a-4dec-48d9-b090-d5596ecb65d1": [
+            649,
+            1517,
+            126,
+            58
+        ],
+        "96bb3f12-326f-40c7-8f39-238c090d3f06": [
+            186,
+            1497,
+            69,
+            55
+        ],
+        "2a1e0cd3-5c52-4ef5-b61a-d7cf01e5954f": [
+            918,
+            1383,
+            55,
+            63
+        ],
+        "a5077ee4-c559-41f2-9bd4-00a08ea667ab": [
+            782,
+            1680,
+            227,
+            57
+        ],
+        "3e96ef9c-e807-4f4a-aad6-19aa39e624a6": [
+            1098,
+            157,
+            263,
+            69
+        ],
+        "e326ac08-7e3f-49ec-8fe5-49334493158e": [
+            1139,
+            521,
+            101,
+            51
+        ],
+        "9be521c6-5349-490f-838c-b7676860016d": [
+            698,
+            1311,
+            293,
+            57
+        ],
+        "79ed8f0a-99d9-46a5-ad15-f2f08d30f4ea": [
+            368,
+            1119,
+            242,
+            60
+        ],
+        "1bd80ade-593c-4ca2-a4dd-3aa79fb42792": [
+            853,
+            607,
+            204,
+            63
+        ],
+        "8d0e71d8-c48e-49e4-9eef-ec2ebe2906e5": [
+            975,
+            639,
+            213,
+            69
+        ],
+        "33e90869-95b3-4131-a2ca-c137f8036555": [
+            963,
+            139,
+            242,
+            63
+        ],
+        "e7bd3255-2656-426e-a64c-375a82abbb59": [
+            125,
+            949,
+            95,
+            64
+        ],
+        "3274d07c-ed1a-413b-8af8-233abff1d03e": [
+            490,
+            325,
+            174,
+            64
+        ],
+        "2af84493-d269-4ada-b958-25d4d143df90": [
+            839,
+            1222,
+            115,
+            67
+        ],
+        "55b59a5f-d414-4aa7-992f-997f991b19f8": [
+            873,
+            324,
+            157,
+            55
+        ],
+        "cf88bd44-6897-446f-9c08-ff28e1c6c178": [
+            314,
+            612,
+            283,
+            67
+        ],
+        "fd349865-46d2-4000-ab30-2fdcd88f39f6": [
+            1014,
+            791,
+            118,
+            52
+        ],
+        "2dd95eaf-c9ff-4779-8fd6-ad24f1449554": [
+            300,
+            1060,
+            54,
+            56
+        ],
+        "62a97978-1f42-4618-8e85-1a14ec8d53ef": [
+            332,
+            111,
+            207,
+            69
+        ],
+        "83d64f3c-c7ed-493a-8bb4-70c2830d4285": [
+            239,
+            497,
+            77,
+            56
+        ],
+        "823bc8c4-d352-485f-a9e6-eef9741e7062": [
+            416,
+            954,
+            87,
+            55
+        ],
+        "e4781435-ace5-4655-ae66-189131367a0b": [
+            381,
+            580,
+            202,
+            66
+        ],
+        "03e57eb5-49f7-426e-abb3-7770e99ce403": [
+            911,
+            563,
+            72,
+            57
+        ],
+        "9c3243d7-e8f5-49b8-aaf0-3e484f21a28d": [
+            683,
+            1597,
+            213,
+            50
+        ],
+        "6d955675-51e8-4665-8c43-05c536a1ab99": [
+            474,
+            964,
+            224,
+            68
+        ],
+        "f4ac679d-a2bb-4d38-baa8-657c5f13cd87": [
+            511,
+            597,
+            161,
+            61
+        ],
+        "a0d6915c-dca1-4131-ab5a-45574bca6c41": [
+            786,
+            9,
+            212,
+            61
+        ],
+        "800d9c23-4110-427f-88f6-05832f8754a3": [
+            8,
+            426,
+            117,
+            64
+        ],
+        "a0854008-06a9-4396-a5d5-fe1d7dd07f79": [
+            438,
+            481,
+            231,
+            61
+        ],
+        "66bac902-a4e6-4fed-8ead-3fb4a4e386f4": [
+            212,
+            100,
+            81,
+            52
+        ],
+        "0253c36c-8c05-477e-b676-2170a4cbeb82": [
+            620,
+            1320,
+            210,
+            54
+        ],
+        "a26d3083-d9a2-4e62-9154-25671a29bae3": [
+            641,
+            996,
+            66,
+            61
+        ],
+        "b2fd9c5c-123e-4fd9-b40c-2126856ef226": [
+            355,
+            595,
+            131,
+            51
+        ]
+    }
+}
