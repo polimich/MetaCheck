@@ -3,6 +3,7 @@ from typing import List
 from uuid import UUID
 
 from sqlalchemy import exc, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -45,13 +46,24 @@ async def create_image_detections(
             db_image = await db.scalar(
                 select(model.Image).where(model.Image.id == image_id)
             )
-            db_image.detections.add_all(
-                [model.Detection(**detection.model_dump()) for detection in detections]
-            )
+            if not db_image:
+                raise DBError(f"Image with ID {image_id} not found.")
 
-    except exc.SQLAlchemyError as e:
-        logger.exception(f"Failed creating detections in database")
-        raise DBError(f"Failed creating detections in database") from e
+            # Convert schema objects to ORM models
+            detection_objects = [
+                model.Detection(**detection.model_dump()) for detection in detections
+            ]
+
+            # Corrected: Use .extend() instead of .add_all()
+            db_image.detections.extend(detection_objects)
+
+        await db.commit()  # Ensure the changes are committed
+        return db_image
+
+    except SQLAlchemyError as e:
+        await db.rollback()  # Rollback on failure
+        logger.exception("Failed creating detections in database")
+        raise DBError("Failed creating detections in database") from e
 
 
 async def get_image_detections(

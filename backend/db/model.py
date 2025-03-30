@@ -70,6 +70,7 @@ class Detection(MyTableMixin, Base):
     bbox: Mapped[str] = mapped_column(nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=True)
     annotated: Mapped[bool] = mapped_column(default=False, index=True, nullable=False)
+    value: Mapped[str] = mapped_column(String(300), nullable=False)
 
     @property
     def np_bbox(self):

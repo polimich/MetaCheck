@@ -96,106 +96,126 @@ async def import_collection_yolo(
     if "zip" not in file.content_type:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsuported file type - only zip files are supported.",
+            detail="Unsupported file type - only zip files are supported.",
         )
+
     collection_id = uuid.uuid4()
     collection = base_objects.CollectionNew(
-        id=collection_id, name=file.filename.split(".zip")[0]
+        id=collection_id, name=file.filename.replace(".zip", "")
     )
-    collection = collection.model_dump()
-    await crud_general.new(db, collection, model.Collection)
+    await crud_general.new(db, collection.model_dump(), model.Collection)
+
     path = await get_zip_path(collection_id)
     zip_file_path = os.path.join(path, file.filename)
-    extracked_dir_path = path
+    extracted_dir_path = path
+
     try:
-        raw_input = file.file.read()
+        # Efficient async file writing
         async with aiofiles.open(zip_file_path, mode="wb") as f:
-            await f.write(raw_input)
-        # unzip file
+            while chunk := await file.read(1024 * 1024):  # Read in chunks of 1MB
+                await f.write(chunk)
+
+        # Unzip file
         with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
-            zip_ref.extractall(path)
+            zip_ref.extractall(extracted_dir_path)
 
-        # delete zip file
-        if os.path.exists(zip_file_path):
-            os.remove(zip_file_path)
+        # Delete the ZIP file after extraction
+        os.remove(zip_file_path)
 
-        # get classes from txt file
-        classes = []
-        with open(os.path.join(extracked_dir_path, "classes.txt"), "r") as f:
-            classes = f.read().splitlines()
+        # Read classes.txt file asynchronously
+        classes_txt_path = os.path.join(extracted_dir_path, "classes.txt")
+        async with aiofiles.open(classes_txt_path, mode="r") as f:
+            classes = await f.read()
+        classes = classes.splitlines()
 
-        # get images from folder
+        # Collect images and annotations
         images = []
-        for root, dirs, files in os.walk(os.path.join(extracked_dir_path, "images")):
-            for file in files:
-                if file.endswith((".jpg", ".jpeg", ".png")):
-                    images.append((file, os.path.join(root, file)))
-        # get annotations from folder
-        annotations = []
-        for root, dirs, files in os.walk(os.path.join(extracked_dir_path, "labels")):
-            for file in files:
-                if file.endswith(".txt"):
-                    annotations.append(os.path.join(root, file))
+        annotations = {}
 
-        images.sort()
-        annotations.sort()
+        for root, _, files in os.walk(os.path.join(extracted_dir_path, "images")):
+            for filename in files:
+                if filename.lower().endswith((".jpg", ".jpeg", ".png")):
+                    images.append((filename, os.path.join(root, filename)))
 
-        # upload images
-        for index, image in enumerate(images):
+        for root, _, files in os.walk(os.path.join(extracted_dir_path, "labels")):
+            for filename in files:
+                if filename.lower().endswith(".txt"):
+                    annotations[filename.replace(".txt", "")] = os.path.join(
+                        root, filename
+                    )
+
+        # Sort images to match annotations (assuming same names)
+        images.sort(key=lambda x: x[0])
+
+        # Process images and annotations
+        for index, (image_name, image_path) in enumerate(images):
             image_id = uuid.uuid4()
-            raw_input = open(image[1], "rb").read()
-            await save_image(raw_input, image[0], collection_id, image_id, index, db)
-            # upload annotations
+
+            # Async image file read
+            async with aiofiles.open(image_path, mode="rb") as f:
+                raw_input = await f.read()
+            await save_image(raw_input, image_name, collection_id, image_id, index, db)
+
+            # Get annotation file
+            annotation_path = annotations.get(image_name.rsplit(".", 1)[0])
+            if not annotation_path:
+                continue  # Skip if no annotation file exists
+
+            # Read annotation file asynchronously
+            async with aiofiles.open(annotation_path, mode="r") as f:
+                annotation_lines = await f.readlines()
+
             detections = []
             image_info = await get_image(image_id, db)
-            with open(annotations[index], "r") as f:
-                annotation = f.read().splitlines()
-            for line in annotation:
-                line = line.split(" ")
-                class_id = int(line[0])
-                x_normalized = float(line[1])
-                y_normalized = float(line[2])
-                width_normalized = float(line[3])
-                height_normalized = float(line[4])
+
+            for line in annotation_lines:
+                parts = line.strip().split()
+                if len(parts) != 5:
+                    continue  # Skip malformed lines
+
+                class_id, x_norm, y_norm, w_norm, h_norm = map(float, parts)
 
                 image_width = image_info.width
                 image_height = image_info.height
 
-                width = float(width_normalized * image_width)
-                height = float(height_normalized * image_height)
-                x = float(x_normalized * image_width - width / 2)
-                y = float(y_normalized * image_height - height / 2)
+                width = w_norm * image_width
+                height = h_norm * image_height
+                x = x_norm * image_width - width / 2
+                y = y_norm * image_height - height / 2
 
                 bbox = f"{x};{y};{width};{height}"
+
                 detection_types = await get_detection_types(db)
-                detection_types_names = [
-                    detection.name for detection in detection_types
-                ]
-                if classes[class_id] not in detection_types_names:
+                detection_types_names = {d.name for d in detection_types}
+
+                class_name = classes[int(class_id)]
+                if class_name not in detection_types_names:
                     new_detection_type = base_objects.DetectionTypeNew(
                         id=uuid.uuid4(),
-                        name=classes[class_id],
+                        name=class_name,
                         color=f"#{random.randint(0, 0xFFFFFF):06x}",
-                        display_name=classes[class_id].capitalize(),
+                        display_name=class_name.capitalize(),
                     )
                     await post_detection_type(new_detection_type, db)
-                    print(f"Added new detection type: {classes[class_id]}")
+                    logger.info(f"Added new detection type: {class_name}")
 
-                detection_type = await get_detection_type_by_name(classes[class_id], db)
+                detection_type = await get_detection_type_by_name(class_name, db)
                 detection = base_objects.DetectionNew(
-                    id=uuid.uuid4(), type_id=detection_type.id, bbox=bbox
+                    id=uuid.uuid4(),
+                    type_id=detection_type.id,
+                    bbox=bbox,
+                    image_id=image_id,
                 )
                 detections.append(detection)
 
             await crud_image.create_image_detections(db, image_id, detections)
 
-        # delete zip folder and its content
-        if os.path.exists(extracked_dir_path):
-            shutil.rmtree(extracked_dir_path)
+        # Delete extracted folder
+        shutil.rmtree(extracted_dir_path)
 
     except Exception as e:
-        logger.exception(f"Failed to write file to disk. Path={zip_file_path}")
-        raise HTTPException(status_code=500, detail="Failed to write file to disk.")
+        logger.exception(f"Failed to process file. Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process the file.")
 
 
 @collection_route.post("/import_metakat", tags=["Import"])

@@ -106,13 +106,14 @@ class DetectionNew(BaseModel):
     id: UUID
 
     type_id: UUID
+    image_id: UUID
     bbox: str
+    value: str = ""
 
     confidence: Optional[float] = None
 
 
 class Detection(DetectionNew):
-    image_id: UUID
     type: DetectionType
     annotated: bool = False
 
@@ -128,9 +129,10 @@ class Detection(DetectionNew):
 
 class DetectionUpdate(BaseModel):
     id: UUID
+    value: Optional[str] = None
     image_id: Optional[UUID] = None
     annotated: Optional[bool] = None
-
+    confidence: Optional[float] = None
     type_id: Optional[UUID] = None
     bbox: Optional[str] = None
 
