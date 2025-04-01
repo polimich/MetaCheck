@@ -98,7 +98,7 @@ async def save_image(
         "height": image.shape[0],
         "deleted": False,
         "imagehash": imagehash,
-        "work_state": model.WorkState.NEW,
+        "work_state": base_objects.WorkState.NEW,
     }
     await crud_general.new(db, image_new, model.Image)
 
