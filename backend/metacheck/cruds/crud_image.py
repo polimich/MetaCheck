@@ -1,16 +1,25 @@
 import logging
+import os
+import hashlib
 from typing import List
 from uuid import UUID
 
+import cv2
+import numpy as np
+import aiofiles
+from aiofiles import os as aiofiles_os
+from aiopath import AsyncPath
+from fastapi import HTTPException
 from sqlalchemy import exc, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from db import model
-from metacheck.cruds.crud_aux import update_all
+from metacheck.cruds.crud_aux import update_all, make_preview_from_image
 from metacheck.database import DBError
 from metacheck.schemas import base_objects
+from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -176,3 +185,76 @@ async def get_image(db: AsyncSession, image_id: UUID) -> base_objects.Image:
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed reading image from database")
         raise DBError(f"Failed reading image from database") from e
+
+
+async def save_image_file(
+    raw_input, image_name, collection_id, image_id, order, db: AsyncSession
+):
+    contents = np.asarray(bytearray(raw_input), dtype="uint8")
+    image = cv2.imdecode(contents, cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Failed to decode/open image.")
+    imagehash = hashlib.md5(raw_input).hexdigest()
+
+    image_duplicate = await is_image_duplicate(db, collection_id, imagehash)
+    if image_duplicate:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Image is already uploaded as {image_duplicate.name}.",
+        )
+
+    write_path = await get_image_path(image_id=image_id, collection_id=collection_id)
+    async with aiofiles.open(write_path, mode="wb") as f:
+        await f.write(raw_input)
+
+    await make_preview_from_image(
+        image,
+        await get_preview_path(image_id),
+        resolution=config.IMAGE_PREVIEW_RESOLUTION,
+    )
+
+    image_new = {
+        "id": image_id,
+        "collection_id": collection_id,
+        "order": order,
+        "name": image_name,
+        "width": image.shape[1],
+        "height": image.shape[0],
+        "deleted": False,
+        "imagehash": imagehash,
+        "work_state": base_objects.WorkState.NEW,
+    }
+    from metacheck.cruds import crud_general
+    await crud_general.new(db, image_new, model.Image)
+
+    # preview is optional, so we don't check if this goes through
+    try:
+        from metacheck.cruds import crud_collection
+        await crud_collection.check_preview_and_set(db, collection_id, image_id)
+    except DBError as e:
+        logger.exception(f"Failed creating image preview")
+
+
+async def get_image_path(image_id: UUID, collection_id: UUID):
+    path = os.path.join(config.IMAGE_UPLOADED_DIR, str(collection_id))
+    await aiofiles_os.makedirs(path, exist_ok=True)
+    return os.path.join(path, f"{image_id}.jpg")
+
+
+async def make_image_preview(db: AsyncSession, image_id: UUID, preview_path: str):
+    from metacheck.cruds import crud_general
+    image = await crud_general.get(db, base_objects.Image, model.Image, image_id)
+    image_path = os.path.join(
+        config.IMAGE_UPLOADED_DIR, f"{image.collection_id}", f"{image_id}.jpg"
+    )
+    image = cv2.imread(image_path, 1)
+    await make_preview_from_image(
+        image, preview_path, resolution=config.IMAGE_PREVIEW_RESOLUTION
+    )
+
+
+async def get_preview_path(image_id: UUID) -> str:
+    image_id = str(image_id)
+    path = os.path.join(config.IMAGE_PREVIEW_DIR, image_id[:2])
+    await aiofiles_os.makedirs(path, exist_ok=True)
+    return os.path.join(path, f"{image_id}.jpg")

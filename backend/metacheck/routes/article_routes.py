@@ -2,11 +2,10 @@ import logging
 from uuid import UUID
 
 from fastapi import Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import model
-from metacheck.cruds import crud_general
+from metacheck.cruds import crud_general, crud_article
 from metacheck.database import get_async_session
 from metacheck.routes import article_route
 from metacheck.routes.router_factory import CRUDRouter
@@ -35,8 +34,4 @@ async def get_articles_by_collection(
     collection_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
     """Get all articles belonging to a specific collection"""
-    async with db.begin():
-        query = select(model.Article).where(model.Article.collection_id == collection_id)
-        result = await db.execute(query)
-        articles = result.unique().scalars()
-        return [base_objects.Article.model_validate(article) for article in articles]
+    return await crud_article.get_articles_by_collection(db, collection_id)

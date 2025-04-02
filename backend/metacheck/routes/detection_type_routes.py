@@ -4,7 +4,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import model
-from metacheck.cruds import crud_general
+from metacheck.cruds import crud_general, crud_detection_type
 from metacheck.database import get_async_session
 from metacheck.routes import detection_type_route
 from metacheck.routes.router_factory import CRUDRouter
@@ -27,16 +27,11 @@ async def post_detection_type(
     db: AsyncSession = Depends(get_async_session),
 ):
     """Create a new detection type - maintained for backwards compatibility"""
-    detection_type = detection_type_new.model_dump()
-    await crud_general.new(db, detection_type, model.DetectionType)
+    await crud_detection_type.create_detection_type(db, detection_type_new)
 
 async def get_detection_types(db: AsyncSession = Depends(get_async_session)):
     """Get all detection types - maintained for backwards compatibility"""
-    return await crud_general.get_all(db, base_objects.DetectionType, model.DetectionType)
+    return await crud_detection_type.get_all_detection_types(db)
 
 async def get_detection_type_by_name(name: str, db):
-    detections = await get_detection_types(db)
-    for detection in detections:
-        if detection.name == name:
-            return detection
-    return None
+    return await crud_detection_type.get_detection_type_by_name(db, name)
