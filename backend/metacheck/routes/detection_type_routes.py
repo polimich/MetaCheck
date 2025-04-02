@@ -7,55 +7,32 @@ from db import model
 from metacheck.cruds import crud_general
 from metacheck.database import get_async_session
 from metacheck.routes import detection_type_route
+from metacheck.routes.router_factory import CRUDRouter
 from metacheck.schemas import base_objects
 
+# Register standard CRUD routes
+crud_router = CRUDRouter(
+    router=detection_type_route,
+    schema=base_objects.DetectionType,
+    schema_new=base_objects.DetectionTypeNew,
+    schema_update=base_objects.DetectionTypeUpdate,
+    model_class=model.DetectionType,
+    prefix="detection_type",
+    tags=["Detection Type"],
+)
 
-@detection_type_route.post("", tags=["Detection Type"])
+# Custom routes for backwards compatibility
 async def post_detection_type(
     detection_type_new: base_objects.DetectionTypeNew,
     db: AsyncSession = Depends(get_async_session),
 ):
+    """Create a new detection type - maintained for backwards compatibility"""
     detection_type = detection_type_new.model_dump()
     await crud_general.new(db, detection_type, model.DetectionType)
 
-
-@detection_type_route.get(
-    "/{detection_type_id}",
-    response_model=base_objects.DetectionType,
-    tags=["Detection Type"],
-)
-async def get_detection_type(
-    detection_type_id: UUID, db: AsyncSession = Depends(get_async_session)
-):
-    return await crud_general.get(
-        db, base_objects.DetectionType, model.DetectionType, detection_type_id
-    )
-
-
-@detection_type_route.put("", tags=["Detection Type"])
-async def put_detection_type(
-    detection_type_update: base_objects.DetectionTypeUpdate,
-    db: AsyncSession = Depends(get_async_session),
-):
-    await crud_general.update_obj(db, detection_type_update, model.DetectionType)
-
-
-@detection_type_route.get(
-    "", response_model=list[base_objects.DetectionType], tags=["Detection Type"]
-)
 async def get_detection_types(db: AsyncSession = Depends(get_async_session)):
-    return await crud_general.get_all(
-        db, base_objects.DetectionType, model.DetectionType
-    )
-
-
-@detection_type_route.delete("/{detection_type_id}", tags=["Detection Type"])
-async def delete_detection_type(
-    detection_type_id: UUID, db: AsyncSession = Depends(get_async_session)
-):
-    await crud_general.delete_obj(db, detection_type_id, model.DetectionType)
-    return {"message": "Detection Type deleted."}
-
+    """Get all detection types - maintained for backwards compatibility"""
+    return await crud_general.get_all(db, base_objects.DetectionType, model.DetectionType)
 
 async def get_detection_type_by_name(name: str, db):
     detections = await get_detection_types(db)

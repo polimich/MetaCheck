@@ -21,63 +21,31 @@ from metacheck.routes.detection_type_routes import (
     get_detection_type_by_name,
 )
 from metacheck.routes.image_routes import save_image, get_image
+from metacheck.routes.router_factory import CRUDRouter
 from metacheck.schemas import base_objects
 from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
 
-
-@collection_route.post("", tags=["Collection"])
-async def post_collection(
-    collection_new: base_objects.CollectionNew,
-    db: AsyncSession = Depends(get_async_session),
-):
-    collection = collection_new.model_dump()
-    await crud_general.new(db, collection, model.Collection)
-
-
-@collection_route.get(
-    "/{collection_id}", response_model=base_objects.Collection, tags=["Collection"]
+# Register standard CRUD routes
+crud_router = CRUDRouter(
+    router=collection_route,
+    schema=base_objects.Collection,
+    schema_new=base_objects.CollectionNew,
+    schema_update=base_objects.CollectionUpdate,
+    model_class=model.Collection,
+    prefix="collection",
+    tags=["Collection"],
 )
-async def get_collection(
-    collection_id: UUID, db: AsyncSession = Depends(get_async_session)
-):
-    return await crud_collection.get_collection(db, collection_id)
 
-
+# Custom routes
 @collection_route.get("/eager/{collection_id}", tags=["Collection"])
 async def get_collections_eager(
     collection_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
     return await crud_collection.get_collection_with_all_metadata(db, collection_id)
 
-
-@collection_route.put("", tags=["Collection"])
-async def put_collection(
-    collection_update: base_objects.CollectionUpdate,
-    db: AsyncSession = Depends(get_async_session),
-):
-    await crud_general.update_obj(db, collection_update, model.Collection)
-
-
-@collection_route.get(
-    "", response_model=list[base_objects.Collection], tags=["Collection"]
-)
-async def get_collections(db: AsyncSession = Depends(get_async_session)):
-    return await crud_general.get_all(db, base_objects.Collection, model.Collection)
-
-
-@collection_route.delete("/{collection_id}", tags=["Collection"])
-async def delete_collection(
-    collection_id: UUID, db: AsyncSession = Depends(get_async_session)
-):
-    await crud_collection.delete_collection(db, collection_id)
-    return {"message": "Collection deleted."}
-
-
 # get all images from collection
-
-
 @collection_route.get(
     "/{collection_id}/images",
     response_model=list[base_objects.Image],
@@ -227,6 +195,146 @@ async def import_collection_metakat(
             status_code=400,
             detail=f"Unsuported file type - only json files are supported.",
         )
+    
+    try:
+        # Read and parse the JSON file
+        content = await file.read()
+        import json
+        try:
+            metakat_data = json.loads(content.decode('utf-8'))
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid JSON format in the uploaded file."
+            )
+        
+        # Create a new collection
+        collection_id = uuid.uuid4()
+        collection_name = metakat_data.get("name", file.filename.replace(".json", ""))
+        collection = base_objects.CollectionNew(
+            id=collection_id, 
+            name=collection_name,
+            description=metakat_data.get("description", ""),
+            info=metakat_data.get("info", "")
+        )
+        await crud_general.new(db, collection.model_dump(), model.Collection)
+        
+        # Process images if present in the MetaKat format
+        images_data = metakat_data.get("images", [])
+        for index, image_data in enumerate(images_data):
+            # Generate UUID for the image
+            image_id = uuid.uuid4()
+            
+            # Handle image data (assuming base64 encoded or URL paths based on MetaKat format)
+            image_path = image_data.get("path")
+            image_name = image_data.get("name", f"image_{index}.jpg")
+            
+            # If image data is provided directly in the JSON
+            raw_image_data = None
+            if "data" in image_data and image_data["data"]:
+                import base64
+                try:
+                    raw_image_data = base64.b64decode(image_data["data"])
+                except Exception as e:
+                    logger.warning(f"Failed to decode base64 image data: {e}")
+                    continue
+            
+            # If image path is provided instead of direct data
+            elif image_path:
+                try:
+                    # Try to read image from the path assuming it's relative to the system
+                    async with aiofiles.open(image_path, mode="rb") as f:
+                        raw_image_data = await f.read()
+                except FileNotFoundError:
+                    logger.warning(f"Image file not found: {image_path}")
+                    continue
+                except Exception as e:
+                    logger.warning(f"Failed to read image file: {e}")
+                    continue
+            
+            # Skip if no valid image data was found
+            if not raw_image_data:
+                logger.warning(f"No valid image data found for image at index {index}")
+                continue
+                
+            # Save the image using the existing functionality
+            try:
+                await save_image(raw_image_data, image_name, collection_id, image_id, index, db)
+            except HTTPException as e:
+                logger.warning(f"Failed to save image: {e.detail}")
+                continue
+                
+            # Process detections if present for this image
+            detections_data = image_data.get("detections", [])
+            if detections_data:
+                # Get image info to calculate coordinates
+                image_info = await get_image(image_id, db)
+                
+                # Process each detection
+                detections = []
+                for detection_data in detections_data:
+                    detection_type_name = detection_data.get("type", "default")
+                    
+                    # Check if detection type exists, create if not
+                    detection_types = await get_detection_types(db)
+                    detection_types_names = {d.name for d in detection_types}
+                    
+                    if detection_type_name not in detection_types_names:
+                        new_detection_type = base_objects.DetectionTypeNew(
+                            id=uuid.uuid4(),
+                            name=detection_type_name,
+                            color=f"#{random.randint(0, 0xFFFFFF):06x}",
+                            display_name=detection_type_name.capitalize(),
+                        )
+                        await post_detection_type(new_detection_type, db)
+                        logger.info(f"Added new detection type: {detection_type_name}")
+                    
+                    detection_type = await get_detection_type_by_name(detection_type_name, db)
+                    
+                    # Process bounding box
+                    bbox_data = detection_data.get("bbox", {})
+                    if bbox_data:
+                        # Handle different bbox formats (normalized or absolute)
+                        if "normalized" in bbox_data and bbox_data["normalized"]:
+                            # Convert normalized coordinates to absolute
+                            x_norm = bbox_data.get("x", 0)
+                            y_norm = bbox_data.get("y", 0)
+                            w_norm = bbox_data.get("width", 0)
+                            h_norm = bbox_data.get("height", 0)
+                            
+                            width = w_norm * image_info.width
+                            height = h_norm * image_info.height
+                            x = x_norm * image_info.width
+                            y = y_norm * image_info.height
+                        else:
+                            # Use absolute coordinates directly
+                            x = bbox_data.get("x", 0)
+                            y = bbox_data.get("y", 0)
+                            width = bbox_data.get("width", 0)
+                            height = bbox_data.get("height", 0)
+                        
+                        bbox = f"{x};{y};{width};{height}"
+                        
+                        # Create detection object
+                        detection = base_objects.DetectionNew(
+                            id=uuid.uuid4(),
+                            type_id=detection_type.id,
+                            bbox=bbox,
+                            image_id=image_id,
+                            value=detection_data.get("value", ""),
+                            confidence=detection_data.get("confidence", None)
+                        )
+                        detections.append(detection)
+                
+                # Save detections for this image
+                if detections:
+                    await crud_image.create_image_detections(db, image_id, detections)
+        
+        return {"message": "MetaKat collection imported successfully", "collection_id": str(collection_id)}
+        
+    except Exception as e:
+        logger.exception(f"Failed to process MetaKat import file. Error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process the MetaKat import file.")
 
 
 async def get_zip_path(collection_id: UUID):

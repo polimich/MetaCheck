@@ -116,31 +116,31 @@ class Volume(Entity):
     )
 
     # Many-to-many relationships
-    publishers: WriteOnlyMapped[List["Detection"]] = relationship(
+    publishers: Mapped[List["Detection"]] = relationship(
         "Detection", secondary=volume_publishers_table
     )
 
-    manufacture_publishers: WriteOnlyMapped[List["Detection"]] = relationship(
+    manufacture_publishers: Mapped[List["Detection"]] = relationship(
         "Detection",
         secondary=volume_manufacture_publishers_table,
     )
 
-    manufacture_place_terms: WriteOnlyMapped[List["Detection"]] = relationship(
+    manufacture_place_terms: Mapped[List["Detection"]] = relationship(
         "Detection", secondary=volume_manufacture_place_terms_table
     )
 
-    authors: WriteOnlyMapped[List["Detection"]] = relationship(
+    authors: Mapped[List["Detection"]] = relationship(
         "Detection", secondary=volume_authors_table
     )
 
-    illustrators: WriteOnlyMapped[List["Detection"]] = relationship(
+    illustrators: Mapped[List["Detection"]] = relationship(
         "Detection", secondary=volume_illustrators_table
     )
 
-    translators: WriteOnlyMapped[List["Detection"]] = relationship(
+    translators: Mapped[List["Detection"]] = relationship(
         "Detection", secondary=volume_translators_table
     )
 
-    editors: WriteOnlyMapped[List["Detection"]] = relationship(
+    editors: Mapped[List["Detection"]] = relationship(
         "Detection", secondary=volume_editors_table
     )

@@ -2,7 +2,7 @@ import uuid
 from typing import List, Optional
 
 from sqlalchemy import ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship, WriteOnlyMapped
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.model.base import Entity, create_detection_association_table
 
@@ -56,6 +56,6 @@ class Article(Entity):
     )
 
     # Many-to-many relationships
-    authors: WriteOnlyMapped[List["Detection"]] = relationship(
+    authors: Mapped[List["Detection"]] = relationship(
         "Detection", secondary=article_authors_table
     )

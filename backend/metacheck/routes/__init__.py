@@ -12,6 +12,10 @@ article_route = APIRouter()
 detection_type_route = APIRouter()
 detection_route = APIRouter()
 
+# First import generic route utilities
+from .router_factory import CRUDRouter
+
+# Then import all route modules
 from .collection_routes import collection_route
 from .image_routes import image_route
 from .debug_routes import debug_route
@@ -20,5 +24,6 @@ from .volume_routes import volume_route
 from .page_routes import page_route
 from .chapter_routes import chapter_route
 from .issue_routes import issue_route
+from .article_routes import article_route  # Ensure this comes after creating the APIRouter
 from .detection_type_routes import detection_type_route
 from .detection_routes import detection_route

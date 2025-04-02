@@ -26,7 +26,28 @@ from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
 
+# Custom CRUD routes for Image - excluding the GET operation which is implemented separately
+# The PUT operation
+@image_route.put("", tags=["Image"])
+async def put_image(
+    image_update: ImageUpdate, db: AsyncSession = Depends(get_async_session)
+):
+    await crud_general.update_obj(db, image_update, model.Image)
 
+# The GET ALL operation
+@image_route.get("", response_model=List[base_objects.Image], tags=["Image"])
+async def get_all_images(db: AsyncSession = Depends(get_async_session)):
+    return await crud_general.get_all(db, base_objects.Image, model.Image)
+
+# The DELETE operation
+@image_route.delete("/{image_id}", tags=["Image"])
+async def delete_image(
+    image_id: UUID, db: AsyncSession = Depends(get_async_session)
+):
+    await crud_general.delete_obj(db, image_id, model.Image)
+    return {"message": "Image deleted."}
+
+# Custom routes
 @image_route.post("/upload/{collection_id}/{order}", tags=["Image"])
 async def upload_image(
     collection_id: UUID,
@@ -109,16 +130,10 @@ async def save_image(
         logger.exception(f"Failed creating image preview")
 
 
+# This is needed for compatibility with other parts
 @image_route.get("/{image_id}", response_model=base_objects.Image, tags=["Image"])
 async def get_image(image_id: UUID, db: AsyncSession = Depends(get_async_session)):
     return await crud_image.get_image(db, image_id)
-
-
-@image_route.put("", tags=["Image"])
-async def put_image(
-    image_update: ImageUpdate, db: AsyncSession = Depends(get_async_session)
-):
-    await crud_general.update_obj(db, image_update, model.Image)
 
 
 @image_route.get("/raster/{image_id}", response_class=FileResponse, tags=["Image"])

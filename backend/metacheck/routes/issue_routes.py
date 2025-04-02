@@ -8,38 +8,21 @@ from db import model
 from metacheck.cruds import crud_general
 from metacheck.database import get_async_session
 from metacheck.routes import issue_route
+from metacheck.routes.router_factory import CRUDRouter
 from metacheck.schemas import base_objects
 
 logger = logging.getLogger(__name__)
 
+# Register standard CRUD routes
+crud_router = CRUDRouter(
+    router=issue_route,
+    schema=base_objects.Issue,
+    schema_new=base_objects.IssueNew,
+    schema_update=base_objects.IssueUpdate,
+    model_class=model.Issue,
+    prefix="issue",
+    tags=["Issue"],
+)
 
-@issue_route.post("", tags=["Issue"])
-async def post_issue(
-    issue_new: base_objects.IssueNew, db: AsyncSession = Depends(get_async_session)
-):
-    issue = issue_new.model_dump()
-    await crud_general.new(db, issue, model.Issue)
-
-
-@issue_route.get("/{issue_id}", response_model=base_objects.Issue, tags=["Issue"])
-async def get_issue(issue_id: UUID, db: AsyncSession = Depends(get_async_session)):
-    return await crud_general.get(db, base_objects.Issue, model.Issue, issue_id)
-
-
-@issue_route.put("", tags=["Issue"])
-async def put_issue(
-    issue_update: base_objects.IssueUpdate,
-    db: AsyncSession = Depends(get_async_session),
-):
-    await crud_general.update_obj(db, issue_update, model.Issue)
-
-
-@issue_route.get("", response_model=list[base_objects.Issue], tags=["Issue"])
-async def get_issues(db: AsyncSession = Depends(get_async_session)):
-    return await crud_general.get_all(db, base_objects.Issue, model.Issue)
-
-
-@issue_route.delete("/{issue_id}", tags=["Issue"])
-async def delete_issue(issue_id: UUID, db: AsyncSession = Depends(get_async_session)):
-    await crud_general.delete_obj(db, issue_id, model.Issue)
-    return {"message": "Issue deleted."}
+# If needed, add custom routes below:
+# @issue_route.get("/custom/{param}", ...)
