@@ -1,4 +1,5 @@
 import uuid
+from typing import List
 
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -17,10 +18,6 @@ class Detection(Entity):
         ForeignKey("images.id", ondelete="CASCADE"), index=True, nullable=False
     )
 
-    type_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("detection_types.id", ondelete="CASCADE"), nullable=False
-    )
-
     # Fields
     bbox: Mapped[str] = mapped_column(nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=True)
@@ -32,13 +29,6 @@ class Detection(Entity):
         "Image",
         back_populates="detections",
         foreign_keys=[image_id],
-    )
-
-    type: Mapped["DetectionType"] = relationship(
-        "DetectionType",
-        back_populates="detections",
-        foreign_keys=[type_id],
-        lazy="joined",
     )
 
     # Properties

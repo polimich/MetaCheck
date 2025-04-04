@@ -6,9 +6,21 @@ from typing import Any, Optional, Type, TypeVar, Union, Callable
 
 from sqlalchemy import Column, ForeignKey, Table
 from sqlalchemy.orm import Mapped, DeclarativeBase, mapped_column, relationship
+from sqlalchemy.inspection import inspect
 
-# converts ORM row object to dict
-orm2dict = lambda r: {c.name: getattr(r, c.name) for c in r.__table__.columns}
+# Updated to include both table columns and SQLAlchemy computed properties
+def orm2dict(r):
+    """Convert ORM object to dictionary, including table columns and computed properties."""
+    # Get regular table columns
+    result = {c.name: getattr(r, c.name) for c in r.__table__.columns}
+    
+    # Add any column_property values (computed columns)
+    mapper = inspect(r.__class__)
+    for prop in mapper.column_attrs:
+        if prop.key not in result:  # Only add if not already added from regular columns
+            result[prop.key] = getattr(r, prop.key)
+    
+    return result
 
 # converts CORE row object to dict
 row2dict = lambda r: dict(r._mapping)

@@ -12,14 +12,12 @@ from metacheck.routes import (
     collection_route,
     image_route,
     debug_route,
-    title_route,
-    volume_route,
-    issue_route,
-    page_route,
-    chapter_route,
-    article_route,
-    detection_type_route,
     detection_route,
+    meta_role_route,
+    meta_element_route,
+    meta_element_type_route,
+    meta_element_detection_route,
+    meta_element_detection_attribute_type_route,
 )
 from metacheck_common.config import config
 
@@ -37,6 +35,22 @@ tags_metadata = [
     },
     {
         "name": "Image",
+        "description": "",
+    },
+    {
+        "name": "MetaElement",
+        "description": "",
+    },
+    {
+        "name": "MetaElementType",
+        "description": "",
+    },
+    {
+        "name": "MetaElementDetection",
+        "description": "",
+    },
+    {
+        "name": "MetaElementDetectionAttributeType",
         "description": "",
     },
 ]
@@ -58,15 +72,12 @@ async def startup():
 app.include_router(collection_route, prefix="/api/collection")
 app.include_router(image_route, prefix="/api/image")
 app.include_router(debug_route, prefix="/api/debug")
-app.include_router(title_route, prefix="/api/title")
-app.include_router(volume_route, prefix="/api/volume")
-app.include_router(issue_route, prefix="/api/issues")
-app.include_router(page_route, prefix="/api/page")
-app.include_router(chapter_route, prefix="/api/chapter")
-app.include_router(article_route, prefix="/api/article")
-app.include_router(detection_type_route, prefix="/api/detection_type")
 app.include_router(detection_route, prefix="/api/detection")
-
+app.include_router(meta_role_route, prefix="/api/meta_role")
+app.include_router(meta_element_route, prefix="/api/meta_element")
+app.include_router(meta_element_type_route, prefix="/api/meta_element_type")
+app.include_router(meta_element_detection_route, prefix="/api/meta_element_detection")
+app.include_router(meta_element_detection_attribute_type_route, prefix="/api/meta_element_detection_attribute_type")
 
 if os.path.isdir("metacheck/static"):
     app.mount("/", StaticFiles(directory="metacheck/static", html=True), name="static")

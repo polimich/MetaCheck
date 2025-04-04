@@ -12,17 +12,9 @@ from metacheck.schemas import base_objects
 logger = logging.getLogger(__name__)
 
 
-volume_many_to_many_relationships = [
-    'publishers', 'manufacture_publishers', 'manufacture_place_terms', 
-    'authors', 'illustrators', 'translators', 'editors'
-]
 
-article_many_to_many_relationships = [
-    'authors',
-]
-
-issue_many_to_many_relationships = [
-    'publishers', 'manufactures', 'redaktors',
+meta_role_relationships = [
+    'meta_element_type', 'meta_element_detection_attribute_type'
 ]
 
 
@@ -41,14 +33,8 @@ async def get_all(
             from sqlalchemy.orm import selectinload
             
             # Add eager loading for relationships based on model type
-            if table.__name__ == 'Volume':
-                for rel in volume_many_to_many_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            elif table.__name__ == 'Article':
-                for rel in article_many_to_many_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            elif table.__name__ == 'Issue':
-                for rel in issue_many_to_many_relationships:
+            if table.__name__ == 'MetaRole':
+                for rel in meta_role_relationships:
                     query = query.options(selectinload(getattr(table, rel)))
             
             db_objects = await db.execute(query)
@@ -60,27 +46,14 @@ async def get_all(
                 obj_dict = model.orm2dict(obj)
                 
                 # Handle relationship lists based on model type
-                if table.__name__ == 'Volume':
-                    for rel in volume_many_to_many_relationships:
-                        rel_objects = getattr(obj, rel)
-                        if rel_objects:
-                            obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
+                
+                if table.__name__ == 'MetaRole':
+                    for rel in meta_role_relationships:
+                        rel_object = getattr(obj, rel)
+                        if rel_object:
+                            obj_dict[rel] = model.orm2dict(rel_object)
                         else:
-                            obj_dict[rel] = []
-                elif table.__name__ == 'Article':
-                    for rel in article_many_to_many_relationships:
-                        rel_objects = getattr(obj, rel)
-                        if rel_objects:
-                            obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
-                        else:
-                            obj_dict[rel] = []
-                elif table.__name__ == 'Issue':
-                    for rel in issue_many_to_many_relationships:
-                        rel_objects = getattr(obj, rel)
-                        if rel_objects:
-                            obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
-                        else:
-                            obj_dict[rel] = []
+                            obj_dict[rel] = None
                 
                 # Validate with Pydantic
                 result.append(model_class.model_validate(obj_dict))
@@ -103,14 +76,8 @@ async def get(
             from sqlalchemy.orm import selectinload
             
             # Add eager loading for relationships based on model type
-            if table.__name__ == 'Volume':
-                for rel in volume_many_to_many_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            elif table.__name__ == 'Article':
-                for rel in article_many_to_many_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            elif table.__name__ == 'Issue':
-                for rel in issue_many_to_many_relationships:
+            if table.__name__ == 'MetaRole':
+                for rel in meta_role_relationships:
                     query = query.options(selectinload(getattr(table, rel)))
             
             db_object = await db.execute(query)
@@ -122,27 +89,13 @@ async def get(
             obj_dict = model.orm2dict(db_object)
             
             # Handle relationship lists based on model type
-            if table.__name__ == 'Volume':
-                for rel in volume_many_to_many_relationships:
-                    rel_objects = getattr(db_object, rel)
-                    if rel_objects:
-                        obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
+            if table.__name__ == 'MetaRole':
+                for rel in meta_role_relationships:
+                    rel_object = getattr(db_object, rel)
+                    if rel_object:
+                        obj_dict[rel] = model.orm2dict(rel_object)
                     else:
-                        obj_dict[rel] = []
-            elif table.__name__ == 'Article':
-                for rel in article_many_to_many_relationships:
-                    rel_objects = getattr(db_object, rel)
-                    if rel_objects:
-                        obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
-                    else:
-                        obj_dict[rel] = []
-            elif table.__name__ == 'Issue':
-                for rel in issue_many_to_many_relationships:
-                    rel_objects = getattr(db_object, rel)
-                    if rel_objects:
-                        obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
-                    else:
-                        obj_dict[rel] = []
+                        obj_dict[rel] = None
             
             # Validate with Pydantic
             return model_class.model_validate(obj_dict)
@@ -167,14 +120,8 @@ async def get_or_none(
             from sqlalchemy.orm import selectinload
             
             # Add eager loading for relationships based on model type
-            if table.__name__ == 'Volume':
-                for rel in volume_many_to_many_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            elif table.__name__ == 'Article':
-                for rel in article_many_to_many_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            elif table.__name__ == 'Issue':
-                for rel in issue_many_to_many_relationships:
+            if table.__name__ == 'MetaRole':
+                for rel in meta_role_relationships:
                     query = query.options(selectinload(getattr(table, rel)))
             
             db_object = await db.execute(query)
@@ -186,27 +133,13 @@ async def get_or_none(
             obj_dict = model.orm2dict(db_object)
             
             # Handle relationship lists based on model type
-            if table.__name__ == 'Volume':
-                for rel in volume_many_to_many_relationships:
-                    rel_objects = getattr(db_object, rel)
-                    if rel_objects:
-                        obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
+            if table.__name__ == 'MetaRole':
+                for rel in meta_role_relationships:
+                    rel_object = getattr(db_object, rel)
+                    if rel_object:
+                        obj_dict[rel] = model.orm2dict(rel_object)
                     else:
-                        obj_dict[rel] = []
-            elif table.__name__ == 'Article':
-                for rel in article_many_to_many_relationships:
-                    rel_objects = getattr(db_object, rel)
-                    if rel_objects:
-                        obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
-                    else:
-                        obj_dict[rel] = []
-            elif table.__name__ == 'Issue':
-                for rel in issue_many_to_many_relationships:
-                    rel_objects = getattr(db_object, rel)
-                    if rel_objects:
-                        obj_dict[rel] = [model.orm2dict(rel_obj) for rel_obj in rel_objects]
-                    else:
-                        obj_dict[rel] = []
+                        obj_dict[rel] = None
             
             # Validate with Pydantic
             return model_class.model_validate(obj_dict)

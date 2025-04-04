@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import model
 from metacheck.cruds import crud_general
 from metacheck.database import get_async_session
-from metacheck.routes import volume_route
+from metacheck.routes import meta_role_route
 from metacheck.routes.router_factory import CRUDRouter
 from metacheck.schemas import base_objects
 
@@ -15,14 +15,14 @@ logger = logging.getLogger(__name__)
 
 # Register standard CRUD routes
 crud_router = CRUDRouter(
-    router=volume_route,
-    schema=base_objects.Volume,
-    schema_new=base_objects.VolumeNew,
-    schema_update=base_objects.VolumeUpdate,
-    model_class=model.Volume,
-    prefix="volume",
-    tags=["Volume"],
+    router=meta_role_route,
+    schema=base_objects.MetaRole,
+    schema_new=base_objects.MetaRoleNew,
+    schema_update=base_objects.MetaRoleUpdate,
+    model_class=model.MetaRole,
+    prefix="meta_role",
+    tags=["MetaRole"],
 )
 
 # If needed, add custom routes below:
-# @volume_route.get("/custom/{param}", ...)
+# @meta_role_route.get("/custom/{param}", ...) 
