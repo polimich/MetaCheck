@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import List, Union
 from uuid import UUID
@@ -45,6 +46,14 @@ async def get_all(
                 # Use orm2dict for the basic attributes
                 obj_dict = model.orm2dict(obj)
                 
+                # Handle JSON attributes if present
+                if 'attributes' in obj_dict and isinstance(obj_dict['attributes'], str):
+                    try:
+                        obj_dict['attributes'] = json.loads(obj_dict['attributes'])
+                    except json.JSONDecodeError:
+                        # If not valid JSON, keep as is
+                        pass
+                
                 # Handle relationship lists based on model type
                 
                 if table.__name__ == 'MetaRole':
@@ -87,6 +96,14 @@ async def get(
                 
             # Use orm2dict for the basic attributes
             obj_dict = model.orm2dict(db_object)
+            
+            # Handle JSON attributes if present
+            if 'attributes' in obj_dict and isinstance(obj_dict['attributes'], str):
+                try:
+                    obj_dict['attributes'] = json.loads(obj_dict['attributes'])
+                except json.JSONDecodeError:
+                    # If not valid JSON, keep as is
+                    pass
             
             # Handle relationship lists based on model type
             if table.__name__ == 'MetaRole':
@@ -131,6 +148,14 @@ async def get_or_none(
                 
             # Use orm2dict for the basic attributes
             obj_dict = model.orm2dict(db_object)
+            
+            # Handle JSON attributes if present
+            if 'attributes' in obj_dict and isinstance(obj_dict['attributes'], str):
+                try:
+                    obj_dict['attributes'] = json.loads(obj_dict['attributes'])
+                except json.JSONDecodeError:
+                    # If not valid JSON, keep as is
+                    pass
             
             # Handle relationship lists based on model type
             if table.__name__ == 'MetaRole':

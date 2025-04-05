@@ -4,7 +4,7 @@ from typing import List
 from sqlalchemy import ForeignKey, String, func, select
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
-from db.model.meta_element import PageMetaElement
+from db.model.meta_element import MetaElement
 from db.model.collection import Collection
 from db.model.detection import Detection
 from db.model.base import Entity
@@ -32,7 +32,11 @@ class Image(Entity):
     height: Mapped[int] = mapped_column(nullable=False)
     width: Mapped[int] = mapped_column(nullable=False)
     imagehash: Mapped[str] = mapped_column(index=True)
-    work_state: Mapped[WorkState] = mapped_column(default=WorkState.NEW, nullable=False)
+    work_state: Mapped[WorkState] = mapped_column(
+        String(50), 
+        default=WorkState.NEW.value,
+        nullable=False
+    )
 
     # Computed fields
     # an average of the confidence of the detections
@@ -68,8 +72,8 @@ class Image(Entity):
         cascade="all, delete-orphan",
     )
     
-    page_meta_element: Mapped["PageMetaElement"] = relationship(
-        "PageMetaElement", 
+    page_meta_element: Mapped["MetaElement"] = relationship(
+        "MetaElement", 
         foreign_keys=[page_meta_element_id],
         cascade="all",
         back_populates="image",

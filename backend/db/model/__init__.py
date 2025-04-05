@@ -17,7 +17,7 @@ from db.model.utils import (
 from db.model.collection import Collection
 from db.model.detection import Detection
 from db.model.image import Image
-from db.model.meta_element import MetaElement, PageMetaElement, TitleMetaElement, VolumeMetaElement, IssueMetaElement, SupplementMetaElement, ChapterMetaElement, ArticleMetaElement
+from db.model.meta_element import MetaElement
 from db.model.meta_element_detection import MetaElementDetection
 from db.model.meta_element_detection_attribute_type import MetaElementDetectionAttributeType
 from db.model.meta_element_type import MetaElementType

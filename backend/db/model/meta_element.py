@@ -1,25 +1,19 @@
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
-from sqlalchemy import JSON, ForeignKey, String
+from sqlalchemy import ForeignKey, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.model.collection import Collection
 from db.model.meta_element_type import MetaElementType
 from db.model.base import Entity, create_fk_relationship
 from metacheck.constants import META_ELEMENT_TYPE_IDS
-from metacheck.schemas.base_objects import PageType
-# Polymorphic identity constants - you'll want to replace these with actual UUIDs
-# from your meta_element_types table
 
 class MetaElement(Entity):
-    """Meta element."""
+    """Meta element with JSONB attributes for flexible property storage."""
 
     __tablename__ = "meta_elements"
-    __mapper_args__ = {
-        "polymorphic_on": "meta_element_type_id",
-        "with_polymorphic": "*"
-    }
     
     collection_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("collections.id", ondelete="CASCADE"), nullable=False
@@ -52,76 +46,67 @@ class MetaElement(Entity):
     children: Mapped[List["MetaElement"]] = relationship(
         "MetaElement", back_populates="parent"
     )
-
-
-
-class PageMetaElement(MetaElement):
-    """Page-specific meta element."""
     
-    # No new __tablename__ - using single table inheritance
-    __mapper_args__ = {
-        "polymorphic_identity": META_ELEMENT_TYPE_IDS["page"]
-    }
+    # JSONB attribute to store type-specific properties
+    attributes: Mapped[Dict[str, Any]] = mapped_column(
+        JSONB, default=dict, nullable=False, server_default="{}"
+    )
     
-    page_index: Mapped[int] = mapped_column(default=0, nullable=True)
-    #page_type: Mapped[PageType] = mapped_column(default=PageType.NORMAL_PAGE, nullable=False)
-    
-    image: Mapped["Image"] = relationship(
+    # Relationship to Image for page elements
+    image: Mapped[Optional["Image"]] = relationship(
         "Image",
         back_populates="page_meta_element",
         foreign_keys="Image.page_meta_element_id",
-        uselist=False  # One-to-one relationship
+        uselist=False,  # One-to-one relationship
     )
     
-class TitleMetaElement(MetaElement):
-    """Title-specific meta element."""
+    @property
+    def is_page(self) -> bool:
+        """Check if this meta element is a page type."""
+        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["page"]
     
-    __mapper_args__ = {
-        "polymorphic_identity": META_ELEMENT_TYPE_IDS["title"]
-    }
-    periodical: Mapped[bool] = mapped_column(default=False, nullable=True)
+    @property
+    def is_title(self) -> bool:
+        """Check if this meta element is a title type."""
+        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["title"]
     
+    @property
+    def is_volume(self) -> bool:
+        """Check if this meta element is a volume type."""
+        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["volume"]
     
-class VolumeMetaElement(MetaElement):
-    """Volume-specific meta element."""
+    @property
+    def is_issue(self) -> bool:
+        """Check if this meta element is an issue type."""
+        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["issue"]
     
-    __mapper_args__ = {
-        "polymorphic_identity": META_ELEMENT_TYPE_IDS["volume"]
-    }
-    periodical: Mapped[bool] = mapped_column(default=False, nullable=True, use_existing_column=True)
+    @property
+    def is_supplement(self) -> bool:
+        """Check if this meta element is a supplement type."""
+        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["supplement"]
     
-class IssueMetaElement(MetaElement):
-    """Issue-specific meta element."""
+    @property
+    def is_chapter(self) -> bool:
+        """Check if this meta element is a chapter type."""
+        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["chapter"]
     
-    __mapper_args__ = {
-        "polymorphic_identity": META_ELEMENT_TYPE_IDS["issue"]
-    }
+    @property
+    def is_article(self) -> bool:
+        """Check if this meta element is an article type."""
+        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["article"]
     
+    # Helper methods to provide type-safe access to attributes
     
-class SupplementMetaElement(MetaElement):
-    """Supplement-specific meta element."""
+    def get_attribute(self, key: str, default: Any = None) -> Any:
+        """Get an attribute value with a default fallback."""
+        return self.attributes.get(key, default)
     
-    __mapper_args__ = {
-        "polymorphic_identity": META_ELEMENT_TYPE_IDS["supplement"]
-    }
-    
-    
-class ChapterMetaElement(MetaElement):
-    """Chapter-specific meta element."""
-    
-    __mapper_args__ = {
-        "polymorphic_identity": META_ELEMENT_TYPE_IDS["chapter"]
-    }
-    page_index_start: Mapped[int] = mapped_column(default=0, nullable=True)
-    page_index_end: Mapped[int] = mapped_column(default=0, nullable=True)
-    
-    
-class ArticleMetaElement(MetaElement):
-    """Article-specific meta element."""    
-    
-    __mapper_args__ = {
-        "polymorphic_identity": META_ELEMENT_TYPE_IDS["article"]
-    }
-    page_index_start: Mapped[int] = mapped_column(default=0, nullable=True, use_existing_column=True)
-    page_index_end: Mapped[int] = mapped_column(default=0, nullable=True, use_existing_column=True)
+    def set_attribute(self, key: str, value: Any) -> None:
+        """Set an attribute value."""
+        self.attributes[key] = value
+        
+    def delete_attribute(self, key: str) -> None:
+        """Delete an attribute if it exists."""
+        if key in self.attributes:
+            del self.attributes[key]
 

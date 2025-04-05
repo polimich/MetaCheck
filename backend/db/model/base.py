@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Optional, Type, TypeVar, Union, Callable
@@ -19,6 +20,13 @@ def orm2dict(r):
     for prop in mapper.column_attrs:
         if prop.key not in result:  # Only add if not already added from regular columns
             result[prop.key] = getattr(r, prop.key)
+    
+    # Handle attributes - if it's a string that contains valid JSON, convert it
+    if 'attributes' in result and isinstance(result['attributes'], str):
+        try:
+            result['attributes'] = json.loads(result['attributes'])
+        except (json.JSONDecodeError, TypeError):
+            pass  # Keep as is if not valid JSON
     
     return result
 

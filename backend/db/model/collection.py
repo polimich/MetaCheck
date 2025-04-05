@@ -18,7 +18,11 @@ class Collection(Entity):
     description: Mapped[str] = mapped_column(default="", nullable=False)
     info: Mapped[str] = mapped_column(default="", nullable=False)
     confidence: Mapped[float] = mapped_column(nullable=True)
-    work_state: Mapped[WorkState] = mapped_column(default=WorkState.NEW, nullable=False)
+    work_state: Mapped[WorkState] = mapped_column(
+        String(50),
+        default=WorkState.NEW.value,
+        nullable=False
+    )
     image_count: Mapped[int] = mapped_column(default=0, nullable=False)
     detection_count: Mapped[int] = mapped_column(default=0, nullable=False)
     annotated_detection_count: Mapped[int] = mapped_column(default=0, nullable=False)

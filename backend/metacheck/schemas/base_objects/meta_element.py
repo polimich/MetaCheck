@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 from typing import Optional, Dict, List, Any
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, model_validator
 
 from metacheck.schemas.base_objects.base_entity import BaseEntity
 
@@ -17,6 +18,16 @@ class MetaElementNew(BaseModel):
     meta_element_type_id: UUID
     parent_id: Optional[UUID] = None
     attributes: Optional[Dict[str, Any]] = None
+
+    @field_validator('attributes')
+    @classmethod
+    def validate_attributes(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                raise ValueError("Invalid JSON in attributes field")
+        return v
 
 
 class MetaElement(MetaElementNew, BaseEntity):
@@ -42,6 +53,16 @@ class MetaElementUpdate(BaseModel):
     attributes: Optional[Dict[str, Any]] = None
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None
+
+    @field_validator('attributes')
+    @classmethod
+    def validate_attributes(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                raise ValueError("Invalid JSON in attributes field")
+        return v
 
 
 # Import at the end to avoid circular references
