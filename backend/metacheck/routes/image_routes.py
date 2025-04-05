@@ -45,7 +45,7 @@ async def delete_image(
 async def upload_image(
     collection_id: UUID,
     order: int,
-    file: UploadFile,
+    file: UploadFile,   
     db: AsyncSession = Depends(get_async_session),
 ):
     if "image" not in file.content_type:

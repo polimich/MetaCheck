@@ -22,7 +22,8 @@ class MetaRole(Entity):
     meta_element_type: Mapped["MetaElementType"] = relationship(
         "MetaElementType", 
         foreign_keys=[meta_element_type_id],
-        cascade="all"
+        cascade="all",
+        lazy="selectin"
     )
     
     meta_element_detection_attribute_type_id: Mapped[uuid.UUID] = mapped_column(
@@ -32,7 +33,8 @@ class MetaRole(Entity):
     meta_element_detection_attribute_type: Mapped["MetaElementDetectionAttributeType"] = relationship(
         "MetaElementDetectionAttributeType", 
         foreign_keys=[meta_element_detection_attribute_type_id],
-        cascade="all"
+        cascade="all",
+        lazy="selectin"
     )
     
     color: Mapped[str] = mapped_column(String(7), nullable=False)

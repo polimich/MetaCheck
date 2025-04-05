@@ -22,7 +22,8 @@ class MetaElement(Entity):
     collection: Mapped["Collection"] = relationship(
         "Collection", 
         foreign_keys=[collection_id],
-        cascade="all"
+        cascade="all",
+        lazy="selectin"
     )
 
     meta_element_type_id: Mapped[uuid.UUID] = mapped_column(
@@ -32,19 +33,27 @@ class MetaElement(Entity):
     meta_element_type: Mapped["MetaElementType"] = relationship(
         "MetaElementType", 
         foreign_keys=[meta_element_type_id],
-        cascade="all"
+        cascade="all",
+        lazy="selectin"
     )
 
     parent_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("meta_elements.id", ondelete="CASCADE"), nullable=True
     )
 
+    # For self-referential relationships, use selectin for the parent (single item)
+    # but joined for children to avoid recursive loading issues
     parent: Mapped[Optional["MetaElement"]] = relationship(
-        "MetaElement", back_populates="children", remote_side="MetaElement.id"
+        "MetaElement", 
+        back_populates="children", 
+        remote_side="MetaElement.id",
+        lazy="selectin"
     )
     
     children: Mapped[List["MetaElement"]] = relationship(
-        "MetaElement", back_populates="parent"
+        "MetaElement", 
+        back_populates="parent",
+        lazy="joined"  # Use joined loading for children to prevent recursion issues
     )
     
     # JSONB attribute to store type-specific properties
@@ -58,6 +67,7 @@ class MetaElement(Entity):
         back_populates="page_meta_element",
         foreign_keys="Image.page_meta_element_id",
         uselist=False,  # One-to-one relationship
+        lazy="selectin"
     )
     
     @property

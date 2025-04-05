@@ -43,9 +43,11 @@ class Collection(Entity):
         back_populates="collection",
         foreign_keys="Image.collection_id",
         cascade="all, delete-orphan",
+        lazy="selectin",
     )
     
     meta_elements: Mapped[List["MetaElement"]] = create_fk_relationship(
-        "MetaElement", "collection_id", backref_name="collection"
+        "MetaElement", "collection_id", backref_name="collection",
+        sa_relationship_kwargs={"lazy": "selectin"}
     )(lambda: MetaElement)
 

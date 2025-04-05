@@ -70,9 +70,17 @@ class CRUDRouter:
             return {"message": f"{self.entity_name} created."}
         
         @self.router.get("/{entity_id}", response_model=self.schema, tags=self.tags)
-        async def get_entity(entity_id: UUID, db: AsyncSession = Depends(get_async_session)):
+        async def get_entity(
+            entity_id: UUID, 
+            db: AsyncSession = Depends(get_async_session)
+        ):
             """Get a single entity by ID"""
-            return await crud_general.get(db, self.schema, self.model_class, entity_id)
+            return await crud_general.get(
+                db, 
+                self.schema, 
+                self.model_class, 
+                entity_id
+            )
         
         @self.router.put("", tags=self.tags)
         async def update_entity(
@@ -83,9 +91,17 @@ class CRUDRouter:
             return {"message": f"{self.entity_name} updated."}
         
         @self.router.get("", response_model=List[self.schema], tags=self.tags)
-        async def get_all_entities(db: AsyncSession = Depends(get_async_session)):
-            """Get all entities"""
-            return await crud_general.get_all(db, self.schema, self.model_class)
+        async def get_all_entities(
+            limit: int = 1000,
+            db: AsyncSession = Depends(get_async_session)
+        ):
+            """Get all entities with specified limit"""
+            return await crud_general.get_all(
+                db, 
+                self.schema, 
+                self.model_class, 
+                limit=limit
+            )
         
         @self.router.delete("/{entity_id}", tags=self.tags)
         async def delete_entity(

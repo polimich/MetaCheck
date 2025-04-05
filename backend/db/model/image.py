@@ -1,13 +1,14 @@
 import uuid
-from typing import List
+from typing import List, cast
 
-from sqlalchemy import ForeignKey, String, func, select
+from sqlalchemy import ForeignKey, String, func, select, event, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 from db.model.meta_element import MetaElement
 from db.model.collection import Collection
 from db.model.detection import Detection
-from db.model.base import Entity
+
+from db.model.base import Entity, create_fk_relationship
 from metacheck.schemas.base_objects import WorkState
 
 
@@ -38,37 +39,21 @@ class Image(Entity):
         nullable=False
     )
 
-    # Computed fields
-    # an average of the confidence of the detections
-    confidence: Mapped[float] = column_property(
-        select(func.avg(Detection.confidence))
-        .where(Detection.image_id == id)
-        .scalar_subquery()
-    )
-    
-    detection_count: Mapped[int] = column_property(
-        select(func.count(Detection.id))
-        .where(Detection.image_id == id)
-        .scalar_subquery()
-    )
-    
-    annotated_detection_count: Mapped[int] = column_property(
-        select(func.count(Detection.id))
-        .where(Detection.image_id == id)
-        .where(Detection.annotated == True)
-        .scalar_subquery()
-    )
+    # Computed fields are defined below the class to avoid circular references
 
     # Relationships - Use string references to avoid circular imports
     collection: Mapped["Collection"] = relationship(
-        "Collection", back_populates="images", foreign_keys=[collection_id]
+        "Collection", 
+        back_populates="images", 
+        foreign_keys=[collection_id],
+        lazy="selectin"
     )
 
     detections: Mapped[List["Detection"]] = relationship(
         "Detection",
         back_populates="image",
         foreign_keys="Detection.image_id",
-        lazy="joined",
+        lazy="selectin",
         cascade="all, delete-orphan",
     )
     
@@ -77,8 +62,32 @@ class Image(Entity):
         foreign_keys=[page_meta_element_id],
         cascade="all",
         back_populates="image",
-        lazy="joined"
-    )    
+        lazy="selectin"
+    )
+
+
+# Add computed properties after the class definition to avoid circular references
+@event.listens_for(Image, "mapper_configured")
+def _add_computed_properties(mapper, cls):
+    """Add computed properties after the mapper is configured to avoid circular references."""
+    cls.confidence = column_property(
+        select(func.avg(Detection.confidence))
+        .where(Detection.image_id == cls.id)
+        .scalar_subquery()
+    )
+    
+    cls.detection_count = column_property(
+        select(func.count(Detection.id))
+        .where(Detection.image_id == cls.id)
+        .scalar_subquery()
+    )
+    
+    cls.annotated_detection_count = column_property(
+        select(func.count(Detection.id))
+        .where(Detection.image_id == cls.id)
+        .where(Detection.annotated == True)
+        .scalar_subquery()
+    )
     
     
     

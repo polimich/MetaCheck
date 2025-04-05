@@ -21,7 +21,6 @@ class DetectionNew(BaseModel):
 class Detection(DetectionNew, BaseEntity):
     """Schema for a detection."""
 
-    type: DetectionType
     annotated: bool = False
 
     class Config:
@@ -36,6 +35,5 @@ class DetectionUpdate(BaseModel):
     image_id: Optional[UUID] = None
     annotated: Optional[bool] = None
     confidence: Optional[float] = None
-    type_id: Optional[UUID] = None
     bbox: Optional[str] = None
     deleted: Optional[bool] = None

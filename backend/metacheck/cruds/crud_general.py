@@ -1,120 +1,171 @@
 import json
 import logging
-from typing import List, Union
+from typing import List, Union, Type, TypeVar, Dict, Any, Set
 from uuid import UUID
 
 from sqlalchemy import exc, select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.inspection import inspect
+from pydantic import BaseModel
 
 from db import model
+from db.model.base import orm2dict
 from metacheck.database import DBError
 from metacheck.schemas import base_objects
 
 logger = logging.getLogger(__name__)
 
+# Type variable for Pydantic models
+T = TypeVar('T', bound=BaseModel)
 
 
-meta_role_relationships = [
-    'meta_element_type', 'meta_element_detection_attribute_type'
-]
+def sqlalchemy_to_dict(obj, visited=None):
+    """
+    Direct approach to convert SQLAlchemy objects to dictionaries with
+    special handling for self-referential relationships and async safety.
+    
+    Args:
+        obj: SQLAlchemy ORM object
+        visited: Set of already visited object IDs to prevent circular references
+        
+    Returns:
+        Dictionary representation with proper handling of relationships
+    """
+    if obj is None:
+        return None
+        
+    # Initialize visited set if not provided
+    if visited is None:
+        visited = set()
+        
+    # For lists/collections, handle each item separately
+    if isinstance(obj, list):
+        return [sqlalchemy_to_dict(item, visited) for item in obj]
+        
+    # Get object ID for reference checks
+    obj_id = getattr(obj, 'id', None)
+    
+    # Check if we've already visited this object to prevent circular references
+    if obj_id and str(obj_id) in visited:
+        # Return just a basic reference to avoid circular recursion
+        return {"id": obj_id, "reference_only": True}
+    
+    # Mark this object as visited
+    if obj_id:
+        visited.add(str(obj_id))
+    
+    # Get base dictionary with column values using orm2dict
+    # This safely extracts column values without triggering lazy loads
+    try:
+        result = orm2dict(obj)
+    except Exception as e:
+        # Fallback if orm2dict fails
+        logger.warning(f"orm2dict failed for {obj.__class__.__name__}: {str(e)}")
+        result = {"id": obj_id} if obj_id else {}
+    
+    # CRITICAL: Only access attributes that are already in __dict__
+    # This prevents triggering lazy loads which require async context
+    obj_dict = obj.__dict__
+    
+    # Get class name for type-specific handling
+    class_name = obj.__class__.__name__
+    
+    # Determine which relationships are already loaded
+    # Skip SQLAlchemy internal attributes that start with _
+    for key, value in obj_dict.items():
+        if key.startswith('_') or key in result:
+            continue
+            
+        # Skip if not a proper relationship
+        if not hasattr(obj.__class__, key):
+            continue
+            
+        attr = getattr(obj.__class__, key)
+        if not hasattr(attr, 'prop'):
+            continue
+            
+        # Handle different relationship types safely
+        if value is None:
+            result[key] = None
+            continue
+            
+        # Special handling for MetaElement parent/children to prevent circular refs
+        if class_name == 'MetaElement' and key in ('parent', 'children'):
+            if key == 'parent':
+                # For parent, include basic info without going deeper
+                if value is not None:
+                    parent_dict = orm2dict(value)
+                    result[key] = parent_dict
+            elif key == 'children':
+                # For children, include basic info for each child
+                if value:
+                    result[key] = [orm2dict(child) for child in value]
+        # Special handling for Image-MetaElement relationship
+        elif class_name == 'Image' and key == 'page_meta_element':
+            if value is not None:
+                result[key] = {"id": getattr(value, 'id', None)}
+        # Special handling for MetaElement-Image relationship
+        elif class_name == 'MetaElement' and key == 'image':
+            if value is not None:
+                result[key] = {"id": getattr(value, 'id', None)}
+        # For regular relationships
+        elif isinstance(value, list):
+            # List relationships
+            if value:
+                result[key] = [sqlalchemy_to_dict(item, visited.copy()) for item in value]
+            else:
+                result[key] = []
+        else:
+            # Single object relationships
+            result[key] = sqlalchemy_to_dict(value, visited.copy())
+    
+    return result
 
 
 async def get_all(
     db: AsyncSession,
-    model_class: base_objects.BaseModel,
+    model_class: Type[T],
     table: model.Base,
     limit: int = 1000,
-) -> List[model.Base]:
+) -> List[T]:
     try:
         async with db.begin():
-            # Build the query
+            # Build and execute the query
             query = select(table).order_by(table.created_date.desc()).limit(limit)
-            
-            # Import here to avoid circular imports
-            from sqlalchemy.orm import selectinload
-            
-            # Add eager loading for relationships based on model type
-            if table.__name__ == 'MetaRole':
-                for rel in meta_role_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            
             db_objects = await db.execute(query)
             db_objects = db_objects.unique().scalars().all()
             
+            # Convert SQLAlchemy objects to dictionaries with relationships
             result = []
             for obj in db_objects:
-                # Use orm2dict for the basic attributes
-                obj_dict = model.orm2dict(obj)
-                
-                # Handle JSON attributes if present
-                if 'attributes' in obj_dict and isinstance(obj_dict['attributes'], str):
-                    try:
-                        obj_dict['attributes'] = json.loads(obj_dict['attributes'])
-                    except json.JSONDecodeError:
-                        # If not valid JSON, keep as is
-                        pass
-                
-                # Handle relationship lists based on model type
-                
-                if table.__name__ == 'MetaRole':
-                    for rel in meta_role_relationships:
-                        rel_object = getattr(obj, rel)
-                        if rel_object:
-                            obj_dict[rel] = model.orm2dict(rel_object)
-                        else:
-                            obj_dict[rel] = None
-                
-                # Validate with Pydantic
+                # Use our direct conversion approach
+                obj_dict = sqlalchemy_to_dict(obj)
                 result.append(model_class.model_validate(obj_dict))
             
             return result
     except exc.SQLAlchemyError as e:
-        logger.exception(f"Failed fetching objects from database.")
-        raise DBError(f"Failed fetching objects from database.") from e
+        logger.exception(f"Failed fetching objects from database: {str(e)}")
+        raise DBError(f"Failed fetching objects from database: {str(e)}") from e
 
 
 async def get(
-    db: AsyncSession, model_class: base_objects.BaseModel, table: model.Base, id: UUID
-) -> model.Base:
+    db: AsyncSession, 
+    model_class: Type[T], 
+    table: model.Base, 
+    id: UUID,
+) -> T:
     try:
         async with db.begin():
-            # Build the query
+            # Simple query with ID filter
             query = select(table).where(table.id == id)
-            
-            # Import here to avoid circular imports
-            from sqlalchemy.orm import selectinload
-            
-            # Add eager loading for relationships based on model type
-            if table.__name__ == 'MetaRole':
-                for rel in meta_role_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            
             db_object = await db.execute(query)
             db_object = db_object.unique().scalar()
+            
             if db_object is None:
-                raise exc.SQLAlchemyError
+                raise exc.SQLAlchemyError(f"Object with ID={id} not found")
                 
-            # Use orm2dict for the basic attributes
-            obj_dict = model.orm2dict(db_object)
-            
-            # Handle JSON attributes if present
-            if 'attributes' in obj_dict and isinstance(obj_dict['attributes'], str):
-                try:
-                    obj_dict['attributes'] = json.loads(obj_dict['attributes'])
-                except json.JSONDecodeError:
-                    # If not valid JSON, keep as is
-                    pass
-            
-            # Handle relationship lists based on model type
-            if table.__name__ == 'MetaRole':
-                for rel in meta_role_relationships:
-                    rel_object = getattr(db_object, rel)
-                    if rel_object:
-                        obj_dict[rel] = model.orm2dict(rel_object)
-                    else:
-                        obj_dict[rel] = None
-            
-            # Validate with Pydantic
+            # Use our direct conversion approach
+            obj_dict = sqlalchemy_to_dict(db_object)
             return model_class.model_validate(obj_dict)
     except exc.SQLAlchemyError as e:
         logging.exception(
@@ -126,59 +177,43 @@ async def get(
 
 
 async def get_or_none(
-    db: AsyncSession, model_class: base_objects.BaseModel, table: model.Base, id: UUID
-) -> Union[model.Base, None]:
+    db: AsyncSession, 
+    model_class: Type[T], 
+    table: model.Base, 
+    id: UUID,
+) -> Union[T, None]:
     try:
         async with db.begin():
-            # Build the query
+            # Simple query with ID filter
             query = select(table).where(table.id == id)
-            
-            # Import here to avoid circular imports
-            from sqlalchemy.orm import selectinload
-            
-            # Add eager loading for relationships based on model type
-            if table.__name__ == 'MetaRole':
-                for rel in meta_role_relationships:
-                    query = query.options(selectinload(getattr(table, rel)))
-            
             db_object = await db.execute(query)
             db_object = db_object.unique().scalar()
+            
             if db_object is None:
                 return None
                 
-            # Use orm2dict for the basic attributes
-            obj_dict = model.orm2dict(db_object)
-            
-            # Handle JSON attributes if present
-            if 'attributes' in obj_dict and isinstance(obj_dict['attributes'], str):
-                try:
-                    obj_dict['attributes'] = json.loads(obj_dict['attributes'])
-                except json.JSONDecodeError:
-                    # If not valid JSON, keep as is
-                    pass
-            
-            # Handle relationship lists based on model type
-            if table.__name__ == 'MetaRole':
-                for rel in meta_role_relationships:
-                    rel_object = getattr(db_object, rel)
-                    if rel_object:
-                        obj_dict[rel] = model.orm2dict(rel_object)
-                    else:
-                        obj_dict[rel] = None
-            
-            # Validate with Pydantic
+            # Use our direct conversion approach
+            obj_dict = sqlalchemy_to_dict(db_object)
             return model_class.model_validate(obj_dict)
     except exc.SQLAlchemyError as e:
         logging.exception(f"Failed fetching object from database. ID={id}")
         raise DBError(f"Failed fetching object from database. ID={id}") from e
 
 
-async def new(db: AsyncSession, obj: dict, table: model.Base):
+async def new(db: AsyncSession, obj: Dict[str, Any], table: model.Base, start_transaction: bool = True):
     try:
-        async with db.begin():
+        if start_transaction:
+            async with db.begin():
+                db_obj = table(**obj)
+                db.add(db_obj)
+                await db.commit()
+                return db_obj
+        else:
+            # Use the existing transaction
             db_obj = table(**obj)
             db.add(db_obj)
-            await db.commit()
+            # Don't commit here, the transaction will be committed by the caller
+            return db_obj
     except exc.SQLAlchemyError as e:
         logging.exception(
             f'Failed adding object to database. Could be that the object already exists. ID={obj["id"]}'
@@ -189,7 +224,7 @@ async def new(db: AsyncSession, obj: dict, table: model.Base):
 
 
 async def update_obj(
-    db: AsyncSession, obj: base_objects.BaseModel, table: model.Base, exclude_none=True
+    db: AsyncSession, obj: BaseModel, table: model.Base, exclude_none=True
 ):
     try:
         async with db.begin():

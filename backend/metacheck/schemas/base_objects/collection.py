@@ -9,11 +9,7 @@ from metacheck.schemas.base_objects.enums import WorkState
 
 if TYPE_CHECKING:
     from metacheck.schemas.base_objects.image import Image
-    from metacheck.schemas.base_objects.title import Title
-    from metacheck.schemas.base_objects.volume import Volume
-    from metacheck.schemas.base_objects.issue import Issue  
-    from metacheck.schemas.base_objects.chapter import Chapter
-    from metacheck.schemas.base_objects.article import Article
+    from metacheck.schemas.base_objects.meta_element import MetaElement
 
 
 class CollectionNew(BaseModel):
@@ -45,11 +41,8 @@ class CollectionWithMetadata(Collection):
     """Schema for a collection with related entities."""
 
     images: List["Image"] = []
-    titles: List["Title"] = []
-    volumes: List["Volume"] = []
-    issues: List["Issue"] = []
-    chapters: List["Chapter"] = []
-    articles: List["Article"] = []
+    # Meta elements by type
+    meta_elements: List["MetaElement"] = []
 
     class Config:
         from_attributes = True
@@ -72,8 +65,4 @@ class CollectionUpdate(BaseModel):
 
 # Import at the end to avoid circular references
 from metacheck.schemas.base_objects.image import Image
-from metacheck.schemas.base_objects.title import Title
-from metacheck.schemas.base_objects.volume import Volume
-from metacheck.schemas.base_objects.issue import Issue  
-from metacheck.schemas.base_objects.chapter import Chapter
-from metacheck.schemas.base_objects.article import Article
+from metacheck.schemas.base_objects.meta_element import MetaElement

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from db import model
+from metacheck.constants import META_ELEMENT_TYPE_IDS, ElementTypeEnum
 from metacheck.database import DBError
 from metacheck.schemas import base_objects
 from metacheck_common.config import config
@@ -43,98 +44,102 @@ async def get_collection_with_all_metadata(
 ) -> base_objects.CollectionWithMetadata:
     try:
         async with db.begin():
+            # Query the collection with all necessary relationships in a single query
             db_collection = await db.scalar(
                 select(model.Collection)
                 .options(
+                    # Load images with their detections
                     joinedload(model.Collection.images)
-                    .joinedload(model.Image.detections)
-                    .joinedload(model.Detection.type),
-                    joinedload(model.Collection.titles),
-                    joinedload(model.Collection.volumes),
-                    joinedload(model.Collection.issues),
-                    joinedload(model.Collection.chapters),
-                    joinedload(model.Collection.articles),
+                    .joinedload(model.Image.detections),
+                    
+                    # Load all meta elements
+                    joinedload(model.Collection.meta_elements)
                 )
                 .filter(model.Collection.id == collection_id)
             )
-            collection = base_objects.CollectionWithMetadata(
-                **model.orm2dict(db_collection)
-            )
-            print(db_collection.images[0].detections[0].type.__str__())
-            loaded_images = []
-            for image in db_collection.images:
-                loaded_images.append(
-                    base_objects.Image(
-                        **model.orm2dict(image),
-                        detections=[
-                            base_objects.Detection(
-                                **model.orm2dict(detection),
-                                type=base_objects.DetectionType(
-                                    **model.orm2dict(detection.type)
-                                ),
-                            )
-                            for detection in image.detections
-                        ],
-                    )
-                )
-            collection.images = loaded_images
-
-            collection.titles = [
-                base_objects.Title(**model.orm2dict(title))
-                for title in db_collection.titles
-            ]
-
-            collection.volumes = [
-                base_objects.Volume(**model.orm2dict(volume))
-                for volume in db_collection.volumes
-            ]
-
-            collection.issues = [
-                base_objects.Issue(**model.orm2dict(issue))
-                for issue in db_collection.issues
-            ]
-
-            collection.chapters = [
-                base_objects.Chapter(**model.orm2dict(chapter))
-                for chapter in db_collection.chapters
-            ]
-
-            collection.articles = [
-                base_objects.Article(**model.orm2dict(article))
-                for article in db_collection.articles
-            ]
-
+            
+            if not db_collection:
+                raise DBError(f"Collection with ID={collection_id} not found")
+            
+            # Use the improved sqlalchemy_to_dict function to safely handle circular references
+            from metacheck.cruds.crud_general import sqlalchemy_to_dict
+            collection_dict = sqlalchemy_to_dict(db_collection)
+            
+            # Process meta_elements list to categorize by type
+            meta_elements_by_type = {}
+            
+            if 'meta_elements' in collection_dict and collection_dict['meta_elements']:
+                # Initialize lists
+                meta_elements_by_type = {
+                    'titles': [],
+                    'volumes': [],
+                    'issues': [],
+                    'pages': [],
+                    'chapters': [],
+                    'articles': [],
+                    'supplements': []
+                }
+                
+                # Categorize meta elements by type
+                for element in collection_dict['meta_elements']:
+                    element_type_id = element.get('meta_element_type_id')
+                    
+                    # Reverse lookup the type name from the UUID
+                    from metacheck.constants import META_ELEMENT_TYPE_NAMES
+                    element_type = META_ELEMENT_TYPE_NAMES.get(str(element_type_id))
+                    
+                    if element_type and element_type + 's' in meta_elements_by_type:
+                        meta_elements_by_type[element_type + 's'].append(element)
+            
+            # Update the collection dict with categorized meta elements
+            collection_dict.update(meta_elements_by_type)
+            
+            # Create the Pydantic model from the dictionary
+            collection = base_objects.CollectionWithMetadata.model_validate(collection_dict)
+            
             return collection
 
     except exc.SQLAlchemyError as e:
-        logger.exception(f"Failed reading collection from database")
-        raise DBError(f"Failed reading collection from database") from e
+        logger.exception(f"Failed reading collection from database: {str(e)}")
+        raise DBError(f"Failed reading collection from database: {str(e)}") from e
 
 
 async def check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id: UUID):
     try:
-        async with db.begin():
-            # Update collection preview if it is null to image_id
-            db_image = await db.execute(
-                select(model.Image).filter(model.Image.id == image_id)
-            )
-            db_image = db_image.unique().scalar_one()
-            await db.execute(
-                update(model.Collection)
-                .where(
-                    model.Collection.id == collection_id,
-                    model.Collection.preview_image_id == None,
-                )
-                .values(
-                    preview_image_id=image_id,
-                    preview_image_width=db_image.width,
-                    preview_image_height=db_image.height,
-                )
-            )
+        # Check if transaction is already in progress
+        is_transaction_active = db.in_transaction()
+        
+        if not is_transaction_active:
+            async with db.begin():
+                await _do_check_preview_and_set(db, collection_id, image_id)
+        else:
+            # If a transaction is already active, just run the query
+            await _do_check_preview_and_set(db, collection_id, image_id)
 
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed updating collection preview")
         raise DBError(f"Failed updating collection preview") from e
+
+
+async def _do_check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id: UUID):
+    """Internal function to check and set preview"""
+    # Update collection preview if it is null to image_id
+    db_image = await db.execute(
+        select(model.Image).filter(model.Image.id == image_id)
+    )
+    db_image = db_image.unique().scalar_one()
+    await db.execute(
+        update(model.Collection)
+        .where(
+            model.Collection.id == collection_id,
+            model.Collection.preview_image_id == None,
+        )
+        .values(
+            preview_image_id=image_id,
+            preview_image_width=db_image.width,
+            preview_image_height=db_image.height,
+        )
+    )
 
 
 # get all collections
@@ -344,148 +349,217 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
     if "json" not in file.content_type:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsuported file type - only json files are supported.",
+            detail=f"Unsupported file type - only json files are supported.",
         )
     
     try:
         # Import necessary modules here to avoid circular imports
-        from metacheck.cruds import crud_general, crud_image, crud_detection_type
+        from backend.metacheck.cruds import crud_general, crud_image, crud_meta_element
+        from backend.metacheck.schemas.metakat_object import MetaKatImport
+        
+        # Get the project root for resolving image paths
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_file_dir, "../../.."))
+        logger.info(f"Project root directory: {project_root}")
         
         # Read and parse the JSON file
         content = await file.read()
         import json
         try:
-            metakat_data = json.loads(content.decode('utf-8'))
+            metakat_import = MetaKatImport.model_validate(
+                json.loads(content.decode('utf-8'))
+            )
+            metakat_data = metakat_import.model_dump()
         except json.JSONDecodeError:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid JSON format in the uploaded file."
             )
         
-        # Create a new collection
-        collection_id = uuid.uuid4()
-        collection_name = metakat_data.get("name", file.filename.replace(".json", ""))
-        collection = base_objects.CollectionNew(
-            id=collection_id, 
-            name=collection_name,
-            description=metakat_data.get("description", ""),
-            info=metakat_data.get("info", "")
-        )
-        await crud_general.new(db, collection.model_dump(), model.Collection)
-        
-        # Process images if present in the MetaKat format
-        images_data = metakat_data.get("images", [])
-        for index, image_data in enumerate(images_data):
-            # Generate UUID for the image
-            image_id = uuid.uuid4()
+        async with db.begin():
+            # Create a new collection or check if it already exists
+            collection_id = metakat_data.get("batch_id")
+            collection_name = f'Batch: {metakat_data.get("batch_id")}'
             
-            # Handle image data (assuming base64 encoded or URL paths based on MetaKat format)
-            image_path = image_data.get("path")
-            image_name = image_data.get("name", f"image_{index}.jpg")
+            # Check if collection already exists
+            collection_check = await db.execute(
+                select(model.Collection).filter(model.Collection.id == collection_id)
+            )
+            existing_collection = collection_check.unique().scalar_one_or_none()
             
-            # If image data is provided directly in the JSON
-            raw_image_data = None
-            if "data" in image_data and image_data["data"]:
-                import base64
+            if existing_collection:
+                # Update existing collection
+                await db.execute(
+                    update(model.Collection)
+                    .where(model.Collection.id == collection_id)
+                    .values(
+                        name=collection_name,
+                        description=metakat_data.get("description", ""),
+                        info=metakat_data.get("info", "")
+                    )
+                )
+                logger.info(f"Updated existing collection: {collection_id}")
+            else:
+                # Create new collection
+                collection = base_objects.CollectionNew(
+                    id=collection_id, 
+                    name=collection_name,
+                    description=metakat_data.get("description", ""),
+                    info=metakat_data.get("info", "")
+                )
+                await crud_general.new(db, collection.model_dump(), model.Collection, start_transaction=False)
+                logger.info(f"Created new collection: {collection_id}")
+            
+            # Simple counters to track progress
+            success_counters = {
+                "volumes": 0,
+                "pages": 0,
+                "issues": 0,
+                "titles": 0,
+                "supplements": 0,
+                "chapters": 0,
+                "articles": 0
+            }
+            
+            # Process volumes - simplified
+            for volume_data in metakat_data.get("volumes", []):
                 try:
-                    raw_image_data = base64.b64decode(image_data["data"])
+                    element_id = volume_data.get("id")
+                    if not element_id:
+                        continue
+                    
+                    # Check if element already exists
+                    element_check = await db.execute(
+                        select(model.MetaElement).filter(model.MetaElement.id == element_id)
+                    )
+                    if element_check.unique().scalar_one_or_none():
+                        # Skip if already exists
+                        logger.info(f"Volume already exists: {element_id}")
+                        success_counters["volumes"] += 1
+                        continue
+                    
+                    # Create new volume with minimal attributes
+                    volume_element = base_objects.MetaElementNew(
+                        id=element_id,
+                        collection_id=collection_id,
+                        meta_element_type_id=META_ELEMENT_TYPE_IDS["volume"],
+                        parent_id=None,
+                        attributes={
+                            "periodical": volume_data.get("periodical", False)
+                        }
+                    )
+                    
+                    # Create directly with the simplified function
+                    await crud_meta_element.create_meta_element(db, volume_element)
+                    success_counters["volumes"] += 1
+                    logger.info(f"Created volume: {element_id}")
                 except Exception as e:
-                    logger.warning(f"Failed to decode base64 image data: {e}")
-                    continue
+                    logger.warning(f"Failed to process volume {volume_data.get('id')}: {e}")
             
-            # If image path is provided instead of direct data
-            elif image_path:
+            # Process pages - simplified
+            for page_data in metakat_data.get("pages", []):
                 try:
-                    # Try to read image from the path assuming it's relative to the system
-                    async with aiofiles.open(image_path, mode="rb") as f:
-                        raw_image_data = await f.read()
-                except FileNotFoundError:
-                    logger.warning(f"Image file not found: {image_path}")
-                    continue
-                except Exception as e:
-                    logger.warning(f"Failed to read image file: {e}")
-                    continue
-            
-            # Skip if no valid image data was found
-            if not raw_image_data:
-                logger.warning(f"No valid image data found for image at index {index}")
-                continue
-                
-            # Save the image using the existing functionality
-            try:
-                await crud_image.save_image_file(raw_image_data, image_name, collection_id, image_id, index, db)
-            except HTTPException as e:
-                logger.warning(f"Failed to save image: {e.detail}")
-                continue
-                
-            # Process detections if present for this image
-            detections_data = image_data.get("detections", [])
-            if detections_data:
-                # Get image info to calculate coordinates
-                image_info = await crud_image.get_image(db, image_id)
-                
-                # Process each detection
-                detections = []
-                for detection_data in detections_data:
-                    detection_type_name = detection_data.get("type", "default")
+                    element_id = page_data.get("id")
+                    if not element_id:
+                        continue
                     
-                    # Check if detection type exists, create if not
-                    detection_types = await crud_detection_type.get_all_detection_types(db)
-                    detection_types_names = {d.name for d in detection_types}
+                    # Check if element already exists
+                    element_check = await db.execute(
+                        select(model.MetaElement).filter(model.MetaElement.id == element_id)
+                    )
+                    if element_check.unique().scalar_one_or_none():
+                        # Skip if already exists
+                        logger.info(f"Page already exists: {element_id}")
+                        success_counters["pages"] += 1
+                        continue
                     
-                    if detection_type_name not in detection_types_names:
-                        new_detection_type = base_objects.DetectionTypeNew(
-                            id=uuid.uuid4(),
-                            name=detection_type_name,
-                            color=f"#{random.randint(0, 0xFFFFFF):06x}",
-                            display_name=detection_type_name.capitalize(),
-                        )
-                        await crud_detection_type.create_detection_type(db, new_detection_type)
-                        logger.info(f"Added new detection type: {detection_type_name}")
+                    # Create with minimal attributes
+                    page_element = base_objects.MetaElementNew(
+                        id=element_id,
+                        collection_id=collection_id,
+                        meta_element_type_id=META_ELEMENT_TYPE_IDS["page"],
+                        parent_id=page_data.get("parent_id"),
+                        attributes={
+                            "pageIndex": page_data.get("pageIndex"),
+                            "pageType": page_data.get("pageType", {})
+                        }
+                    )
                     
-                    detection_type = await crud_detection_type.get_detection_type_by_name(db, detection_type_name)
+                    # Create directly
+                    await crud_meta_element.create_meta_element(db, page_element)
+                    success_counters["pages"] += 1
+                    logger.info(f"Created page: {element_id}")
                     
-                    # Process bounding box
-                    bbox_data = detection_data.get("bbox", {})
-                    if bbox_data:
-                        # Handle different bbox formats (normalized or absolute)
-                        if "normalized" in bbox_data and bbox_data["normalized"]:
-                            # Convert normalized coordinates to absolute
-                            x_norm = bbox_data.get("x", 0)
-                            y_norm = bbox_data.get("y", 0)
-                            w_norm = bbox_data.get("width", 0)
-                            h_norm = bbox_data.get("height", 0)
+                    # Process image if available
+                    image_path = page_data.get("image_path")
+                    if image_path:
+                        try:
+                            # Check if an image already exists for this page
+                            image_check = await db.execute(
+                                select(model.Image).filter(model.Image.page_meta_element_id == element_id)
+                            )
+                            if image_check.unique().scalar_one_or_none():
+                                logger.info(f"Image already exists for page: {element_id}")
+                                continue
+                                
+                            # Create new image
+                            image_id = uuid.uuid4()
                             
-                            width = w_norm * image_info.width
-                            height = h_norm * image_info.height
-                            x = x_norm * image_info.width
-                            y = y_norm * image_info.height
-                        else:
-                            # Use absolute coordinates directly
-                            x = bbox_data.get("x", 0)
-                            y = bbox_data.get("y", 0)
-                            width = bbox_data.get("width", 0)
-                            height = bbox_data.get("height", 0)
-                        
-                        bbox = f"{x};{y};{width};{height}"
-                        
-                        # Create detection object
-                        detection = base_objects.DetectionNew(
-                            id=uuid.uuid4(),
-                            type_id=detection_type.id,
-                            bbox=bbox,
-                            image_id=image_id,
-                            value=detection_data.get("value", ""),
-                            confidence=detection_data.get("confidence", None)
-                        )
-                        detections.append(detection)
-                
-                # Save detections for this image
-                if detections:
-                    await crud_image.create_image_detections(db, image_id, detections)
-        
-        return {"message": "MetaKat collection imported successfully", "collection_id": str(collection_id)}
+                            # Get absolute path relative to project root
+                            image_name = os.path.basename(image_path)
+                            
+                            # Handle paths that start with a slash by removing the leading slash
+                            if image_path.startswith('/'):
+                                image_path = image_path[1:]
+                            
+                            absolute_image_path = os.path.join(project_root, image_path)
+                            logger.info(f"Looking for image at: {absolute_image_path}")
+                            
+                            # Try to load the image
+                            try:
+                                async with aiofiles.open(absolute_image_path, mode="rb") as f:
+                                    raw_image_data = await f.read()
+                                
+                                # Use the existing image handling function that will properly process the image
+                                image_index = page_data.get("pageIndex", 0)
+                                await crud_image.save_image_file(
+                                    raw_input=raw_image_data, 
+                                    image_name=image_name, 
+                                    collection_id=collection_id, 
+                                    image_id=image_id, 
+                                    order=image_index, 
+                                    db=db,
+                                    page_meta_element_id=element_id
+                                )
+                                logger.info(f"Added image for page: {element_id} with name {image_name}")
+                            except FileNotFoundError:
+                                logger.warning(f"Image file not found: {absolute_image_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to add image for page {element_id}: {e}")
+                except Exception as e:
+                    logger.warning(f"Failed to process page {page_data.get('id')}: {e}")
+            
+            # Handle other element types if needed (issues, titles, etc.)
+            # ...
+            
+            # Update collection counts
+            await db.execute(
+                update(model.Collection)
+                .where(model.Collection.id == collection_id)
+                .values(
+                    image_count=success_counters["pages"],
+                    detection_count=len(metakat_data.get("detection_to_bbox", {}))
+                )
+            )
+            
+            # We'll let the transaction commit automatically at the end of the with block
+            
+            return {
+                "message": "MetaKat collection imported successfully", 
+                "collection_id": str(collection_id),
+                "elements_imported": success_counters
+            }
         
     except Exception as e:
         logger.exception(f"Failed to process MetaKat import file. Error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to process the MetaKat import file.")
+        raise HTTPException(status_code=500, detail=f"Failed to process the MetaKat import file: {str(e)}")

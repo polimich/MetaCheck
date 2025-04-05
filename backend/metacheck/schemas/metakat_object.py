@@ -325,10 +325,16 @@ class MetaKatImport(BaseModel):
                 return transform_page_type_detection(value)
             return value
 
-
-            
-
         elements_output = []
+        
+        # Group elements by type
+        volumes = []
+        issues = []
+        titles = []
+        pages = []
+        supplements = []
+        chapters = []
+        articles = []
 
         # 1) Iterate over each element object in 'self.elements'
         for elem in self.elements:
@@ -357,12 +363,36 @@ class MetaKatImport(BaseModel):
                 if self.page_to_image_mapping and page_id in self.page_to_image_mapping:
                     data["image_path"] = self.page_to_image_mapping[page_id]
 
+            # Add to elements output and to the type-specific collections
             elements_output.append(data)
+            
+            # Add to appropriate type-specific list
+            element_type = data.get("type")
+            if element_type == ElementType.volume.value:
+                volumes.append(data)
+            elif element_type == ElementType.issue.value:
+                issues.append(data)
+            elif element_type == ElementType.title.value:
+                titles.append(data)
+            elif element_type == ElementType.page.value:
+                pages.append(data)
+            elif element_type == ElementType.supplement.value:
+                supplements.append(data)
+            elif element_type == ElementType.chapter.value:
+                chapters.append(data)
+            elif element_type == ElementType.article.value:
+                articles.append(data)
 
         # 3) Build the final top-level dict
         return {
             "batch_id": str(self.batch_id),
-            "elements": elements_output,
+            "volumes": volumes,
+            "issues": issues,
+            "titles": titles,
+            "pages": pages,
+            "supplements": supplements,
+            "chapters": chapters,
+            "articles": articles,
             "detection_to_page_mapping": {
                 str(k): v for k, v in self.detection_to_page_mapping.items()
             },
@@ -371,9 +401,6 @@ class MetaKatImport(BaseModel):
                 if self.page_to_alto_mapping
                 else None
             ),
-            "page_to_image_mapping": {
-                str(k): v for k, v in self.page_to_image_mapping.items()
-            },
             "detection_to_bbox": {str(k): v for k, v in self.detection_to_bbox.items()},
         }
 

@@ -26,25 +26,38 @@ logger = logging.getLogger(__name__)
 
 async def is_image_duplicate(db: AsyncSession, collection_id, img_hash):
     try:
-        async with db.begin():
-            stm = (
-                select(model.Image)
-                .join(
-                    model.Collection, model.Image.collection_id == model.Collection.id
-                )
-                .where(model.Collection.id == collection_id)
-                .where(model.Image.imagehash == img_hash)
-                .where(model.Image.deleted == False)
-            )
-            result = await db.execute(stm)
-            db_image = result.unique().scalar_one_or_none()
-            if not db_image:
-                return None
-            return base_objects.Image.model_validate(db_image)
+        # Check if transaction is already in progress
+        is_transaction_active = db.in_transaction()
+        
+        # Use a transaction context only if one is not already active
+        if not is_transaction_active:
+            async with db.begin():
+                return await _check_duplicate_image(db, collection_id, img_hash)
+        else:
+            # If a transaction is already active, just run the query
+            return await _check_duplicate_image(db, collection_id, img_hash)
 
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed checking for duplicate image in database")
         raise DBError(f"Failed checking for duplicate image in database") from e
+
+
+async def _check_duplicate_image(db: AsyncSession, collection_id, img_hash):
+    """Internal function to check for duplicate images"""
+    stm = (
+        select(model.Image)
+        .join(
+            model.Collection, model.Image.collection_id == model.Collection.id
+        )
+        .where(model.Collection.id == collection_id)
+        .where(model.Image.imagehash == img_hash)
+        .where(model.Image.deleted == False)
+    )
+    result = await db.execute(stm)
+    db_image = result.unique().scalar_one_or_none()
+    if not db_image:
+        return None
+    return base_objects.Image.model_validate(db_image)
 
 
 async def create_image_detections(
@@ -188,7 +201,7 @@ async def get_image(db: AsyncSession, image_id: UUID) -> base_objects.Image:
 
 
 async def save_image_file(
-    raw_input, image_name, collection_id, image_id, order, db: AsyncSession
+    raw_input, image_name, collection_id, image_id, order, db: AsyncSession, page_meta_element_id=None
 ):
     contents = np.asarray(bytearray(raw_input), dtype="uint8")
     image = cv2.imdecode(contents, cv2.IMREAD_COLOR)
@@ -196,6 +209,7 @@ async def save_image_file(
         raise HTTPException(status_code=400, detail="Failed to decode/open image.")
     imagehash = hashlib.md5(raw_input).hexdigest()
 
+    # Check for duplicates (this now handles transactions properly)
     image_duplicate = await is_image_duplicate(db, collection_id, imagehash)
     if image_duplicate:
         raise HTTPException(
@@ -203,20 +217,42 @@ async def save_image_file(
             detail=f"Image is already uploaded as {image_duplicate.name}.",
         )
 
+    # Save image file
     write_path = await get_image_path(image_id=image_id, collection_id=collection_id)
     async with aiofiles.open(write_path, mode="wb") as f:
         await f.write(raw_input)
 
+    # Create preview
     await make_preview_from_image(
         image,
         await get_preview_path(image_id),
         resolution=config.IMAGE_PREVIEW_RESOLUTION,
     )
 
+    # If page_meta_element_id is not provided, we need to create a temporary one
+    if page_meta_element_id is None:
+        # Import here to avoid circular dependencies
+        from metacheck.cruds import crud_meta_element
+        from metacheck.constants import META_ELEMENT_TYPE_IDS
+        from metacheck.schemas.base_objects import MetaElementNew
+        import uuid
+
+        # Create a temporary page element
+        temp_page_id = uuid.uuid4()
+        temp_page = MetaElementNew(
+            id=temp_page_id,
+            collection_id=collection_id,
+            meta_element_type_id=META_ELEMENT_TYPE_IDS["page"],
+            attributes={"placeholder": True}
+        )
+        await crud_meta_element.create_meta_element(db, temp_page)
+        page_meta_element_id = temp_page_id
+
+    # Create image record in database
     image_new = {
         "id": image_id,
         "collection_id": collection_id,
-        "order": order,
+        "page_meta_element_id": page_meta_element_id,
         "name": image_name,
         "width": image.shape[1],
         "height": image.shape[0],
@@ -225,7 +261,10 @@ async def save_image_file(
         "work_state": base_objects.WorkState.NEW,
     }
     from metacheck.cruds import crud_general
-    await crud_general.new(db, image_new, model.Image)
+    
+    # Check if transaction is active and pass that info to crud_general.new
+    is_transaction_active = db.in_transaction()
+    await crud_general.new(db, image_new, model.Image, start_transaction=not is_transaction_active)
 
     # preview is optional, so we don't check if this goes through
     try:
@@ -233,6 +272,8 @@ async def save_image_file(
         await crud_collection.check_preview_and_set(db, collection_id, image_id)
     except DBError as e:
         logger.exception(f"Failed creating image preview")
+        
+    return image_new
 
 
 async def get_image_path(image_id: UUID, collection_id: UUID):

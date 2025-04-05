@@ -1,55 +1,42 @@
-"""seed_meta_initial_data
+"""Seed meta initial data
 
 Revision ID: 67208458c241
 Revises: 971ed423ad59
-Create Date: 2025-04-04 22:46:00.000000
+Create Date: 2023-10-01 14:40:21.123123
 
 """
-from typing import Union, Sequence
 from datetime import datetime
 import uuid
+from typing import Dict, List, Optional, Sequence, Union
+from uuid import UUID as PythonUUID
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.sql import table, column
+from sqlalchemy import table, column
 from sqlalchemy.dialects.postgresql import UUID
+
+# Import shared constants (must be importable from migrations without dependencies)
+from metacheck.constants_source import (
+    ELEMENT_TYPE_UUID_STRINGS,
+    ATTRIBUTE_TYPES,
+    ELEMENT_COLORS,
+    ELEMENT_ATTRIBUTE_MAPPINGS
+)
 
 # revision identifiers, used by Alembic.
 revision: str = '67208458c241'
-down_revision: Union[str, None] = '971ed423ad59'
+down_revision: Optional[str] = '971ed423ad59'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-# Define element types with constant UUIDs
-element_types = {
-    "page": "e1000000-0000-4000-a000-000000000001",
-    "title": "e1000000-0000-4000-a000-000000000002",
-    "volume": "e1000000-0000-4000-a000-000000000003",
-    "issue": "e1000000-0000-4000-a000-000000000004",
-    "supplement": "e1000000-0000-4000-a000-000000000005",
-    "chapter": "e1000000-0000-4000-a000-000000000006",
-    "article": "e1000000-0000-4000-a000-000000000007"
-}
-
-attribute_types = ["page_number", "title", "sub_title", "page_type", "author", "editor", "publisher", 
-        "date_issued", "place_term", "part_number", "part_name", "edition",  
-        "manufacture_publisher", "manufacture_place_term", "illustrator", 
-        "translator", "redaktor", "series_name", "series_number", "abstract", 
-        "keywords"]
-
+# Use the imported constant 
+element_types = ELEMENT_TYPE_UUID_STRINGS
+attribute_types = ATTRIBUTE_TYPES
 
 def generate_default_color(element_type: str, attribute_type: str) -> str:
     """Generate a default color for a role based on element type and attribute type"""
-    # Define base colors for element types
-    element_colors = {
-        "page": "#39A40B",      # Green
-        "title": "#9B372A",     # Dark Red
-        "volume": "#3643F5",    # Blue
-        "issue": "#8B4513",     # Brown
-        "supplement": "#FF7F50", # Coral
-        "chapter": "#003B56",   # Dark Blue
-        "article": "#CCA19F"    # Pinkish
-    }
+    # Use the imported element colors
+    element_colors = ELEMENT_COLORS
     
     # Get base color or default to gray
     base_color = element_colors.get(element_type, "#808080")
@@ -80,7 +67,7 @@ def upgrade() -> None:
     # Define tables for data insertion
     meta_element_types = table(
         'meta_element_types',
-        column('id', UUID),
+        column('id', UUID(as_uuid=True)),
         column('name', sa.String),
         column('created_date', sa.DateTime),
         column('last_change', sa.DateTime),
@@ -90,7 +77,7 @@ def upgrade() -> None:
     
     meta_element_detection_attribute_types = table(
         'meta_element_detection_attribute_types',
-        column('id', UUID),
+        column('id', UUID(as_uuid=True)),
         column('name', sa.String),
         column('created_date', sa.DateTime),
         column('last_change', sa.DateTime),
@@ -100,9 +87,9 @@ def upgrade() -> None:
     
     meta_roles = table(
         'meta_roles',
-        column('id', UUID),
-        column('meta_element_type_id', UUID),
-        column('meta_element_detection_attribute_type_id', UUID),
+        column('id', UUID(as_uuid=True)),
+        column('meta_element_type_id', UUID(as_uuid=True)),
+        column('meta_element_detection_attribute_type_id', UUID(as_uuid=True)),
         column('color', sa.String),
         column('created_date', sa.DateTime),
         column('last_change', sa.DateTime),
@@ -143,28 +130,8 @@ def upgrade() -> None:
     print(f"Inserted {len(attribute_types_data)} attribute types")
     
     # --- META ROLES ---
-    # Define element-attribute mappings
-    
-    volume_attributes = [
-        "title", "sub_title", "author", "editor", "date_issued",
-        "publisher", "part_name", "edition", 
-        "place_term", "manufacture_publisher", "manufacture_place_term",
-        "illustrator", "translator", "series_name", "series_number"
-    ]
-    
-    element_attribute_mappings = {
-        "page": ["page_number", "page_type"],
-        "title": volume_attributes,
-        "volume": volume_attributes,
-        "issue": [
-            "title", "sub_title", "part_number", "date_issued", "place_term", "publisher",
-            "manufacture_publisher", "manufacture_place_term", 
-            "redaktor"
-        ],
-        "chapter": ["title", "sub_title", "part_number"],
-        "article": ["title", "author", "abstract", "keywords"],
-        "supplement": ["title", "sub_title", "part_number", "date_issued", "author", "publisher", "place_term"]
-    }
+    # Define element-attribute mappings - use imported constant
+    element_attribute_mappings = ELEMENT_ATTRIBUTE_MAPPINGS
     
     # Create roles based on mappings
     roles_data = []

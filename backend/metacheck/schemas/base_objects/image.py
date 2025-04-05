@@ -14,7 +14,6 @@ class Image(BaseEntity):
 
     collection_id: UUID
     name: str
-    order: int
     height: int
     width: int
     confidence: Optional[float] = None
@@ -33,7 +32,6 @@ class ImageUpdate(BaseModel):
 
     id: UUID
     name: Optional[str] = None
-    order: Optional[int] = None
     work_state: Optional[WorkState] = None
     last_change: Optional[datetime] = None
     last_access: Optional[datetime] = None
