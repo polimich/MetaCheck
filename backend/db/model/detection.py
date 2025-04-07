@@ -1,11 +1,18 @@
 import uuid
-from typing import List
+from typing import List, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey, String, select, text, event
+from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 from db.model.base import Entity
 from db.model.utils import json_to_points, json_to_np_points, points_to_json
+
+# Forward references for related models
+if TYPE_CHECKING:
+    from db.model.image import Image
+    from db.model.meta_element_detection import MetaElementDetection
+    from db.model.meta_element import MetaElement
+    from db.model.meta_role import MetaRole
 
 
 class Detection(Entity):
@@ -30,7 +37,38 @@ class Detection(Entity):
         back_populates="detections",
         foreign_keys=[image_id],
     )
-
+    
+    meta_element_detections: Mapped[List["MetaElementDetection"]] = relationship(
+        "MetaElementDetection",
+        back_populates="detection",
+        foreign_keys="MetaElementDetection.detection_id",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+    
+    # Computed properties
+    computed_color: Mapped[str] = column_property(
+        select(text("meta_roles.color"))
+        .select_from(text("meta_roles"))
+        .join(text("meta_element_detections"), 
+              text("meta_roles.id = meta_element_detections.meta_role_id"))
+        .where(text("meta_element_detections.detection_id = detections.id"))
+        .scalar_subquery()
+    )
+    
+    computed_type: Mapped[str] = column_property(
+        select(text("meta_element_types.name || '.' || meta_element_detection_attribute_types.name"))
+        .select_from(text("meta_roles"))
+        .join(text("meta_element_detections"), 
+              text("meta_roles.id = meta_element_detections.meta_role_id"))
+        .join(text("meta_element_types"),
+              text("meta_roles.meta_element_type_id = meta_element_types.id"))
+        .join(text("meta_element_detection_attribute_types"),
+              text("meta_roles.meta_element_detection_attribute_type_id = meta_element_detection_attribute_types.id"))
+        .where(text("meta_element_detections.detection_id = detections.id"))
+        .scalar_subquery()
+    )
+    
     # Properties
     @property
     def np_bbox(self):
@@ -47,3 +85,17 @@ class Detection(Entity):
     @n_bbox.setter
     def n_bbox(self, ps):
         self.bbox = points_to_json(ps)
+
+@event.listens_for(Detection, "mapper_configured")
+def _add_computed_properties(mapper, cls):
+    """Add computed properties after the mapper is configured to avoid circular references."""
+    from db.model.meta_role import MetaRole
+    from db.model.meta_element_detection import MetaElementDetection
+    
+    cls.computed_display_type = column_property(
+        select(MetaRole.computed_display_name)
+        .select_from(MetaElementDetection)
+        .join(MetaRole)
+        .where(MetaElementDetection.detection_id == cls.id)
+        .scalar_subquery()
+    )

@@ -25,13 +25,7 @@ crud_router = CRUDRouter(
 )
 
 # Custom routes
-@collection_route.get("/eager/{collection_id}", tags=["Collection"])
-async def get_collections_eager(
-    collection_id: UUID, db: AsyncSession = Depends(get_async_session)
-):
-    return await crud_collection.get_collection_with_all_metadata(db, collection_id)
 
-# get all images from collection
 @collection_route.get(
     "/{collection_id}/images",
     response_model=list[base_objects.Image],
@@ -40,6 +34,7 @@ async def get_collections_eager(
 async def get_collection_images(
     collection_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
+    """Get all images belonging to a specific collection"""
     return await crud_collection.get_collection_images(db, collection_id)
 
 

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from metacheck.schemas.base_objects.base_entity import BaseEntity
 from metacheck.schemas.base_objects.detection import Detection
 from metacheck.schemas.base_objects.enums import WorkState
-
+from metacheck.schemas.base_objects.meta_element import MetaElement
 
 class Image(BaseEntity):
     """Schema for an image."""
@@ -22,7 +22,7 @@ class Image(BaseEntity):
     detections: List[Detection] = []
     detection_count: int
     annotated_detection_count: int
-
+    page_meta_element: Optional["MetaElement"] = None
     class Config:
         from_attributes = True
 

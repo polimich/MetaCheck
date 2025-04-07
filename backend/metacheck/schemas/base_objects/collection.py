@@ -32,21 +32,11 @@ class Collection(CollectionNew, BaseEntity):
     preview_image_id: Optional[UUID] = None
     preview_image_height: int
     preview_image_width: int
-
-    class Config:
-        from_attributes = True
-
-
-class CollectionWithMetadata(Collection):
-    """Schema for a collection with related entities."""
-
-    images: List["Image"] = []
-    # Meta elements by type
     meta_elements: List["MetaElement"] = []
+    images: List["Image"] = []
 
     class Config:
         from_attributes = True
-        arbitrary_types_allowed = True
 
 
 class CollectionUpdate(BaseModel):

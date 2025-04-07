@@ -1,11 +1,15 @@
 import uuid
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from db.model.collection import Collection
+# Avoid circular imports using TYPE_CHECKING
+if TYPE_CHECKING:
+    from db.model.collection import Collection
+    from db.model.image import Image
+
 from db.model.meta_element_type import MetaElementType
 from db.model.base import Entity, create_fk_relationship
 from metacheck.constants import META_ELEMENT_TYPE_IDS
@@ -19,10 +23,11 @@ class MetaElement(Entity):
         ForeignKey("collections.id", ondelete="CASCADE"), nullable=False
     )
     
+    # Use string reference to avoid circular imports
     collection: Mapped["Collection"] = relationship(
         "Collection", 
         foreign_keys=[collection_id],
-        cascade="all",
+        back_populates="meta_elements",
         lazy="selectin"
     )
 
@@ -61,7 +66,7 @@ class MetaElement(Entity):
         JSONB, default=dict, nullable=False, server_default="{}"
     )
     
-    # Relationship to Image for page elements
+    # Relationship to Image for page elements - using string reference
     image: Mapped[Optional["Image"]] = relationship(
         "Image",
         back_populates="page_meta_element",

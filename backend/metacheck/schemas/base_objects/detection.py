@@ -4,14 +4,12 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from metacheck.schemas.base_objects.base_entity import BaseEntity
-from metacheck.schemas.base_objects.detection_type import DetectionType
 
 
 class DetectionNew(BaseModel):
     """Schema for creating a new detection."""
 
     id: UUID
-    type_id: UUID
     image_id: UUID
     bbox: str
     value: str = ""
@@ -22,7 +20,9 @@ class Detection(DetectionNew, BaseEntity):
     """Schema for a detection."""
 
     annotated: bool = False
-
+    computed_color: Optional[str] = None
+    computed_type: Optional[str] = None
+    computed_display_type: Optional[str] = None
     class Config:
         from_attributes = True
 

@@ -103,11 +103,35 @@ def sqlalchemy_to_dict(obj, visited=None):
         # Special handling for Image-MetaElement relationship
         elif class_name == 'Image' and key == 'page_meta_element':
             if value is not None:
-                result[key] = {"id": getattr(value, 'id', None)}
+                result[key] = {
+                    "id": getattr(value, 'id', None),
+                    "created_date": getattr(value, 'created_date', None),
+                    "last_change": getattr(value, 'last_change', None),
+                    "last_access": getattr(value, 'last_access', None),
+                    "deleted": getattr(value, 'deleted', False),
+                    "collection_id": getattr(value, 'collection_id', None),
+                    "meta_element_type_id": getattr(value, 'meta_element_type_id', None),
+                    "parent_id": getattr(value, 'parent_id', None),
+                    "attributes": getattr(value, 'attributes', {})
+                }
         # Special handling for MetaElement-Image relationship
         elif class_name == 'MetaElement' and key == 'image':
             if value is not None:
-                result[key] = {"id": getattr(value, 'id', None)}
+                result[key] = {
+                    "id": getattr(value, 'id', None),
+                    "created_date": getattr(value, 'created_date', None),
+                    "last_change": getattr(value, 'last_change', None),
+                    "last_access": getattr(value, 'last_access', None), 
+                    "deleted": getattr(value, 'deleted', False),
+                    "collection_id": getattr(value, 'collection_id', None),
+                    "name": getattr(value, 'name', ""),
+                    "height": getattr(value, 'height', 0),
+                    "width": getattr(value, 'width', 0),
+                    "imagehash": getattr(value, 'imagehash', ""),
+                    "work_state": getattr(value, 'work_state', "new"),
+                    "detection_count": getattr(value, 'detection_count', 0),
+                    "annotated_detection_count": getattr(value, 'annotated_detection_count', 0)
+                }
         # For regular relationships
         elif isinstance(value, list):
             # List relationships

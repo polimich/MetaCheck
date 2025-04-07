@@ -1,13 +1,15 @@
 import uuid
-from typing import List, cast
+from typing import List, cast, TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, String, func, select, event, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
-from db.model.meta_element import MetaElement
-from db.model.collection import Collection
-from db.model.detection import Detection
+# Use TYPE_CHECKING to avoid circular imports
+if TYPE_CHECKING:
+    from db.model.meta_element import MetaElement
+    from db.model.collection import Collection
 
+from db.model.detection import Detection
 from db.model.base import Entity, create_fk_relationship
 from metacheck.schemas.base_objects import WorkState
 

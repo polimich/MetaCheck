@@ -5,7 +5,7 @@ import sys
 from enum import Enum
 from pprint import pprint
 from typing import List, Dict, Tuple, Optional, Union, get_args, get_origin
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, field_validator, model_serializer
 
@@ -275,11 +275,13 @@ class MetaKatImport(BaseModel):
                 return None
             text_value, confidence, det_uuid = d
             bbox = self.detection_to_bbox.get(det_uuid)
-            return {
+            detection_dict = {
+                "id": str(det_uuid),
                 "value": text_value,
                 "confidence": confidence,
-                "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None,
+                "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None
             }
+            return detection_dict
 
         def transform_page_type_detection(pt):
             if pt is None:
@@ -324,9 +326,10 @@ class MetaKatImport(BaseModel):
             if annotation == PageTypeDetection:
                 return transform_page_type_detection(value)
             return value
-
-        elements_output = []
         
+        elements_output = []
+        detections_output = []
+        page_type_detections = []
         # Group elements by type
         volumes = []
         issues = []
@@ -343,10 +346,88 @@ class MetaKatImport(BaseModel):
             # Use the Pydantic v2 API: model_fields
             model_fields = type(elem).model_fields
 
+            # First collect all detection fields
+            all_detections = []
+            
             for field_name, field_info in model_fields.items():
                 if field_name in data:
                     annotation = field_info.annotation
-                    data[field_name] = transform_any(data[field_name], annotation)
+                    original_value = data[field_name]
+                    
+                    # Convert camelCase to snake_case
+                    def camel_to_snake(name):
+                        import re
+                        name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+                        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+                    
+                    snake_field_name = camel_to_snake(field_name)
+                    
+                    # Extract detections based on their structure, not by type comparison
+                    if isinstance(original_value, tuple) and len(original_value) == 3 and \
+                       isinstance(original_value[0], str) and isinstance(original_value[1], float) and \
+                       isinstance(original_value[2], UUID):
+                        # This is a Detection tuple
+                        text, confidence, detection_uuid = original_value
+                        bbox = self.detection_to_bbox.get(detection_uuid)
+                        
+                        # Get the image_id from the detection_to_page_mapping
+                        page_id = self.detection_to_page_mapping.get(detection_uuid)
+                        
+                        detection_dict = {
+                            "id": str(detection_uuid),
+                            "value": text,
+                            "confidence": confidence,
+                            "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None,
+                            "parent_element_id": str(data.get("id")),
+                            "element_type": data.get("type"),
+                            "meta_attribute_type": snake_field_name,
+                            "page_id": page_id
+                        }
+                        
+                        # Only add to detections_output if bbox is not None
+                        if bbox:
+                            all_detections.append(detection_dict)
+                        else:
+                            # Add to page_type_detections if no bbox
+                            page_type_detections.append(detection_dict)
+                            
+                    elif isinstance(original_value, list) and original_value and isinstance(original_value[0], tuple):
+                        # Check if this is a list of Detection tuples
+                        for det in original_value:
+                            if isinstance(det, tuple) and len(det) == 3 and \
+                               isinstance(det[0], str) and isinstance(det[1], float) and \
+                               isinstance(det[2], UUID):
+                                text, confidence, detection_uuid = det
+                                bbox = self.detection_to_bbox.get(detection_uuid)
+                                
+                                # Get the image_id from the detection_to_page_mapping
+                                page_id = self.detection_to_page_mapping.get(detection_uuid)
+                                
+                                detection_dict = {
+                                    "id": str(detection_uuid),
+                                    "value": text,
+                                    "confidence": confidence,
+                                    "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None,
+                                    "parent_element_id": str(data.get("id")),
+                                    "element_type": data.get("type"),
+                                    "meta_attribute_type": snake_field_name,
+                                    "page_id": page_id
+                                }
+                                
+                                # Only add to detections_output if bbox is not None
+                                if bbox:
+                                    all_detections.append(detection_dict)
+                                else:
+                                    # Add to page_type_detections if no bbox
+                                    page_type_detections.append(detection_dict)
+                    
+                    # Transform the value as before
+                    transformed_value = transform_any(original_value, annotation)
+                    data[field_name] = transformed_value
+            
+            # Add all detections from this element to the overall list
+            detections_output.extend(all_detections)
+            
             # Convert IDs or Enums to strings if desired
             # e.g. 'id' -> str
             if "id" in data and data["id"] is not None:
@@ -393,15 +474,13 @@ class MetaKatImport(BaseModel):
             "supplements": supplements,
             "chapters": chapters,
             "articles": articles,
-            "detection_to_page_mapping": {
-                str(k): v for k, v in self.detection_to_page_mapping.items()
-            },
             "page_to_alto_mapping": (
                 {str(k): v for k, v in self.page_to_alto_mapping.items()}
                 if self.page_to_alto_mapping
                 else None
             ),
-            "detection_to_bbox": {str(k): v for k, v in self.detection_to_bbox.items()},
+            "detections": detections_output,
+            "page_type_detections": page_type_detections
         }
 
 
@@ -421,12 +500,12 @@ def main():
     # Now parse/validate
     metakat = MetaKatImport.model_validate(sample_data)
 
+    # Use the model_dump method which handles UUID serialization
     serialized = metakat.model_dump_json(indent=2)
-    json_serialized = serialized
     
     output_file_path = "./out.json"  # Specify the output file path
     with open(output_file_path, "w", encoding="utf-8") as output_file:
-        output_file.write(json_serialized)
+        output_file.write(serialized)
     print(f"Data exported to {output_file_path}")
 
 

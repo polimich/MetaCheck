@@ -39,71 +39,6 @@ async def get_collection(
         raise DBError(f"Failed reading collection from database") from e
 
 
-async def get_collection_with_all_metadata(
-    db: AsyncSession, collection_id: UUID
-) -> base_objects.CollectionWithMetadata:
-    try:
-        async with db.begin():
-            # Query the collection with all necessary relationships in a single query
-            db_collection = await db.scalar(
-                select(model.Collection)
-                .options(
-                    # Load images with their detections
-                    joinedload(model.Collection.images)
-                    .joinedload(model.Image.detections),
-                    
-                    # Load all meta elements
-                    joinedload(model.Collection.meta_elements)
-                )
-                .filter(model.Collection.id == collection_id)
-            )
-            
-            if not db_collection:
-                raise DBError(f"Collection with ID={collection_id} not found")
-            
-            # Use the improved sqlalchemy_to_dict function to safely handle circular references
-            from metacheck.cruds.crud_general import sqlalchemy_to_dict
-            collection_dict = sqlalchemy_to_dict(db_collection)
-            
-            # Process meta_elements list to categorize by type
-            meta_elements_by_type = {}
-            
-            if 'meta_elements' in collection_dict and collection_dict['meta_elements']:
-                # Initialize lists
-                meta_elements_by_type = {
-                    'titles': [],
-                    'volumes': [],
-                    'issues': [],
-                    'pages': [],
-                    'chapters': [],
-                    'articles': [],
-                    'supplements': []
-                }
-                
-                # Categorize meta elements by type
-                for element in collection_dict['meta_elements']:
-                    element_type_id = element.get('meta_element_type_id')
-                    
-                    # Reverse lookup the type name from the UUID
-                    from metacheck.constants import META_ELEMENT_TYPE_NAMES
-                    element_type = META_ELEMENT_TYPE_NAMES.get(str(element_type_id))
-                    
-                    if element_type and element_type + 's' in meta_elements_by_type:
-                        meta_elements_by_type[element_type + 's'].append(element)
-            
-            # Update the collection dict with categorized meta elements
-            collection_dict.update(meta_elements_by_type)
-            
-            # Create the Pydantic model from the dictionary
-            collection = base_objects.CollectionWithMetadata.model_validate(collection_dict)
-            
-            return collection
-
-    except exc.SQLAlchemyError as e:
-        logger.exception(f"Failed reading collection from database: {str(e)}")
-        raise DBError(f"Failed reading collection from database: {str(e)}") from e
-
-
 async def check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id: UUID):
     try:
         # Check if transaction is already in progress
@@ -118,28 +53,36 @@ async def check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id:
 
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed updating collection preview")
-        raise DBError(f"Failed updating collection preview") from e
+        # Don't raise the error as this is a non-critical operation
+        # raise DBError(f"Failed updating collection preview") from e
 
 
 async def _do_check_preview_and_set(db: AsyncSession, collection_id: UUID, image_id: UUID):
     """Internal function to check and set preview"""
-    # Update collection preview if it is null to image_id
-    db_image = await db.execute(
-        select(model.Image).filter(model.Image.id == image_id)
-    )
-    db_image = db_image.unique().scalar_one()
-    await db.execute(
-        update(model.Collection)
-        .where(
-            model.Collection.id == collection_id,
-            model.Collection.preview_image_id == None,
+    try:
+        # Update collection preview if it is null to image_id
+        db_image = await db.execute(
+            select(model.Image).filter(model.Image.id == image_id)
         )
-        .values(
-            preview_image_id=image_id,
-            preview_image_width=db_image.width,
-            preview_image_height=db_image.height,
-        )
-    )
+        db_image = db_image.unique().scalar_one_or_none()
+        
+        if db_image:
+            await db.execute(
+                update(model.Collection)
+                .where(
+                    model.Collection.id == collection_id,
+                    model.Collection.preview_image_id == None,
+                )
+                .values(
+                    preview_image_id=image_id,
+                    preview_image_width=db_image.width,
+                    preview_image_height=db_image.height,
+                )
+            )
+    except exc.NoResultFound:
+        logger.warning(f"Image {image_id} not found when trying to set preview for collection {collection_id}")
+    except Exception as e:
+        logger.warning(f"Error setting preview image: {str(e)}")
 
 
 # get all collections
@@ -354,8 +297,8 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
     
     try:
         # Import necessary modules here to avoid circular imports
-        from backend.metacheck.cruds import crud_general, crud_image, crud_meta_element
-        from backend.metacheck.schemas.metakat_object import MetaKatImport
+        from metacheck.cruds import crud_general, crud_image, crud_meta_element
+        from metacheck.schemas.metakat_object import MetaKatImport
         
         # Get the project root for resolving image paths
         current_file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -370,6 +313,16 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
                 json.loads(content.decode('utf-8'))
             )
             metakat_data = metakat_import.model_dump()
+            
+            # Log the structure of imported data for debugging
+            logger.info(f"MetaKat import data: batch_id={metakat_data.get('batch_id')}")
+            logger.info(f"Found {len(metakat_data.get('volumes', []))} volumes")
+            logger.info(f"Found {len(metakat_data.get('issues', []))} issues")
+            logger.info(f"Found {len(metakat_data.get('titles', []))} titles")
+            logger.info(f"Found {len(metakat_data.get('pages', []))} pages")
+            logger.info(f"Found {len(metakat_data.get('detections', []))} detections")
+            logger.info(f"Found {len(metakat_data.get('page_type_detections', []))} page type detections")
+            
         except json.JSONDecodeError:
             raise HTTPException(
                 status_code=400,
@@ -379,7 +332,11 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
         async with db.begin():
             # Create a new collection or check if it already exists
             collection_id = metakat_data.get("batch_id")
-            collection_name = f'Batch: {metakat_data.get("batch_id")}'
+            if not collection_id:
+                collection_id = uuid.uuid4()
+                logger.warning(f"No batch_id found in import file, generating a new collection ID: {collection_id}")
+            
+            collection_name = f'Batch: {collection_id}'
             
             # Check if collection already exists
             collection_check = await db.execute(
@@ -410,7 +367,7 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
                 await crud_general.new(db, collection.model_dump(), model.Collection, start_transaction=False)
                 logger.info(f"Created new collection: {collection_id}")
             
-            # Simple counters to track progress
+            # Initialize success counters to track progress
             success_counters = {
                 "volumes": 0,
                 "pages": 0,
@@ -418,15 +375,27 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
                 "titles": 0,
                 "supplements": 0,
                 "chapters": 0,
-                "articles": 0
+                "articles": 0,
+                "images": 0,
+                "detections": 0,
+                "meta_element_detections": 0
             }
             
-            # Process volumes - simplified
+            # Map to keep track of image_ids by page_id for later detection processing
+            page_to_image_id_map = {}
+            
+            # PHASE 1: Process all meta elements first (volumes, issues, titles, etc.)
+            logger.info("PHASE 1: Processing meta elements...")
+            
+            # Process volumes
             for volume_data in metakat_data.get("volumes", []):
                 try:
                     element_id = volume_data.get("id")
                     if not element_id:
+                        logger.warning("Found volume without ID, skipping")
                         continue
+                    
+                    logger.debug(f"Processing volume: {element_id}")
                     
                     # Check if element already exists
                     element_check = await db.execute(
@@ -438,57 +407,128 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
                         success_counters["volumes"] += 1
                         continue
                     
-                    # Create new volume with minimal attributes
+                    # Create new volume with attributes
+                    attributes = {}
+                    # Extract all relevant fields from volume_data for attributes
+                    for field in ["periodical"]:
+                        if field in volume_data:
+                            attributes[field] = volume_data.get(field)
+                    
                     volume_element = base_objects.MetaElementNew(
                         id=element_id,
                         collection_id=collection_id,
                         meta_element_type_id=META_ELEMENT_TYPE_IDS["volume"],
                         parent_id=None,
-                        attributes={
-                            "periodical": volume_data.get("periodical", False)
-                        }
+                        attributes=attributes
                     )
                     
-                    # Create directly with the simplified function
                     await crud_meta_element.create_meta_element(db, volume_element)
                     success_counters["volumes"] += 1
                     logger.info(f"Created volume: {element_id}")
                 except Exception as e:
                     logger.warning(f"Failed to process volume {volume_data.get('id')}: {e}")
             
-            # Process pages - simplified
+            # Process other element types: issues, titles, etc.
+            for element_type in ["issues", "titles", "chapters", "articles", "supplements"]:
+                if element_type in metakat_data and metakat_data[element_type]:
+                    logger.info(f"Processing {element_type}...")
+                    
+                    element_type_singular = element_type[:-1]  # Remove 's' at the end
+                    meta_element_type_id = META_ELEMENT_TYPE_IDS.get(element_type_singular)
+                    
+                    if not meta_element_type_id:
+                        logger.warning(f"No meta element type ID found for {element_type_singular}, skipping")
+                        continue
+                    
+                    for element_data in metakat_data[element_type]:
+                        try:
+                            element_id = element_data.get("id")
+                            if not element_id:
+                                logger.warning(f"Found {element_type_singular} without ID, skipping")
+                                continue
+                            
+                            logger.debug(f"Processing {element_type_singular}: {element_id}")
+                            
+                            # Check if element already exists
+                            element_check = await db.execute(
+                                select(model.MetaElement).filter(model.MetaElement.id == element_id)
+                            )
+                            if element_check.unique().scalar_one_or_none():
+                                logger.info(f"{element_type_singular.capitalize()} already exists: {element_id}")
+                                success_counters[element_type] += 1
+                                continue
+                            
+                            # Extract parent_id from data
+                            parent_id = element_data.get("parent_id")
+                            
+                            # Create element with attributes from all available fields
+                            attributes = {k: v for k, v in element_data.items() 
+                                         if k not in ["id", "parent_id", "collection_id", "type"]}
+                            
+                            element_obj = base_objects.MetaElementNew(
+                                id=element_id,
+                                collection_id=collection_id,
+                                meta_element_type_id=meta_element_type_id,
+                                parent_id=parent_id,
+                                attributes=attributes
+                            )
+                            
+                            await crud_meta_element.create_meta_element(db, element_obj)
+                            success_counters[element_type] += 1
+                            logger.info(f"Created {element_type_singular}: {element_id}")
+                        except Exception as e:
+                            logger.warning(f"Failed to process {element_type_singular} {element_data.get('id')}: {e}")
+            
+            # PHASE 2: Process pages and their images
+            logger.info("PHASE 2: Processing pages and images...")
+            
             for page_data in metakat_data.get("pages", []):
                 try:
                     element_id = page_data.get("id")
                     if not element_id:
+                        logger.warning("Found page without ID, skipping")
                         continue
+                    
+                    logger.debug(f"Processing page: {element_id}")
                     
                     # Check if element already exists
                     element_check = await db.execute(
                         select(model.MetaElement).filter(model.MetaElement.id == element_id)
                     )
                     if element_check.unique().scalar_one_or_none():
-                        # Skip if already exists
-                        logger.info(f"Page already exists: {element_id}")
-                        success_counters["pages"] += 1
-                        continue
-                    
-                    # Create with minimal attributes
-                    page_element = base_objects.MetaElementNew(
-                        id=element_id,
-                        collection_id=collection_id,
-                        meta_element_type_id=META_ELEMENT_TYPE_IDS["page"],
-                        parent_id=page_data.get("parent_id"),
-                        attributes={
+                        # Check if this page already has an image
+                        image_check = await db.execute(
+                            select(model.Image).filter(model.Image.page_meta_element_id == element_id)
+                        )
+                        existing_image = image_check.unique().scalar_one_or_none()
+                        
+                        if existing_image:
+                            logger.info(f"Page {element_id} and its image already exist")
+                            page_to_image_id_map[str(element_id)] = existing_image.id
+                            success_counters["pages"] += 1
+                            success_counters["images"] += 1
+                            continue
+                        else:
+                            logger.info(f"Page already exists: {element_id}")
+                            success_counters["pages"] += 1
+                    else:
+                        # Create the page meta element
+                        attributes = {
                             "pageIndex": page_data.get("pageIndex"),
-                            "pageType": page_data.get("pageType", {})
+                            "pageType": page_data.get("pageType", {}),
                         }
-                    )
-                    
-                    # Create directly
-                    await crud_meta_element.create_meta_element(db, page_element)
-                    success_counters["pages"] += 1
-                    logger.info(f"Created page: {element_id}")
+                        
+                        page_element = base_objects.MetaElementNew(
+                            id=element_id,
+                            collection_id=collection_id,
+                            meta_element_type_id=META_ELEMENT_TYPE_IDS["page"],
+                            parent_id=page_data.get("parent_id"),
+                            attributes=attributes
+                        )
+                        
+                        await crud_meta_element.create_meta_element(db, page_element)
+                        success_counters["pages"] += 1
+                        logger.info(f"Created page: {element_id}")
                     
                     # Process image if available
                     image_path = page_data.get("image_path")
@@ -498,8 +538,11 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
                             image_check = await db.execute(
                                 select(model.Image).filter(model.Image.page_meta_element_id == element_id)
                             )
-                            if image_check.unique().scalar_one_or_none():
+                            existing_image = image_check.unique().scalar_one_or_none()
+                            
+                            if existing_image:
                                 logger.info(f"Image already exists for page: {element_id}")
+                                page_to_image_id_map[str(element_id)] = existing_image.id
                                 continue
                                 
                             # Create new image
@@ -531,7 +574,11 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
                                     db=db,
                                     page_meta_element_id=element_id
                                 )
-                                logger.info(f"Added image for page: {element_id} with name {image_name}")
+                                logger.info(f"Added image for page: {element_id} with image ID: {image_id}")
+                                
+                                # Store the image ID for this page for later detection processing
+                                page_to_image_id_map[str(element_id)] = image_id
+                                success_counters["images"] += 1
                             except FileNotFoundError:
                                 logger.warning(f"Image file not found: {absolute_image_path}")
                         except Exception as e:
@@ -539,18 +586,123 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
                 except Exception as e:
                     logger.warning(f"Failed to process page {page_data.get('id')}: {e}")
             
-            # Handle other element types if needed (issues, titles, etc.)
-            # ...
+            # PHASE 3: Process detections
+            logger.info("PHASE 3: Processing detections...")
+            
+            # Combine regular detections and page_type_detections
+            all_detections = metakat_data.get("detections", [])
+            
+            if all_detections:
+                logger.info(f"Processing {len(all_detections)} total detections")
+            
+                # Fetch all meta roles to link detections to elements
+                meta_roles_query = await db.execute(select(model.MetaRole))
+                meta_roles = meta_roles_query.unique().scalars().all()
+                
+                # Create a lookup dictionary for meta roles by computed_name (e.g., "volume.title", "page.page_number")
+                meta_roles_by_name = {}
+                for role in meta_roles:
+                    logger.info(f"Processing meta role: {role.computed_name}")
+                    if hasattr(role, 'computed_name'):
+                        meta_roles_by_name[role.computed_name] = role.id
+                
+                logger.info(f"Found {len(meta_roles_by_name)} meta roles for classification")
+                logger.debug(f"Available meta roles: {list(meta_roles_by_name.keys())}")
+                
+                # Process each detection
+                for detection in all_detections:
+                    try:
+                        # Store all needed values from the original dictionary
+                        detection_dict = detection.copy()
+                        detection_id = UUID(detection_dict.get("id"))
+                        
+                        # First check if detection already exists
+                        detection_check = await db.execute(
+                            select(model.Detection).filter(model.Detection.id == detection_id)
+                        )
+                        if detection_check.unique().scalar_one_or_none():
+                            logger.info(f"Detection already exists: {detection_id}")
+                            success_counters["detections"] += 1
+                            continue
+                        
+                        # Get page_id from detection
+                        page_id = detection_dict.get("page_id")
+                        if not page_id:
+                            logger.warning(f"No page found for detection: {detection_id}, skipping detection")
+                            continue
+                        
+                        # Map page_id to image_id
+                        if str(page_id) not in page_to_image_id_map:
+                            logger.warning(f"No image mapping found for page: {page_id}, skipping detection {detection_id}")
+                            continue
+                            
+                        image_id = page_to_image_id_map[str(page_id)]
+                        logger.debug(f"Mapped page {page_id} to image {image_id} for detection {detection_id}")
+                        
+                        bbox_str = detection_dict.get("bbox")
+                        
+                        # Create the detection object
+                        detection_obj = base_objects.DetectionNew(
+                            id=detection_id,
+                            image_id=str(image_id),  # Ensure image_id is a string
+                            bbox=bbox_str,
+                            value=detection_dict.get("value"),
+                            confidence=detection_dict.get("confidence")
+                        )
+                        
+                        # Create the detection
+                        db_detection = model.Detection(**detection_obj.model_dump())
+                        db.add(db_detection)
+                        success_counters["detections"] += 1
+                        logger.info(f"Created detection: {detection_id}")
+                        
+                        # Process meta attribute detections using the original dictionary
+                        meta_element_id = detection_dict.get("parent_element_id")
+                        meta_element_type = detection_dict.get("element_type")
+                        meta_attribute_type = detection_dict.get("meta_attribute_type")
+                        
+                        if not meta_element_id or not meta_element_type or not meta_attribute_type:
+                            logger.warning(f"Missing metadata for detection {detection_id}: element_id={meta_element_id}, type={meta_element_type}, attr={meta_attribute_type}")
+                            continue
+                        
+                        # Find meta role for the computed name
+                        computed_name = f"{meta_element_type}.{meta_attribute_type}"
+                        meta_role_id = meta_roles_by_name.get(computed_name)
+                        if not meta_role_id:
+                            logger.warning(f"No meta role found for {computed_name}")
+                            continue
+                        
+                        # Create MetaRoleDetection
+                        meta_element_detection = base_objects.MetaElementDetectionNew(
+                            id=uuid.uuid4(),
+                            detection_id=detection_id,
+                            meta_element_id=meta_element_id,
+                            meta_role_id=meta_role_id
+                        )
+                        
+                        # Create MetaRoleDetection
+                        db_meta_element_detection = model.MetaElementDetection(**meta_element_detection.model_dump())
+                        db.add(db_meta_element_detection)  
+                        success_counters["meta_element_detections"] += 1
+                        logger.info(f"Created meta element detection for {computed_name} on element {meta_element_id}")
+                        
+                    except Exception as e:
+                        # Use the original dictionary for error reporting
+                        detection_id = detection.get("id", "unknown")
+                        logger.warning(f"Failed to process detection {detection_id}: {e}")
             
             # Update collection counts
             await db.execute(
                 update(model.Collection)
                 .where(model.Collection.id == collection_id)
                 .values(
-                    image_count=success_counters["pages"],
-                    detection_count=len(metakat_data.get("detection_to_bbox", {}))
+                    image_count=success_counters["images"],
+                    detection_count=success_counters["detections"]
                 )
             )
+            
+            logger.info(f"Import complete - collection ID: {collection_id}")
+            logger.info(f"Imported: {success_counters}")
             
             # We'll let the transaction commit automatically at the end of the with block
             
@@ -563,3 +715,4 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
     except Exception as e:
         logger.exception(f"Failed to process MetaKat import file. Error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to process the MetaKat import file: {str(e)}")
+

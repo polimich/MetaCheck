@@ -198,4 +198,61 @@ async def get_meta_element_subtree(
         raise e
     except Exception as e:
         logger.exception(f"Error retrieving meta element subtree: {str(e)}")
-        raise DBError(f"Failed to retrieve meta element subtree: {str(e)}") 
+        raise DBError(f"Failed to retrieve meta element subtree: {str(e)}")
+
+
+async def get_parent_elements_up_to_root(
+    db: AsyncSession,
+    meta_element_id: UUID
+) -> List[model.MetaElement]:
+    """
+    Get all parent elements up to the root for a given meta element.
+    
+    Args:
+        db: Database session
+        meta_element_id: ID of the meta element to start from
+        
+    Returns:
+        List of parent MetaElement objects, starting with the given element and going up to the root
+    """
+    current_element = await db.get(model.MetaElement, meta_element_id)
+    if not current_element:
+        return []
+        
+    parent_elements = [current_element]
+    while current_element.parent_id is not None:
+        current_element = await db.get(model.MetaElement, current_element.parent_id)
+        if current_element:
+            parent_elements.append(current_element)
+        else:
+            break
+            
+    return parent_elements
+
+
+async def get_parent_elements_up_to_root_from_detection(
+    db: AsyncSession,
+    detection_id: UUID
+) -> List[model.MetaElement]:
+    """
+    Get all parent elements up to the root for a given detection.
+    
+    Args:
+        db: Database session
+        detection_id: ID of the detection to start from
+        
+    Returns:
+        List of parent MetaElement objects, starting with the page meta element and going up to the root
+    """
+    # Get the detection and its associated image
+    detection = await db.get(model.Detection, detection_id)
+    if not detection:
+        return []
+        
+    # Get the image and its page meta element
+    image = await db.get(model.Image, detection.image_id)
+    if not image:
+        return []
+        
+    # Use the existing function to get parent elements from the page meta element
+    return await get_parent_elements_up_to_root(db, image.page_meta_element_id) 

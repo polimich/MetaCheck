@@ -1,9 +1,10 @@
 import logging
-from uuid import UUID
 
 from fastapi import Depends
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from metacheck.cruds import crud_meta_role
 from db import model
 from metacheck.cruds import crud_general
 from metacheck.database import get_async_session
@@ -23,6 +24,10 @@ crud_router = CRUDRouter(
     prefix="meta_role",
     tags=["MetaRole"],
 )
+
+@meta_role_route.get("/available_for_detection/{detection_id}",response_model=list[base_objects.MetaRole], tags=["MetaRole"])
+async def get_available_for_detection(detection_id: UUID, session: AsyncSession = Depends(get_async_session)):
+    return await crud_meta_role.get_available_for_detection(detection_id, session)
 
 # If needed, add custom routes below:
 # @meta_role_route.get("/custom/{param}", ...) 
