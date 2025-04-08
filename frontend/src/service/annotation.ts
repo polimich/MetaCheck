@@ -3,7 +3,7 @@ import { Annotator } from 'src/service/annotator.ts';
 import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Container } from 'konva/lib/Container';
 import type { Node } from 'konva/lib/Node';
-import { useDetectionTypesStore, useImageStore } from 'src/stores';
+import { useImageStore } from 'src/stores';
 import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 
@@ -12,7 +12,6 @@ const createAnnotation = async (
   imageId: string,
   annotations: DetectionState[],
 ) => {
-  const detectionTypesStore = useDetectionTypesStore();
   if (annotator.mode !== 'add') return;
   const pointerPosition = annotator.layer.getRelativePointerPosition();
   if (!pointerPosition) return;
@@ -21,8 +20,10 @@ const createAnnotation = async (
   newAnnotation.image_id = imageId;
   newAnnotation.x = x > 0 ? x : 0;
   newAnnotation.y = y > 0 ? y : 0;
-  newAnnotation.type_id = detectionTypesStore.detectionTypes[0].id;
-  newAnnotation.type = detectionTypesStore.detectionTypes[0];
+  newAnnotation.computed_display_type = '';
+  newAnnotation.computed_type = 'box';
+  newAnnotation.computed_color = '#000000';
+
   annotations.push(newAnnotation);
   annotator.innerToolBox.updateAnnotation(newAnnotation);
   annotator.isAnnotating = true;

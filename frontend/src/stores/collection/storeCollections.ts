@@ -1,9 +1,17 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { axios, axiosErrorHandler } from 'src/api/index';
 import { Collection, CollectionAddDto } from './types';
 import { Image, ImageAddDto } from 'src/stores';
 import { useCollectionDataAccess } from 'stores/data-access';
+import {
+  getCollections,
+  addCollection as apiAddCollection,
+  editCollection as apiEditCollection,
+  deleteCollection as apiDeleteCollection,
+  getCollectionImages,
+  uploadImage,
+  importCollection as apiImportCollection,
+} from 'src/api/services';
 
 export const useCollectionStore = defineStore('collections', () => {
   const collectionDA = useCollectionDataAccess();
@@ -12,6 +20,7 @@ export const useCollectionStore = defineStore('collections', () => {
   const collections = ref<Collection[]>([]);
   const images = ref<Image[]>([]);
   const loading = ref(false);
+  const error = ref('');
 
   // Computed property to transform collections for table view
   const getCollectionTableView = computed(() =>
@@ -36,11 +45,18 @@ export const useCollectionStore = defineStore('collections', () => {
 
   const loadCollections = async () => {
     setLoading(true);
+    error.value = '';
     try {
-      const { data } = await axios.get('collection');
-      collections.value = data;
-    } catch (error) {
-      axiosErrorHandler(error);
+      const response = await getCollections();
+      if (response.error) {
+        error.value = response.error;
+        console.error(response.error);
+      } else {
+        collections.value = response.data;
+      }
+    } catch (e) {
+      error.value = 'Failed to load collections';
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -48,11 +64,18 @@ export const useCollectionStore = defineStore('collections', () => {
 
   const addCollection = async (collection: CollectionAddDto) => {
     setLoading(true);
+    error.value = '';
     try {
-      await axios.post('collection', collection);
-      await loadCollections(); // Reload collections after adding
-    } catch (error) {
-      axiosErrorHandler(error);
+      const errorMsg = await apiAddCollection(collection);
+      if (errorMsg) {
+        error.value = errorMsg;
+        console.error(errorMsg);
+      } else {
+        await loadCollections(); // Reload collections after adding
+      }
+    } catch (e) {
+      error.value = 'Failed to add collection';
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -60,11 +83,18 @@ export const useCollectionStore = defineStore('collections', () => {
 
   const editCollection = async (collection: Collection) => {
     setLoading(true);
+    error.value = '';
     try {
-      await axios.put(`collection/${collection.id}`, collection);
-      await loadCollections(); // Reload collections after editing
-    } catch (error) {
-      axiosErrorHandler(error);
+      const errorMsg = await apiEditCollection(collection);
+      if (errorMsg) {
+        error.value = errorMsg;
+        console.error(errorMsg);
+      } else {
+        await loadCollections(); // Reload collections after editing
+      }
+    } catch (e) {
+      error.value = 'Failed to edit collection';
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -72,23 +102,37 @@ export const useCollectionStore = defineStore('collections', () => {
 
   const deleteCollection = async (id: string) => {
     setLoading(true);
+    error.value = '';
     try {
-      await axios.delete(`collection/${id}`);
-      await loadCollections(); // Reload collections after deletion
-    } catch (error) {
-      axiosErrorHandler(error);
+      const errorMsg = await apiDeleteCollection(id);
+      if (errorMsg) {
+        error.value = errorMsg;
+        console.error(errorMsg);
+      } else {
+        await loadCollections(); // Reload collections after deletion
+      }
+    } catch (e) {
+      error.value = 'Failed to delete collection';
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const getCollectionImages = async (collectionId: string) => {
+  const loadCollectionImages = async (collectionId: string) => {
     setLoading(true);
+    error.value = '';
     try {
-      const { data } = await axios.get(`/collection/${collectionId}/images`);
-      images.value = data; // Directly assign data to images
-    } catch (error) {
-      axiosErrorHandler(error);
+      const response = await getCollectionImages(collectionId);
+      if (response.error) {
+        error.value = response.error;
+        console.error(response.error);
+      } else {
+        images.value = response.data;
+      }
+    } catch (e) {
+      error.value = 'Failed to load collection images';
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -98,33 +142,36 @@ export const useCollectionStore = defineStore('collections', () => {
 
   const loadImagesInCollection = async (collectionId: string) => {
     setLoading(true);
-    await collectionDA.loadCollection(collectionId);
-    images.value = collectionDA?.collection?.images as Image[];
-
-    setLoading(false);
+    error.value = '';
+    try {
+      await collectionDA.loadCollection(collectionId);
+      if (collectionDA?.collection?.images) {
+        images.value = collectionDA.collection.images as Image[];
+      } else {
+        error.value = 'No images found in collection';
+      }
+    } catch (e) {
+      error.value = 'Failed to load images from collection';
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const uploadImageToCollection = async (imageToAdd: ImageAddDto) => {
+  const uploadImageToCollectionStore = async (imageToAdd: ImageAddDto) => {
     setLoading(true);
+    error.value = '';
     try {
-      const formData = new FormData();
-      if (imageToAdd.file) {
-        formData.append('file', imageToAdd.file);
+      const errorMsg = await uploadImage(imageToAdd);
+      if (errorMsg) {
+        error.value = errorMsg;
+        console.error(errorMsg);
       } else {
-        return;
+        await loadImagesInCollection(imageToAdd.collection_id);
       }
-      await axios.post(
-        `image/upload/${imageToAdd.collection_id}/${imageToAdd.order}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        },
-      );
-      await loadImagesInCollection(imageToAdd.collection_id);
-    } catch (error) {
-      axiosErrorHandler(error);
+    } catch (e) {
+      error.value = 'Failed to upload image to collection';
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -132,17 +179,18 @@ export const useCollectionStore = defineStore('collections', () => {
 
   const importCollection = async (file: File) => {
     setLoading(true);
+    error.value = '';
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      await axios.post('collection/import_yolo', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      await loadCollections();
-    } catch (error) {
-      axiosErrorHandler(error);
+      const errorMsg = await apiImportCollection(file);
+      if (errorMsg) {
+        error.value = errorMsg;
+        console.error(errorMsg);
+      } else {
+        await loadCollections();
+      }
+    } catch (e) {
+      error.value = 'Failed to import collection';
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -152,6 +200,7 @@ export const useCollectionStore = defineStore('collections', () => {
     collections,
     images,
     loading,
+    error,
     getCollectionTableView,
     init,
     loadCollections,
@@ -159,8 +208,8 @@ export const useCollectionStore = defineStore('collections', () => {
     addCollection,
     editCollection,
     deleteCollection,
-    getCollectionImages,
-    uploadImageToCollection,
+    loadCollectionImages,
+    uploadImageToCollection: uploadImageToCollectionStore,
     importCollection,
   };
 });

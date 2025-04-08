@@ -1,10 +1,9 @@
 import { BaseState } from 'src/types/frontend-state/base.state.ts';
 import { DetectionState } from 'src/types/frontend-state/detection.state.ts';
-import { PageState } from 'src/types/frontend-state/page.state.ts';
+import { MetaElementState } from './meta_element.state';
 
 export type ImageState = BaseState & {
   name: string;
-  order: number;
   height: number;
   width: number;
   confidence?: number;
@@ -13,14 +12,13 @@ export type ImageState = BaseState & {
   annotated_detection_count: number;
 
   detections: DetectionState[];
-  pages: PageState[];
+  page?: MetaElementState;
 };
 
 export const newImageState = (): ImageState => {
   return {
     id: '',
     name: '',
-    order: 0,
     height: 0,
     width: 0,
     confidence: 0,
@@ -28,7 +26,6 @@ export const newImageState = (): ImageState => {
     detection_count: 0,
     annotated_detection_count: 0,
     detections: [],
-    pages: [],
     edited: false,
   };
 };

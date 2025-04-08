@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import LabelEditor from 'pages/LabelEditor.vue';
+import LabelEditorPage from 'pages/LabelEditorPage.vue';
+
+defineOptions({
+  name: 'DevPage',
+});
 </script>
 
 <template>
-  <LabelEditor />
+  <LabelEditorPage />
 </template>
 
 <style scoped></style>

@@ -1,10 +1,6 @@
 import { BaseState } from 'src/types/frontend-state/base.state.ts';
 import { ImageState } from 'src/types/frontend-state/image.state.ts';
-import { VolumeState } from 'src/types/frontend-state/volume.state.ts';
-import { TitleState } from 'src/types/frontend-state/title.state.ts';
-import { IssueState } from 'src/types/frontend-state/issue.state.ts';
-import { ChapterState } from 'src/types/frontend-state/chapter.state.ts';
-import { ArticleState } from 'src/types/frontend-state/article.state.ts';
+import { MetaElementState } from 'src/types/frontend-state/meta_element.state.ts';
 
 export type CollectionState = BaseState & {
   name: string;
@@ -17,9 +13,13 @@ export type CollectionState = BaseState & {
   annotated_detection_count: number;
 
   images: ImageState[];
-  volumes: VolumeState[];
-  titles: TitleState[];
-  issues: IssueState[];
-  chapters: ChapterState[];
-  articles: ArticleState[];
+  meta_elements: MetaElementState[];
+
+  // Computed properties based on meta_elements with specific type_ids
+  // These are derived from meta_elements and not stored separately in the backend
+  volumes?: MetaElementState[];
+  titles?: MetaElementState[];
+  issues?: MetaElementState[];
+  chapters?: MetaElementState[];
+  articles?: MetaElementState[];
 };

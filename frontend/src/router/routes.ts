@@ -35,7 +35,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: ':collectionId',
         name: 'collection',
-        component: () => import('pages/CollectionDetail.vue'),
+        component: () => import('pages/CollectionDetailPage.vue'),
       },
     ],
   },
@@ -55,7 +55,7 @@ const routes: RouteRecordRaw[] = [
   // but you can also remove it
   {
     path: '/:catchAll(.*)*',
-    component: () => import('pages/ErrorNotFound.vue'),
+    component: () => import('pages/ErrorNotFoundPage.vue'),
   },
 ];
 

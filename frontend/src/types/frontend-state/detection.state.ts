@@ -1,6 +1,13 @@
 import { BaseState } from 'src/types/frontend-state/base.state.ts';
 import { v4 as uuidv4 } from 'uuid';
 
+export type MetaRoleOption = {
+  id: string;
+  label: string;
+  value: string;
+  color: string;
+};
+
 export type DetectionState = BaseState & {
   image_id: string;
   //bbox
@@ -11,19 +18,18 @@ export type DetectionState = BaseState & {
 
   confidence?: number;
   annotated: boolean;
-  type_id: string;
-  type: DetectionTypeState;
-
+  value: string;
+  computed_type: string;
+  computed_color: string;
+  computed_display_type: string;
   created_date: string;
   last_change: string;
   last_access: string;
   deleted: boolean;
-};
 
-export type DetectionTypeState = BaseState & {
-  name: string;
-  color: string;
-  display_name: string;
+  // Meta role properties
+  availableMetaRoles?: MetaRoleOption[];
+  loadingMetaRoles?: boolean;
 };
 
 export const newDetectionState = (): DetectionState => {
@@ -36,23 +42,16 @@ export const newDetectionState = (): DetectionState => {
     height: 0,
     confidence: 0,
     annotated: false,
-    type_id: '',
-    type: newDetectionTypeState(),
+    value: '',
     created_date: '',
     last_change: '',
     last_access: '',
     deleted: false,
     edited: true,
-  };
-};
-
-const newDetectionTypeState = (): DetectionTypeState => {
-  return {
-    id: '',
-    name: '',
-    color: '',
-    display_name: '',
-
-    edited: false,
+    computed_type: '',
+    computed_color: '',
+    computed_display_type: '',
+    availableMetaRoles: [],
+    loadingMetaRoles: true,
   };
 };

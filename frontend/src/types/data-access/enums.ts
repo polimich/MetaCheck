@@ -1,22 +1,18 @@
-import { BaseDA } from 'src/types/data-access/base.da.ts';
-import { DetectionDA } from 'src/types/data-access/detection.da.ts';
+export enum WorkState {
+  NEW = 'new',
+  IN_PROGRESS = 'in_progress',
+  DONE = 'done',
+  FINAL = 'final',
+}
 
-export type PageDA = BaseDA & {
-  image_id: string;
-  batch_id: string;
-  parent_id: string;
-  page_index: number;
-  page_number_id: string;
-  page_type_id: string;
-
-  page_number: DetectionDA;
-  page_type: PageTypeDetectionDA;
-};
-
-export type PageTypeDetectionDA = BaseDA & {
-  confidence?: number;
-  value: PageType;
-};
+export enum ProcessingState {
+  PRISTINE = 'pristine',
+  QUEUED = 'queued',
+  PROCESSING = 'processing',
+  ERROR = 'error',
+  DONE = 'done',
+  CANCELLED = 'cancelled',
+}
 
 export enum PageType {
   ABSTRACT = 'Abstract',

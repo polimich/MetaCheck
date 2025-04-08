@@ -1,39 +1,35 @@
 <script setup lang="ts">
-// import { useImageStore } from 'src/stores';
-import ImageDetailWithProps from 'pages/ImageDetailWithProps.vue';
+import { useImageStore } from 'src/stores';
+import ImageDetailPage from 'pages/ImageDetailPage.vue';
+import { useRoute } from 'vue-router';
+import { ref, onMounted } from 'vue';
 
-// const imageStore = useImageStore();
+defineOptions({
+  name: 'LabelEditorPage',
+});
 
-// const handleEdit = async (id: string) => {
-//   const annotations = imageStore.annotations;
-//   const annotation = annotations.find((a) => a.id === id);
-//   if (!annotation) return;
-//   annotation.type = 'edited';
-//   await imageStore.createOrUpdateDetections(
-//     '8d50bec2-4de2-411b-becb-6b3f7464273d',
-//   );
-//   await imageStore.loadDetections('8d50bec2-4de2-411b-becb-6b3f7464273d');
-// };
+const route = useRoute();
+const imageStore = useImageStore();
+const imageId = ref(route.params.imageId as string);
+const collectionId = ref(route.params.collectionId as string);
+
+// Load data when component mounts
+onMounted(async () => {
+  if (imageId.value) {
+    await imageStore.loadImage(imageId.value, collectionId.value);
+    await imageStore.loadDetections(imageId.value);
+  }
+});
 </script>
 
 <template>
-  <!--  <div>-->
-  <!--    <div v-for="annotation in imageStore.annotations" :key="annotation.id">-->
-  <!--      <div>type: {{ annotation.type }}</div>-->
-  <!--      <div>color: {{ annotation.color }}</div>-->
-  <!--    </div>-->
-  <!--  </div>-->
   <div class="row" :style="{ height: 100 + '%' }">
     <div class="col-3">List Pages</div>
     <div class="col-7 content-center">
-      <ImageDetailWithProps image-id="8d50bec2-4de2-411b-becb-6b3f7464273d" />
+      <ImageDetailPage :image-id="imageId" :collection-id="collectionId" />
     </div>
     <div class="col overflow-auto full-height">
-      <!--      <div v-for="annotation in imageStore.annotations" :key="annotation.id">-->
-      <!--        <div>type: {{ annotation.type }}</div>-->
-      <!--        <div>color: {{ annotation.color }}</div>-->
-      <!--        <button @click="handleEdit(annotation.id)">Edit</button>-->
-      <!--      </div>-->
+      <!-- List of annotations will go here -->
     </div>
   </div>
 </template>

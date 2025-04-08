@@ -1,40 +1,59 @@
 import {
-  ArticleDA,
-  ChapterDA,
+  CollectionNewDA,
+  CollectionUpdateDA,
   CollectionDA,
   DetectionDA,
+  DetectionNewDA,
   DetectionTypeDA,
+  DetectionUpdateDA,
   ImageDA,
-  IssueDA,
-  PageDA,
-  PageTypeDetectionDA,
-  TitleDA,
-  VolumeDA,
+  MetaElementDA,
+  WorkState,
 } from 'src/types/data-access';
 import {
-  ArticleState,
-  ChapterState,
   CollectionState,
   DetectionState,
-  DetectionTypeState,
   ImageState,
-  IssueState,
-  PageState,
-  PageTypeDetectionState,
-  TitleState,
-  VolumeState,
+  META_ELEMENT_TYPES,
+  MetaElementState,
+  MetaElementTypeState,
 } from 'src/types/frontend-state';
 
+// Collection mappers
 function CollectionDAtoState(collectionDA: CollectionDA): CollectionState {
-  const images = collectionDA.images.map((image) => ImageDAtoState(image));
-  const volumes = collectionDA.volumes.map((volume) => VolumeDAtoState(volume));
-  const titles = collectionDA.titles.map((title) => TitleDAtoState(title));
-  const issues = collectionDA.issues.map((issue) => IssueDAtoState(issue));
-  const chapters = collectionDA.chapters.map((chapter) =>
-    ChapterDAtoState(chapter),
+  const images = collectionDA.images.map((image: ImageDA) =>
+    ImageDAtoState(image),
   );
-  const articles = collectionDA.articles.map((article) =>
-    ArticleDAtoState(article),
+
+  // Map all meta_elements
+  const metaElements = collectionDA.meta_elements.map(
+    (metaElement: MetaElementDA) => MetaElementDAtoState(metaElement),
+  );
+
+  // Create derived meta element collections based on type_id
+  const volumes = metaElements.filter(
+    (me: MetaElementState) =>
+      me.meta_element_type_id === META_ELEMENT_TYPES.VOLUME,
+  );
+
+  const titles = metaElements.filter(
+    (me: MetaElementState) =>
+      me.meta_element_type_id === META_ELEMENT_TYPES.TITLE,
+  );
+
+  const issues = metaElements.filter(
+    (me: MetaElementState) =>
+      me.meta_element_type_id === META_ELEMENT_TYPES.ISSUE,
+  );
+
+  const chapters = metaElements.filter(
+    (me: MetaElementState) =>
+      me.meta_element_type_id === META_ELEMENT_TYPES.CHAPTER,
+  );
+
+  const articles = metaElements.filter(
+    (me: MetaElementState) =>
+      me.meta_element_type_id === META_ELEMENT_TYPES.ARTICLE,
   );
 
   return {
@@ -48,6 +67,7 @@ function CollectionDAtoState(collectionDA: CollectionDA): CollectionState {
     detection_count: collectionDA.detection_count,
     annotated_detection_count: collectionDA.annotated_detection_count,
     images: images,
+    meta_elements: metaElements,
     volumes: volumes,
     titles: titles,
     issues: issues,
@@ -57,15 +77,42 @@ function CollectionDAtoState(collectionDA: CollectionDA): CollectionState {
   };
 }
 
+function CollectionStateToDA(
+  collectionState: CollectionState,
+): CollectionUpdateDA {
+  // No meta_elements field in the update, they are updated individually
+  return {
+    id: collectionState.id,
+    name: collectionState.name,
+    description: collectionState.description,
+    info: collectionState.info,
+    work_state: collectionState.work_state as WorkState,
+  };
+}
+
+function CollectionStateToNewDA(
+  collectionState: CollectionState,
+): CollectionNewDA {
+  // No meta_elements field in the new collection, they are added separately
+  return {
+    id: collectionState.id,
+    name: collectionState.name,
+    description: collectionState.description,
+    info: collectionState.info,
+  };
+}
+
+// Image mappers
 function ImageDAtoState(imageDA: ImageDA): ImageState {
-  const detections = imageDA.detections.map((detection) =>
+  const detections = imageDA.detections.map((detection: DetectionDA) =>
     DetectionDAtoState(detection),
   );
-  const pages = imageDA.pages?.map((page) => PageDAtoState(page));
+  const page = imageDA.page_meta_element
+    ? MetaElementDAtoState(imageDA.page_meta_element)
+    : undefined;
   return {
     id: imageDA.id,
     name: imageDA.name,
-    order: imageDA.order,
     height: imageDA.height,
     width: imageDA.width,
     confidence: imageDA.confidence,
@@ -73,11 +120,12 @@ function ImageDAtoState(imageDA: ImageDA): ImageState {
     detection_count: imageDA.detection_count,
     annotated_detection_count: imageDA.annotated_detection_count,
     detections: detections,
-    pages: pages,
+    page: page,
     edited: false,
   };
 }
 
+// Detection mappers
 function DetectionDAtoState(detectionDA: DetectionDA): DetectionState {
   return {
     id: detectionDA.id,
@@ -85,16 +133,18 @@ function DetectionDAtoState(detectionDA: DetectionDA): DetectionState {
     ...bboxToObject(detectionDA.bbox),
     confidence: detectionDA.confidence,
     annotated: detectionDA.annotated,
-    type_id: detectionDA.type_id,
-    type: DetectionTypeDAtoState(detectionDA.type),
-
+    computed_type: detectionDA.computed_type,
+    computed_color: detectionDA.computed_color,
+    value: detectionDA.value,
     created_date: detectionDA.created_date,
     last_change: detectionDA.last_change,
     last_access: detectionDA.last_access,
     deleted: detectionDA.deleted,
     edited: false,
+    computed_display_type: detectionDA.computed_display_type,
   };
 }
+
 type Bbox = {
   x: number;
   y: number;
@@ -103,143 +153,13 @@ type Bbox = {
 };
 
 const bboxToObject = (bbox: string): Bbox => {
-  const [x, y, width, height] = bbox.split(';').map((v) => parseFloat(v));
+  const [x, y, width, height] = bbox.split(',').map((v) => parseFloat(v));
   return { x, y, width, height };
 };
 
 const objectToBbox = (bbox: Bbox): string => {
-  return `${bbox.x};${bbox.y};${bbox.width};${bbox.height}`;
+  return `${bbox.x},${bbox.y},${bbox.width},${bbox.height}`;
 };
-
-function DetectionTypeDAtoState(detectionTypeDA: DetectionTypeDA) {
-  return {
-    id: detectionTypeDA.id,
-    name: detectionTypeDA.name,
-    color: detectionTypeDA.color,
-    display_name: detectionTypeDA.display_name,
-    edited: false,
-  };
-}
-
-function PageDAtoState(pageDA: PageDA): PageState {
-  return {
-    id: pageDA.id,
-    page_index: pageDA.page_index,
-    page_number: DetectionDAtoState(pageDA.page_number),
-    page_type: PageTypeDAtoState(pageDA.page_type),
-    edited: false,
-  };
-}
-
-function PageTypeDAtoState(
-  pageTypeDA: PageTypeDetectionDA,
-): PageTypeDetectionState {
-  return {
-    id: pageTypeDA.id,
-    value: pageTypeDA.value,
-    confidence: pageTypeDA.confidence,
-    edited: false,
-  };
-}
-
-function VolumeDAtoState(volumeDA: VolumeDA): VolumeState {
-  return {
-    id: volumeDA.id,
-    part_number: volumeDA.part_number
-      ? DetectionDAtoState(volumeDA.part_number)
-      : undefined,
-    part_name: volumeDA.part_name
-      ? DetectionDAtoState(volumeDA.part_name)
-      : undefined,
-    date_issued: volumeDA.date_issued
-      ? DetectionDAtoState(volumeDA.date_issued)
-      : undefined,
-    title: volumeDA.title ? DetectionDAtoState(volumeDA.title) : undefined,
-    sub_title: volumeDA.sub_title
-      ? DetectionDAtoState(volumeDA.sub_title)
-      : undefined,
-    edition: volumeDA.edition
-      ? DetectionDAtoState(volumeDA.edition)
-      : undefined,
-    place_term: volumeDA.place_term
-      ? DetectionDAtoState(volumeDA.place_term)
-      : undefined,
-    series_name: volumeDA.series_name
-      ? DetectionDAtoState(volumeDA.series_name)
-      : undefined,
-    series_number: volumeDA.series_number
-      ? DetectionDAtoState(volumeDA.series_number)
-      : undefined,
-    publishers: volumeDA.publishers.map((publisher) =>
-      DetectionDAtoState(publisher),
-    ),
-    manufacture_publishers: volumeDA.manufacture_publishers.map((publisher) =>
-      DetectionDAtoState(publisher),
-    ),
-    manufacture_place_terms: volumeDA.manufacture_place_terms.map((term) =>
-      DetectionDAtoState(term),
-    ),
-    authors: volumeDA.authors.map((author) => DetectionDAtoState(author)),
-    illustrators: volumeDA.illustrators.map((illustrator) =>
-      DetectionDAtoState(illustrator),
-    ),
-    translators: volumeDA.translators.map((translator) =>
-      DetectionDAtoState(translator),
-    ),
-    editors: volumeDA.editors.map((editor) => DetectionDAtoState(editor)),
-    edited: false,
-  };
-}
-
-function TitleDAtoState(titleDA: TitleDA): TitleState {
-  return {
-    id: titleDA.id,
-    title: DetectionDAtoState(titleDA.title),
-    sub_title: DetectionDAtoState(titleDA.sub_title),
-    edited: false,
-  };
-}
-
-function IssueDAtoState(issueDA: IssueDA): IssueState {
-  return {
-    id: issueDA.id,
-    part_number: DetectionDAtoState(issueDA.part_number),
-    date_issued: DetectionDAtoState(issueDA.date_issued),
-    title: DetectionDAtoState(issueDA.title),
-    sub_title: DetectionDAtoState(issueDA.sub_title),
-    place_term: DetectionDAtoState(issueDA.place_term),
-    publishers: issueDA.publishers.map((publisher) =>
-      DetectionDAtoState(publisher),
-    ),
-    manufactures: issueDA.publishers.map((manufacturer) =>
-      DetectionDAtoState(manufacturer),
-    ),
-    redaktors: issueDA.redaktors.map((redaktor) =>
-      DetectionDAtoState(redaktor),
-    ),
-    edited: false,
-  };
-}
-
-function ChapterDAtoState(chapterDA: ChapterDA): ChapterState {
-  return {
-    id: chapterDA.id,
-    title: DetectionDAtoState(chapterDA.title),
-    sub_title: DetectionDAtoState(chapterDA.sub_title),
-    part_number: DetectionDAtoState(chapterDA.part_number),
-    page_index_start: chapterDA.page_index_start,
-    page_index_end: chapterDA.page_index_end,
-    edited: false,
-  };
-}
-
-function ArticleDAtoState(articleDA: ArticleDA): ArticleState {
-  return {
-    id: articleDA.id,
-    collection_id: articleDA.collection_id,
-    edited: false,
-  };
-}
 
 function DetectionStateToDa(detectionState: DetectionState): DetectionDA {
   return {
@@ -251,26 +171,91 @@ function DetectionStateToDa(detectionState: DetectionState): DetectionDA {
       width: detectionState.width,
       height: detectionState.height,
     }),
+    value: detectionState.value,
     confidence: detectionState.confidence,
     annotated: detectionState.annotated,
-    type_id: detectionState.type_id,
-    type: DetectionTypeStateToDA(detectionState.type),
-
+    computed_type: detectionState.computed_type,
+    computed_color: detectionState.computed_color,
     created_date: detectionState.created_date,
     last_change: detectionState.last_change,
     last_access: detectionState.last_access,
     deleted: detectionState.deleted,
+    computed_display_type: detectionState.computed_display_type,
   };
 }
 
+function DetectionStateToNewDA(detectionState: DetectionState): DetectionNewDA {
+  return {
+    id: detectionState.id,
+    image_id: detectionState.image_id,
+    bbox: objectToBbox({
+      x: detectionState.x,
+      y: detectionState.y,
+      width: detectionState.width,
+      height: detectionState.height,
+    }),
+    value: detectionState.value,
+    confidence: detectionState.confidence,
+  };
+}
+
+function DetectionStateToUpdateDA(
+  detectionState: DetectionState,
+): DetectionUpdateDA {
+  return {
+    id: detectionState.id,
+    value: detectionState.value,
+    image_id: detectionState.image_id,
+    annotated: detectionState.annotated,
+    confidence: detectionState.confidence,
+    bbox: objectToBbox({
+      x: detectionState.x,
+      y: detectionState.y,
+      width: detectionState.width,
+      height: detectionState.height,
+    }),
+    deleted: detectionState.deleted,
+  };
+}
+
+// Removed PageDAtoState and PageTypeDAtoState as these types are no longer needed
+
 function DetectionTypeStateToDA(
-  detectionTypeState: DetectionTypeState,
+  detectionTypeState: MetaElementTypeState,
 ): DetectionTypeDA {
   return {
     id: detectionTypeState.id,
     name: detectionTypeState.name,
-    color: detectionTypeState.color,
-    display_name: detectionTypeState.display_name,
+    color: '', // Add a default value since it's required in DetectionTypeDA
+    display_name: detectionTypeState.display_name || '',
+    created_date: '',
+    last_change: '',
+    last_access: '',
+    deleted: false,
+  };
+}
+
+// Meta Element mappers
+function MetaElementDAtoState(metaElementDA: MetaElementDA): MetaElementState {
+  return {
+    id: metaElementDA.id,
+    collection_id: metaElementDA.collection_id,
+    meta_element_type_id: metaElementDA.meta_element_type_id,
+    parent_id: metaElementDA.parent_id,
+    attributes: metaElementDA.attributes,
+    edited: false,
+  };
+}
+
+function MetaElementStateToDA(
+  metaElementState: MetaElementState,
+): MetaElementDA {
+  return {
+    id: metaElementState.id,
+    collection_id: metaElementState.collection_id,
+    meta_element_type_id: metaElementState.meta_element_type_id,
+    parent_id: metaElementState.parent_id,
+    attributes: metaElementState.attributes,
     created_date: '',
     last_change: '',
     last_access: '',
@@ -280,15 +265,14 @@ function DetectionTypeStateToDA(
 
 export {
   CollectionDAtoState,
+  CollectionStateToDA,
+  CollectionStateToNewDA,
   ImageDAtoState,
   DetectionDAtoState,
-  PageDAtoState,
-  PageTypeDAtoState,
-  VolumeDAtoState,
-  TitleDAtoState,
-  IssueDAtoState,
-  ChapterDAtoState,
-  ArticleDAtoState,
-  //
   DetectionStateToDa,
+  DetectionStateToNewDA,
+  DetectionStateToUpdateDA,
+  DetectionTypeStateToDA,
+  MetaElementDAtoState,
+  MetaElementStateToDA,
 };

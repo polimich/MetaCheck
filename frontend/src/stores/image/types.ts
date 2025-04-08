@@ -1,10 +1,9 @@
-import { WorkState } from 'src/stores';
+import { WorkState } from 'src/types/data-access';
 
 export interface Image {
   id: string;
   collection_id: string;
   name: string;
-  order: number;
   height: number;
   width: number;
 

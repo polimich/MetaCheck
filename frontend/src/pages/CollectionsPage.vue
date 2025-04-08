@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import { QTableProps } from 'quasar';
 import { CollectionAddDto, useCollectionStore } from 'src/stores';
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'vue-router';
 
 defineOptions({
   name: 'CollectionsPage',
 });
+
 const router = useRouter();
 const dataStore = useCollectionStore();
-dataStore.loadCollections();
+
+// Load collections when component mounts
+onMounted(async () => {
+  await dataStore.loadCollections();
+});
 
 const columns: QTableProps['columns'] = [
   {
@@ -90,15 +95,17 @@ const onRowClick = (_evt: Event, row: CollectionAddDto) => {
 <template>
   <div class="q-pa-md">
     <q-table
-      title="Collections"
       :rows="dataStore.collections"
       :columns="columns"
       :visible-columns="visibleColumns"
       row-key="name"
       :loading="dataStore.loading"
       @row-click="onRowClick"
+      class="collections-table"
     >
-      <template v-slot:top-right>
+      <template v-slot:top>
+        <div class="text-weight-bold text-h6 q-py-sm">Collections</div>
+        <q-space />
         <q-btn
           color="primary"
           label="Import"

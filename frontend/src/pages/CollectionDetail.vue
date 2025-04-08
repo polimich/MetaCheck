@@ -1,24 +1,50 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
-import { ref } from 'vue';
+import { ref, watch, onMounted } from 'vue';
 import { Image, ImageAddDto } from 'src/stores';
 import { getPreviewImage } from 'utils';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 
+defineOptions({
+  name: 'CollectionDetailPage',
+});
+
 const route = useRoute();
 const router = useRouter();
 const currentCollection = useCurrentCollectionState();
-const collectionId = route.params.collectionId as string;
-currentCollection.loadCollection(collectionId);
+const collectionId = ref(route.params.collectionId as string);
 const grid = ref(true);
 const fileTypes = 'image/*';
 
 const isAddOpen = ref(false);
 const imageToAdd = ref<ImageAddDto>({
-  collection_id: collectionId,
+  collection_id: collectionId.value,
   order: 0,
   file: undefined,
 });
+
+// Load the collection when component is mounted
+onMounted(async () => {
+  await loadCurrentCollection();
+});
+
+// Watch for route changes to reload data when navigating between collections
+watch(
+  () => route.params.collectionId,
+  async (newCollectionId) => {
+    if (newCollectionId && newCollectionId !== collectionId.value) {
+      collectionId.value = newCollectionId as string;
+      imageToAdd.value.collection_id = collectionId.value;
+      await loadCurrentCollection();
+    }
+  },
+);
+
+// Function to load the current collection
+const loadCurrentCollection = async () => {
+  await currentCollection.loadCollection(collectionId.value);
+};
+
 const onRowClick = (_evt: Event, row: Image) => {
   router.push({
     name: 'image',

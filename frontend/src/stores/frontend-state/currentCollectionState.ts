@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 import { useCollectionDataAccess } from 'stores/data-access';
 import { CollectionDAtoState, CollectionState } from 'src/types';
 import { ImageAddDto } from 'src/stores';
-import { axios, axiosErrorHandler } from 'src/api';
+import { uploadImage } from 'src/api/services';
 
 export const useCurrentCollectionState = defineStore(
   'currentCollectionState',
@@ -16,6 +16,7 @@ export const useCurrentCollectionState = defineStore(
     const loading = ref(false);
     const edited = ref(false);
     const loaded = ref(false);
+    const error = ref('');
 
     //
     const imagesGetter = computed(() => {
@@ -37,16 +38,36 @@ export const useCurrentCollectionState = defineStore(
       return;
     };
 
+    const resetState = () => {
+      collection.value = undefined;
+      loaded.value = false;
+      edited.value = false;
+      error.value = '';
+    };
+
     const loadCollection = async (collectionId: string) => {
       setLoading(true);
-      if (!collectionDA.loaded) {
+      // Reset the current state to ensure we don't show stale data
+      resetState();
+
+      try {
+        // Always load fresh data from the API, don't rely on cached data
         await collectionDA.loadCollection(collectionId);
+
+        if (collectionDA.collection) {
+          collection.value = CollectionDAtoState(collectionDA.collection);
+          loaded.value = true;
+          console.log('loaded collection', collection.value.id);
+        } else {
+          error.value = collectionDA.error || 'Failed to load collection';
+          console.error('Failed to load collection:', error.value);
+        }
+      } catch (e) {
+        error.value = 'Error loading collection';
+        console.error('Error in loadCollection:', e);
+      } finally {
+        setLoading(false);
       }
-      if (collectionDA.collection) {
-        collection.value = CollectionDAtoState(collectionDA.collection);
-      }
-      loaded.value = true;
-      setLoading(false);
     };
 
     const uploadImageToCollection = async (imageToAdd: ImageAddDto) => {
@@ -54,24 +75,10 @@ export const useCurrentCollectionState = defineStore(
       setLoading(true);
       console.log(imageToAdd);
       try {
-        const formData = new FormData();
-        if (imageToAdd.file) {
-          formData.append('file', imageToAdd.file);
-        } else {
-          return;
-        }
-        await axios.post(
-          `image/upload/${imageToAdd.collection_id}/${imageToAdd.order}`,
-          formData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          },
-        );
+        await uploadImage(imageToAdd);
         await loadCollection(imageToAdd.collection_id);
       } catch (error) {
-        axiosErrorHandler(error);
+        console.error(error);
       } finally {
         setLoading(false);
       }
@@ -99,11 +106,10 @@ export const useCurrentCollectionState = defineStore(
     };
 
     const reloadCollection = async () => {
-      if (collection.value)
-        await collectionDA.loadCollection(collection.value.id);
-      if (collectionDA.collection) {
-        collection.value = CollectionDAtoState(collectionDA.collection);
-        console.log('reloaded');
+      if (collection.value) {
+        await loadCollection(collection.value.id);
+      } else {
+        console.error('No collection loaded to reload');
       }
     };
 
@@ -112,6 +118,7 @@ export const useCurrentCollectionState = defineStore(
       loading,
       edited,
       loaded,
+      error,
       setLoading,
       init,
       loadCollection,
@@ -119,6 +126,7 @@ export const useCurrentCollectionState = defineStore(
       getImageById,
       imagesGetter,
       reloadCollection,
+      resetState,
     };
   },
 );
