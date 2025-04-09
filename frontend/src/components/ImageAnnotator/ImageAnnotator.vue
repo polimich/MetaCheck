@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
 import { getRasterImage } from 'utils';
-import { onBeforeMount, onMounted, reactive, Ref, ref, watch } from 'vue';
+import {
+  onBeforeMount,
+  onMounted,
+  reactive,
+  Ref,
+  ref,
+  watch,
+  computed,
+} from 'vue';
 import { useImageStore } from 'src/stores';
 import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Stage } from 'konva/lib/Stage';
@@ -26,14 +34,16 @@ import { DetectionState } from 'src/types';
 
 const props = defineProps({
   imageId: String,
+  collectionId: String,
 });
 
 const route = useRoute();
 const imageStore = useImageStore();
-// const currentCollectionState = useCurrentCollectionState();
-// const collectionDA = useCollectionDataAccess();
-const imageId = props.imageId ?? (route.params.imageId as string);
-const imageUrl = getRasterImage(imageId);
+const currentImageId = ref(props.imageId ?? (route.params.imageId as string));
+const currentCollectionId = ref(
+  props.collectionId ?? (route.params.collectionId as string),
+);
+const imageUrl = computed(() => getRasterImage(currentImageId.value));
 
 // Reactive variables
 const annotatorBox: Ref<HTMLDivElement | null> = ref(null);
@@ -42,6 +52,30 @@ const stage = ref<Stage | null>(null);
 const loading = ref(false);
 const dataLoaded = ref(false);
 const annotator = reactive(new Annotator());
+
+// Watch for changes in the imageId prop
+watch(
+  () => props.imageId,
+  async (newImageId) => {
+    if (newImageId && newImageId !== currentImageId.value) {
+      currentImageId.value = newImageId;
+      await reloadImageData();
+    }
+  },
+  { immediate: true },
+);
+
+// Watch for changes in the collectionId prop
+watch(
+  () => props.collectionId,
+  async (newCollectionId) => {
+    if (newCollectionId && newCollectionId !== currentCollectionId.value) {
+      currentCollectionId.value = newCollectionId;
+      await reloadImageData();
+    }
+  },
+  { immediate: true },
+);
 
 // resize observer
 let resizeObserver: ResizeObserver | null = null;
@@ -56,13 +90,27 @@ function setupResizeObserver() {
 }
 
 // functions
+const reloadImageData = async (): Promise<void> => {
+  dataLoaded.value = false;
+  try {
+    await imageStore.loadImage(currentImageId.value, currentCollectionId.value);
+    await imageStore.loadDetections(currentImageId.value);
+    dataLoaded.value = true;
+  } catch (error) {
+    console.error('Error loading image data:', error);
+  }
+};
 
 const init = async (): Promise<void> => {
   if (!isMounted.value) return;
   if (!dataLoaded.value) return;
   if (!annotatorBox.value) return;
   if (imageStore.detections) {
-    await initAnnotator(annotatorBox.value, imageUrl, imageStore.detections);
+    await initAnnotator(
+      annotatorBox.value,
+      imageUrl.value,
+      imageStore.detections,
+    );
   }
 };
 
@@ -157,10 +205,7 @@ async function handleKeyDownEvent(event: KeyboardEvent) {
 
 // lifecycle
 onBeforeMount(async () => {
-  dataLoaded.value = false;
-  await imageStore.loadImage(imageId, route.params.collectionId as string);
-  await imageStore.loadDetections(imageId);
-  dataLoaded.value = true;
+  await reloadImageData();
 });
 
 onMounted(async () => {
@@ -228,7 +273,7 @@ function addAlpha(color: string, opacity: number) {
           <v-image
             :config="annotator.imageConfig"
             @mousedown="
-              createAnnotation(annotator, imageId, imageStore.detections)
+              createAnnotation(annotator, currentImageId, imageStore.detections)
             "
           />
           <v-group
@@ -264,6 +309,9 @@ function addAlpha(color: string, opacity: number) {
           <v-transformer :config="annotator.transformerConfig" />
         </v-layer>
       </v-stage>
+      <div v-if="loading" class="loading-overlay flex flex-center">
+        <q-spinner color="primary" size="48px" />
+      </div>
     </div>
     <q-btn @click="save" class="absolute top-0 right-0" icon="save">
       Save
@@ -274,9 +322,20 @@ function addAlpha(color: string, opacity: number) {
 .annotator {
   min-width: 100%;
   max-width: 100%;
+  position: relative;
 }
 
 .container {
   height: 100%;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  z-index: 10;
 }
 </style>

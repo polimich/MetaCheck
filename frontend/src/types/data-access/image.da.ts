@@ -14,4 +14,5 @@ export type ImageDA = BaseDA & {
   annotated_detection_count: number;
   detections: DetectionDA[];
   page_meta_element: MetaElementDA;
+  order: number;
 };

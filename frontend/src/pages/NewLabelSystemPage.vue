@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ImageAnnotator, AnnotationList, PageList } from 'components';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { ref, onMounted, watch, computed } from 'vue';
 import { useImageStore } from 'src/stores';
 import { useMetaRoleStore } from 'src/stores/meta-role-store';
@@ -10,6 +10,7 @@ defineOptions({
 });
 
 const route = useRoute();
+const router = useRouter();
 const imageId = ref(route.params.imageId as string);
 const imageStore = useImageStore();
 const metaRoleStore = useMetaRoleStore();
@@ -73,13 +74,37 @@ const loadImageData = async () => {
 const handleLoadMetaRoles = async (detectionId: string) => {
   await imageStore.updateDetectionMetaRoles(detectionId);
 };
+
+// Handle image selection from PageList
+const handleSelectImage = async (selectedImageId: string) => {
+  if (selectedImageId !== imageId.value) {
+    imageId.value = selectedImageId;
+
+    // Update the route if needed to keep URL in sync
+    if (route.params.imageId !== selectedImageId) {
+      router.push({
+        name: route.name as string,
+        params: {
+          ...route.params,
+          imageId: selectedImageId,
+        },
+      });
+    }
+
+    // Load the image data
+    await loadImageData();
+  }
+};
 </script>
 
 <template>
   <q-page class="column">
     <div class="row items-stretch" style="min-height: inherit">
       <div class="col-3 flex justify-center">
-        <PageList :collection-id="collectionId" />
+        <PageList
+          :collection-id="collectionId"
+          @select-image="handleSelectImage"
+        />
       </div>
       <div class="col-5 flex justify-center">
         <div class="q-pa-md" style="width: 95%; border: 1px solid">

@@ -121,6 +121,7 @@ function ImageDAtoState(imageDA: ImageDA): ImageState {
     annotated_detection_count: imageDA.annotated_detection_count,
     detections: detections,
     page: page,
+    order: imageDA.order,
     edited: false,
   };
 }

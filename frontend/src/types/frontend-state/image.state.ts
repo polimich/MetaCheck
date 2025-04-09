@@ -10,7 +10,7 @@ export type ImageState = BaseState & {
   work_state?: string;
   detection_count: number;
   annotated_detection_count: number;
-
+  order: number;
   detections: DetectionState[];
   page?: MetaElementState;
 };
@@ -27,5 +27,6 @@ export const newImageState = (): ImageState => {
     annotated_detection_count: 0,
     detections: [],
     edited: false,
+    order: 0,
   };
 };

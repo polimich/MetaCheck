@@ -20,6 +20,27 @@ const filterType = ref(''); // Filter by detection type, empty string means all
 const filterConfidence = ref('all'); // 'all', 'low', 'medium', 'high'
 const filterEdited = ref(false); // Show only edited detections
 
+// Add debounced detections to prevent showing temporary ones
+const debouncedDetections = ref<DetectionState[]>([]);
+const debounceTimeoutId = ref<number | null>(null);
+
+// Update debounced detections with a delay
+watch(
+  () => props.detections,
+  (newDetections) => {
+    // Cancel any pending debounce
+    if (debounceTimeoutId.value !== null) {
+      clearTimeout(debounceTimeoutId.value);
+    }
+
+    // Set a timeout to update the detections after a delay
+    debounceTimeoutId.value = setTimeout(() => {
+      debouncedDetections.value = newDetections;
+    }, 300) as unknown as number; // 300ms delay
+  },
+  { immediate: true },
+);
+
 // Reset filters when detections change completely (new image loaded)
 watch(
   () => props.detections,
@@ -41,8 +62,8 @@ const previousDetectionCount = ref(0);
 
 // Compute sorted and filtered detection list
 const filteredDetections = computed(() => {
-  // Start with all detections
-  let result = [...props.detections];
+  // Start with debounced detections instead of props.detections
+  let result = [...debouncedDetections.value];
 
   // Filter by verification status
   if (filterVerification.value !== 'all') {
@@ -104,7 +125,7 @@ const filteredDetections = computed(() => {
 // Get unique detection types for the type filter
 const uniqueTypes = computed(() => {
   const types = new Set<string>();
-  props.detections.forEach((detection) => {
+  debouncedDetections.value.forEach((detection) => {
     if (detection.computed_type) {
       types.add(detection.computed_type);
     }
@@ -114,19 +135,19 @@ const uniqueTypes = computed(() => {
 
 // Compute statistics about detections
 const statistics = computed(() => {
-  const total = props.detections.length;
-  const verified = props.detections.filter((d) => d.annotated).length;
+  const total = debouncedDetections.value.length;
+  const verified = debouncedDetections.value.filter((d) => d.annotated).length;
   const unverified = total - verified;
-  const edited = props.detections.filter((d) => d.edited).length;
+  const edited = debouncedDetections.value.filter((d) => d.edited).length;
 
-  const lowConfidence = props.detections.filter(
+  const lowConfidence = debouncedDetections.value.filter(
     (d) => (d.confidence ?? 0) < 0.5,
   ).length;
-  const mediumConfidence = props.detections.filter((d) => {
+  const mediumConfidence = debouncedDetections.value.filter((d) => {
     const conf = d.confidence ?? 0;
     return conf >= 0.5 && conf < 0.8;
   }).length;
-  const highConfidence = props.detections.filter(
+  const highConfidence = debouncedDetections.value.filter(
     (d) => (d.confidence ?? 0) >= 0.8,
   ).length;
 
@@ -322,7 +343,7 @@ const resetFilters = () => {
     <div class="q-pa-xs q-mb-sm text-caption text-grey-8 flex justify-between">
       <div>
         Showing {{ filteredDetections.length }} of
-        {{ props.detections.length }} annotations
+        {{ debouncedDetections.length }} annotations
         <template v-if="filterVerification !== 'all'">
           ({{ filterVerification === 'verified' ? 'verified' : 'unverified' }}
           only)
