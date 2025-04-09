@@ -23,6 +23,7 @@ class Image(BaseEntity):
     detection_count: int
     annotated_detection_count: int
     page_meta_element: Optional["MetaElement"] = None
+    order: int
     class Config:
         from_attributes = True
 

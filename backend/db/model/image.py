@@ -91,6 +91,13 @@ def _add_computed_properties(mapper, cls):
         .scalar_subquery()
     )
     
+    # Fix: access pageIndex from the attributes JSONB field
+    from db.model.meta_element import MetaElement
     
+    cls.order = column_property(
+        select(func.cast(MetaElement.attributes['pageIndex'], String))
+        .where(MetaElement.id == cls.page_meta_element_id)
+        .scalar_subquery()  
+    )
     
 
