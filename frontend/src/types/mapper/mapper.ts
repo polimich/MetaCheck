@@ -166,21 +166,21 @@ function DetectionStateToDa(detectionState: DetectionState): DetectionDA {
   return {
     id: detectionState.id,
     image_id: detectionState.image_id,
+    annotated: detectionState.annotated,
+    confidence: detectionState.confidence,
+    value: detectionState.value,
     bbox: objectToBbox({
       x: detectionState.x,
       y: detectionState.y,
       width: detectionState.width,
       height: detectionState.height,
     }),
-    value: detectionState.value,
-    confidence: detectionState.confidence,
-    annotated: detectionState.annotated,
+    created_date: detectionState.created_date ?? new Date(),
+    last_change: detectionState.last_change ?? new Date(),
+    last_access: detectionState.last_access ?? new Date(),
+    deleted: detectionState.deleted ?? false,
     computed_type: detectionState.computed_type,
     computed_color: detectionState.computed_color,
-    created_date: detectionState.created_date,
-    last_change: detectionState.last_change,
-    last_access: detectionState.last_access,
-    deleted: detectionState.deleted,
     computed_display_type: detectionState.computed_display_type,
   };
 }

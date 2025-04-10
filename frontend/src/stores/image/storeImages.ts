@@ -205,7 +205,6 @@ export const useImageStore = defineStore('images', () => {
             (d) => d.id === detection.id,
           );
           if (index !== -1) {
-            detections.value[index].availableMetaRoles = result.data || [];
             detections.value[index].loadingMetaRoles = false;
           }
         }),
@@ -423,7 +422,6 @@ export const useImageStore = defineStore('images', () => {
       // Find and update the detection in our array
       const index = detections.value.findIndex((d) => d.id === detectionId);
       if (index !== -1) {
-        detections.value[index].availableMetaRoles = result.data || [];
         detections.value[index].loadingMetaRoles = false;
         console.log(`Updated meta roles for detection ${detectionId}`);
       } else {

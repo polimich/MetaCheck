@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ImageAnnotator, AnnotationList, PageList } from 'components';
+import { AnnotationList, PageList, ImageAnnotator } from 'components';
 import { useRoute, useRouter } from 'vue-router';
 import { ref, onMounted, watch, computed } from 'vue';
 import { useImageStore } from 'src/stores';
 import { useMetaRoleStore } from 'src/stores/meta-role-store';
-import { useLoadingState } from 'src/stores/app/loadingState';
-import { useStateManager } from 'src/stores/app/stateManager';
-import { useNotificationStore } from 'src/stores/app/notificationService';
+import {
+  useLoadingState,
+  useStateManager,
+  useNotificationStore,
+} from 'src/stores';
 import { useCurrentCollectionState } from 'src/stores/frontend-state';
 
 defineOptions({
-  name: 'NewLabelSystemPage',
+  name: 'ImageDetailPage',
 });
 
 // Setup stores and route
@@ -27,6 +29,12 @@ const currentCollection = useCurrentCollectionState();
 // Computed properties
 const detections = computed(() => imageStore.detections);
 const loadingMessage = computed(() => loadingState.currentLoadingMessage);
+
+// Component ID for loading state
+const componentId = computed(() => {
+  const currentImageId = currentCollection.selectedImageId;
+  return `annotator_${currentImageId}`;
+});
 
 // Use both route params and store state for the imageId
 const imageId = computed({
@@ -151,15 +159,9 @@ const loadImageData = async () => {
     return;
   }
 
-  // Prevent multiple simultaneous loads ONLY if the above check didn't pass
-  if (loadingState.isLoading && loadingState.currentOperation === 'imageLoad') {
-    console.log('Already loading image, skipping duplicate load request');
-    return;
-  }
-
-  // Register component-specific loading states instead of global ones
-  loadingState.setComponentLoading('annotator_' + currentImageId, true);
-  loadingState.setComponentLoading('annotationList_' + currentImageId, true);
+  // Set component-specific loading states
+  loadingState.setComponentLoading(`annotator_${currentImageId}`, true);
+  loadingState.setComponentLoading(`annotationList_${currentImageId}`, true);
 
   try {
     console.log(
@@ -192,9 +194,9 @@ const loadImageData = async () => {
     // Ensure meta roles are loaded
     if (!metaRoleStore.loaded) {
       // Use component-specific loading
-      loadingState.setComponentLoading('metaRoles_' + currentImageId, true);
+      loadingState.setComponentLoading(`metaRoles_${currentImageId}`, true);
       await metaRoleStore.loadMetaRoles();
-      loadingState.setComponentLoading('metaRoles_' + currentImageId, false);
+      loadingState.setComponentLoading(`metaRoles_${currentImageId}`, false);
     }
 
     console.log(`Loaded ${imageStore.detections.length} detections`);
@@ -209,8 +211,8 @@ const loadImageData = async () => {
     setTimeout(() => loadingState.stopLoading('criticalError'), 2000);
   } finally {
     // Clear component-specific loading states
-    loadingState.setComponentLoading('annotator_' + currentImageId, false);
-    loadingState.setComponentLoading('annotationList_' + currentImageId, false);
+    loadingState.setComponentLoading(`annotator_${currentImageId}`, false);
+    loadingState.setComponentLoading(`annotationList_${currentImageId}`, false);
   }
 };
 
@@ -257,6 +259,8 @@ const handleSelectImage = async (selectedImageId: string) => {
       <div>Image ID: {{ imageId }}</div>
       <div>Selected Image: {{ currentCollection.selectedImageId }}</div>
       <div>Detections: {{ detections.length }}</div>
+      <div>Component ID: {{ componentId }}</div>
+      <div>Loading: {{ loadingState.isComponentLoading(componentId) }}</div>
     </div>
 
     <div class="row items-stretch" style="min-height: inherit">
@@ -269,9 +273,27 @@ const handleSelectImage = async (selectedImageId: string) => {
       <div class="col-5 flex justify-center">
         <div class="q-pa-md" style="width: 95%; border: 1px solid">
           <ImageAnnotator
+            v-if="
+              currentCollection.selectedImageId &&
+              !loadingState.isComponentLoading(componentId)
+            "
             :image-id="currentCollection.selectedImageId"
             :collection-id="collectionId"
           />
+          <div
+            v-else-if="currentCollection.selectedImageId"
+            class="flex flex-center full-height"
+          >
+            <q-spinner size="50px" color="secondary" />
+          </div>
+          <div v-else class="flex flex-center full-height q-pa-md">
+            <div class="text-center">
+              <q-icon name="image" size="50px" color="grey-5" />
+              <div class="text-subtitle1 q-mt-sm">
+                Select an image from the list
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="col justify-center overflow-hidden-y">
@@ -281,7 +303,7 @@ const handleSelectImage = async (selectedImageId: string) => {
             :detections="detections"
             :loading="
               loadingState.isComponentLoading(
-                'annotationList_' + currentCollection.selectedImageId,
+                `annotationList_${currentCollection.selectedImageId}`,
               )
             "
             @load-meta-roles="handleLoadMetaRoles"

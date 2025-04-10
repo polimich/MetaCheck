@@ -67,6 +67,17 @@ const onRowClick = (_evt: Event, row: Image) => {
   });
 };
 
+const openComparisonPage = (evt: Event, row: Image) => {
+  evt.stopPropagation();
+  router.push({
+    name: 'imageCompare',
+    params: {
+      imageId: row.id,
+      collectionId: collectionId.value,
+    },
+  });
+};
+
 const handleUpload = async () => {
   console.log('handleUpload');
   await currentCollection.uploadImageToCollection(imageToAdd.value);
@@ -198,8 +209,20 @@ const onReset = () => {
               "
             >
               <q-card-section> {{ props.row.name }} </q-card-section>
-              <q-separator />
-              <q-img :src="getPreviewImage(props.row.id)" />
+              <q-img :src="getPreviewImage(props.row.id)" style="height: 200px">
+                <div class="absolute-bottom text-subtitle2 text-center">
+                  {{ props.row.name }}
+                </div>
+              </q-img>
+              <q-card-actions align="right">
+                <q-btn
+                  flat
+                  color="secondary"
+                  icon="compare"
+                  label="Compare"
+                  @click="(e) => openComparisonPage(e, props.row)"
+                />
+              </q-card-actions>
             </q-card>
           </div>
         </template>
