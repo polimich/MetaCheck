@@ -79,9 +79,20 @@ watch(
 <template>
   <div class="annotation-list">
     <!-- Loading state -->
-    <div v-if="props.loading" class="q-pa-md text-center">
-      <q-spinner color="primary" size="3em" />
-      <div class="text-subtitle1 q-mt-sm">Loading annotations...</div>
+    <div v-if="props.loading" class="q-pa-md">
+      <div class="text-subtitle1 q-pb-md">Loading annotations...</div>
+
+      <!-- Skeleton loaders -->
+      <q-item v-for="n in 5" :key="n" class="q-mb-sm">
+        <q-item-section>
+          <q-skeleton type="QChip" class="q-mb-xs" />
+          <q-skeleton type="text" width="85%" class="q-mb-xs" />
+          <q-skeleton type="text" width="65%" />
+        </q-item-section>
+        <q-item-section avatar>
+          <q-skeleton type="QAvatar" />
+        </q-item-section>
+      </q-item>
     </div>
 
     <!-- Empty state when no detections are available -->

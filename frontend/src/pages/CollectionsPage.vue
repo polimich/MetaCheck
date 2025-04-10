@@ -1,21 +1,28 @@
 <script setup lang="ts">
 import { QTableProps } from 'quasar';
-import { CollectionAddDto, useCollectionStore } from 'src/stores';
-import { ref, onMounted } from 'vue';
+import { CollectionAddDto } from 'src/stores/collection/types';
+import { useCollectionDataAccess } from 'src/stores/data-access';
+import { ref, onMounted, computed } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'vue-router';
+import { CollectionDA } from 'src/types';
+import { TableSkeleton } from 'src/components';
 
 defineOptions({
   name: 'CollectionsPage',
 });
 
 const router = useRouter();
-const dataStore = useCollectionStore();
+const collectionDA = useCollectionDataAccess();
 
 // Load collections when component mounts
 onMounted(async () => {
-  await dataStore.loadCollections();
+  await collectionDA.loadCollections();
 });
+
+// Use computed properties to reactively get data from the store
+const collections = computed(() => collectionDA.collections);
+const loading = computed(() => collectionDA.loading);
 
 const columns: QTableProps['columns'] = [
   {
@@ -34,7 +41,7 @@ const columns: QTableProps['columns'] = [
   },
   {
     align: 'left',
-    field: 'name',
+    field: 'description',
     label: 'Description',
     name: 'description',
     sortable: true,
@@ -65,7 +72,7 @@ const collectionToAdd = ref<CollectionAddDto>({
 const collectionToImport = ref<File | null>(null);
 
 const handleCreate = async () => {
-  await dataStore.addCollection(collectionToAdd.value);
+  await collectionDA.addCollection(collectionToAdd.value);
 };
 
 const handleResetAdd = () => {
@@ -76,7 +83,7 @@ const handleResetAdd = () => {
 
 const handleImport = async () => {
   if (collectionToImport.value) {
-    await dataStore.importCollection(collectionToImport.value);
+    await collectionDA.importCollection(collectionToImport.value);
   }
 };
 
@@ -84,7 +91,7 @@ const handleResetImport = () => {
   collectionToImport.value = null;
 };
 
-const onRowClick = (_evt: Event, row: CollectionAddDto) => {
+const onRowClick = (_evt: Event, row: CollectionDA) => {
   router.push({
     name: 'collection',
     params: { collectionId: row.id },
@@ -94,12 +101,16 @@ const onRowClick = (_evt: Event, row: CollectionAddDto) => {
 
 <template>
   <div class="q-pa-md">
+    <!-- Show skeleton while loading -->
+    <TableSkeleton v-if="loading" :rows="5" />
+
+    <!-- Show table when loaded -->
     <q-table
-      :rows="dataStore.collections"
+      v-else
+      :rows="collections"
       :columns="columns"
       :visible-columns="visibleColumns"
-      row-key="name"
-      :loading="dataStore.loading"
+      row-key="id"
       @row-click="onRowClick"
       class="collections-table"
     >
@@ -110,22 +121,15 @@ const onRowClick = (_evt: Event, row: CollectionAddDto) => {
           color="primary"
           label="Import"
           class="q-mx-sm"
-          :disable="dataStore.loading"
           @click="isImportOpen = true"
         />
-        <q-btn
-          round
-          color="primary"
-          icon="add"
-          :disable="dataStore.loading"
-          @click="isAddOpen = true"
-        />
+        <q-btn round color="primary" icon="add" @click="isAddOpen = true" />
 
         <q-dialog v-model="isAddOpen" @hide="handleResetAdd">
           <q-card style="min-width: 400px">
             <q-form @submit="handleCreate" @reset="handleResetAdd">
               <q-card-section>
-                <div class="text-h6">Add dialog</div>
+                <div class="text-h6">Add Collection</div>
               </q-card-section>
               <q-card-section class="q-pt-none">
                 <q-input

@@ -7,6 +7,7 @@ import { useMetaRoleStore } from 'src/stores/meta-role-store';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { useStateManager } from 'src/stores/app/stateManager';
 import { useNotificationStore } from 'src/stores/app/notificationService';
+import { useCurrentCollectionState } from 'src/stores/frontend-state';
 
 defineOptions({
   name: 'NewLabelSystemPage',
@@ -15,41 +16,61 @@ defineOptions({
 // Setup stores and route
 const route = useRoute();
 const router = useRouter();
-const imageId = ref(route.params.imageId as string);
 const collectionId = ref(route.params.collectionId as string);
 const imageStore = useImageStore();
 const metaRoleStore = useMetaRoleStore();
 const loadingState = useLoadingState();
 const stateManager = useStateManager();
 const notificationStore = useNotificationStore();
+const currentCollection = useCurrentCollectionState();
 
 // Computed properties
 const detections = computed(() => imageStore.detections);
-const isLoading = computed(() => loadingState.isLoading);
 const loadingMessage = computed(() => loadingState.currentLoadingMessage);
+
+// Use both route params and store state for the imageId
+const imageId = computed({
+  get: () => currentCollection.selectedImageId,
+  set: (value: string) => {
+    // Update collection state
+    currentCollection.selectImage(value);
+
+    // Update route if different from current route params
+    if (value !== route.params.imageId) {
+      router.push({
+        name: route.name as string,
+        params: {
+          ...route.params,
+          imageId: value,
+        },
+      });
+    }
+  },
+});
 
 // Load image and detections when component mounts
 onMounted(async () => {
-  if (imageId.value && collectionId.value) {
-    console.log(
-      `Component mounted, loading image ${imageId.value} from collection ${collectionId.value}`,
-    );
+  if (collectionId.value) {
+    console.log(`Component mounted, loading collection ${collectionId.value}`);
 
-    // Validate IDs
-    if (
-      !stateManager.validateIds({
-        lastCollectionId: collectionId.value,
-        lastImageId: imageId.value,
-      })
-    ) {
-      notificationStore.error('Invalid image or collection ID');
+    // Validate collection ID
+    if (!stateManager.validateIds({ lastCollectionId: collectionId.value })) {
+      notificationStore.error('Invalid collection ID');
       return;
     }
 
-    await loadImageData();
+    // First load the collection
+    await currentCollection.loadCollection(collectionId.value);
+
+    // If imageId is provided in route, select that image
+    const routeImageId = route.params.imageId as string;
+    if (routeImageId) {
+      currentCollection.selectImage(routeImageId);
+      await loadImageData();
+    }
   } else {
     notificationStore.error('Missing required parameters');
-    console.error('Missing required route parameters: imageId or collectionId');
+    console.error('Missing required route parameter: collectionId');
   }
 });
 
@@ -58,8 +79,8 @@ watch(
   () => route.params.imageId,
   async (newImageId) => {
     if (newImageId && newImageId !== imageId.value) {
-      console.log(`Image ID changed to ${newImageId}`);
-      imageId.value = newImageId as string;
+      console.log(`Route image ID changed to ${newImageId}`);
+      currentCollection.selectImage(newImageId as string);
       await loadImageData();
     }
   },
@@ -71,6 +92,39 @@ watch(
     if (newCollectionId && newCollectionId !== collectionId.value) {
       console.log(`Collection ID changed to ${newCollectionId}`);
       collectionId.value = newCollectionId as string;
+
+      // Load the new collection
+      await currentCollection.loadCollection(collectionId.value);
+
+      // If route has imageId, select that image in the new collection
+      const routeImageId = route.params.imageId as string;
+      if (routeImageId) {
+        currentCollection.selectImage(routeImageId);
+        await loadImageData();
+      }
+    }
+  },
+);
+
+// Also watch for changes to the selectedImageId in store
+watch(
+  () => currentCollection.selectedImageId,
+  async (newImageId, oldImageId) => {
+    if (newImageId && newImageId !== oldImageId) {
+      console.log(`Selected image changed in store to ${newImageId}`);
+
+      // Update route if needed
+      if (newImageId !== route.params.imageId) {
+        router.push({
+          name: route.name as string,
+          params: {
+            ...route.params,
+            imageId: newImageId,
+          },
+        });
+      }
+
+      // Load the image data
       await loadImageData();
     }
   },
@@ -78,27 +132,47 @@ watch(
 
 // Function to load image data
 const loadImageData = async () => {
-  // Prevent multiple simultaneous loads
-  if (isLoading.value) {
-    console.log('Already loading, skipping duplicate load request');
+  const currentImageId = currentCollection.selectedImageId;
+  if (!currentImageId) {
+    console.log('No image selected, skipping load');
     return;
   }
 
-  // Use the loading state store to manage loading
-  loadingState.startLoading('imageLoad', `Loading image ${imageId.value}`);
+  // Check if the specific image we want is already the current one in the store
+  // and if its detections are loaded (indicated by isLoaded computed property)
+  if (imageStore.image.id === currentImageId && imageStore.isLoaded) {
+    console.log(
+      `Image ${currentImageId} is already loaded in the store, skipping redundant load.`,
+    );
+    // Ensure state manager is updated if somehow missed during init
+    if (stateManager.lastImageId !== currentImageId) {
+      stateManager.updateState(collectionId.value, currentImageId);
+    }
+    return;
+  }
+
+  // Prevent multiple simultaneous loads ONLY if the above check didn't pass
+  if (loadingState.isLoading && loadingState.currentOperation === 'imageLoad') {
+    console.log('Already loading image, skipping duplicate load request');
+    return;
+  }
+
+  // Register component-specific loading states instead of global ones
+  loadingState.setComponentLoading('annotator_' + currentImageId, true);
+  loadingState.setComponentLoading('annotationList_' + currentImageId, true);
 
   try {
     console.log(
-      `Loading image ${imageId.value} from collection ${collectionId.value}`,
+      `Loading image ${currentImageId} from collection ${collectionId.value}`,
     );
 
     // First load the image data
-    await imageStore.loadImage(imageId.value, collectionId.value);
+    await imageStore.loadImage(currentImageId, collectionId.value);
 
     // Then load the detections
     if (imageStore.image.id) {
-      loadingState.startLoading('detectionsLoad', 'Loading annotations');
-      await imageStore.loadDetections(imageId.value);
+      // Use component loading instead of global loading
+      await imageStore.loadDetections(currentImageId);
 
       if (imageStore.detections.length === 0) {
         console.warn('No detections found for this image');
@@ -111,38 +185,40 @@ const loadImageData = async () => {
           `Loaded ${imageStore.detections.length} annotations`,
         );
       }
-
-      loadingState.stopLoading('detectionsLoad');
     } else {
       throw new Error('Image not loaded correctly');
     }
 
     // Ensure meta roles are loaded
     if (!metaRoleStore.loaded) {
-      loadingState.startLoading('metaRoleLoad', 'Loading meta roles');
+      // Use component-specific loading
+      loadingState.setComponentLoading('metaRoles_' + currentImageId, true);
       await metaRoleStore.loadMetaRoles();
-      loadingState.stopLoading('metaRoleLoad');
+      loadingState.setComponentLoading('metaRoles_' + currentImageId, false);
     }
 
     console.log(`Loaded ${imageStore.detections.length} detections`);
 
     // Update state manager
-    stateManager.updateState(collectionId.value, imageId.value);
+    stateManager.updateState(collectionId.value, currentImageId);
   } catch (error) {
     console.error('Error loading image data:', error);
     stateManager.handleError(error, 'Error loading image data');
     notificationStore.error('Error loading image data');
+    loadingState.startLoading('criticalError', 'Error loading image data');
+    setTimeout(() => loadingState.stopLoading('criticalError'), 2000);
   } finally {
-    loadingState.stopLoading('imageLoad');
+    // Clear component-specific loading states
+    loadingState.setComponentLoading('annotator_' + currentImageId, false);
+    loadingState.setComponentLoading('annotationList_' + currentImageId, false);
   }
 };
 
 // Handle loading meta roles for a specific detection
 const handleLoadMetaRoles = async (detectionId: string) => {
-  loadingState.startLoading(
-    'metaRoleUpdate',
-    `Loading meta roles for detection ${detectionId}`,
-  );
+  const componentId = `metaRoles_${detectionId}`;
+  loadingState.setComponentLoading(componentId, true);
+
   try {
     await imageStore.updateDetectionMetaRoles(detectionId);
   } catch (error) {
@@ -152,7 +228,7 @@ const handleLoadMetaRoles = async (detectionId: string) => {
     );
     notificationStore.error('Error loading meta roles');
   } finally {
-    loadingState.stopLoading('metaRoleUpdate');
+    loadingState.setComponentLoading(componentId, false);
   }
 };
 
@@ -160,28 +236,17 @@ const handleLoadMetaRoles = async (detectionId: string) => {
 const handleSelectImage = async (selectedImageId: string) => {
   if (selectedImageId !== imageId.value) {
     imageId.value = selectedImageId;
-
-    // Update the route if needed to keep URL in sync
-    if (route.params.imageId !== selectedImageId) {
-      router.push({
-        name: route.name as string,
-        params: {
-          ...route.params,
-          imageId: selectedImageId,
-        },
-      });
-    }
-
-    // Load the image data
-    await loadImageData();
   }
 };
 </script>
 
 <template>
   <q-page class="column">
-    <!-- Loading overlay -->
-    <div v-if="isLoading" class="loading-overlay">
+    <!-- Only show loading overlay for critical errors -->
+    <div
+      v-if="loadingState.currentOperation === 'criticalError'"
+      class="loading-overlay"
+    >
       <q-spinner color="primary" size="3em" />
       <div class="text-subtitle1 q-mt-sm">{{ loadingMessage }}</div>
     </div>
@@ -190,8 +255,8 @@ const handleSelectImage = async (selectedImageId: string) => {
     <div class="debug-info q-pa-xs bg-grey-1 text-caption" v-if="false">
       <div>Collection ID: {{ collectionId }}</div>
       <div>Image ID: {{ imageId }}</div>
+      <div>Selected Image: {{ currentCollection.selectedImageId }}</div>
       <div>Detections: {{ detections.length }}</div>
-      <div>Loading: {{ isLoading }}</div>
     </div>
 
     <div class="row items-stretch" style="min-height: inherit">
@@ -203,7 +268,10 @@ const handleSelectImage = async (selectedImageId: string) => {
       </div>
       <div class="col-5 flex justify-center">
         <div class="q-pa-md" style="width: 95%; border: 1px solid">
-          <ImageAnnotator :image-id="imageId" :collection-id="collectionId" />
+          <ImageAnnotator
+            :image-id="currentCollection.selectedImageId"
+            :collection-id="collectionId"
+          />
         </div>
       </div>
       <div class="col justify-center overflow-hidden-y">
@@ -211,7 +279,11 @@ const handleSelectImage = async (selectedImageId: string) => {
         <q-scroll-area style="height: 100%; max-width: 100%">
           <AnnotationList
             :detections="detections"
-            :loading="isLoading"
+            :loading="
+              loadingState.isComponentLoading(
+                'annotationList_' + currentCollection.selectedImageId,
+              )
+            "
             @load-meta-roles="handleLoadMetaRoles"
           />
         </q-scroll-area>

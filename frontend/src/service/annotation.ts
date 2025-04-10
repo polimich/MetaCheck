@@ -3,9 +3,9 @@ import { Annotator } from 'src/service/annotator.ts';
 import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Container } from 'konva/lib/Container';
 import type { Node } from 'konva/lib/Node';
-import { useImageStore } from 'src/stores';
 import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
+import type { useImageStore } from 'src/stores';
 
 // Create a new annotation when clicking in add mode
 const createAnnotation = async (
@@ -249,19 +249,16 @@ function adjustAnnotation(
     const targetIndex = imageStore.detections.findIndex(
       (item) => item.id === currentAnnotation.id,
     );
-
-    if (targetIndex === -1) {
+    if (targetIndex !== -1) {
+      // Mark as edited if properties changed
+      imageStore.detections[targetIndex].edited = true;
+    } else {
       console.warn(
-        `Annotation with id ${currentAnnotation.id} not found in store`,
+        `Adjusted annotation ${currentAnnotation.id} not found in store`,
       );
-      return;
     }
 
-    imageStore.detections[targetIndex].x = currentAnnotation.x;
-    imageStore.detections[targetIndex].y = currentAnnotation.y;
-    imageStore.detections[targetIndex].width = currentAnnotation.width;
-    imageStore.detections[targetIndex].height = currentAnnotation.height;
-    imageStore.detections[targetIndex].edited = true;
+    annotator.saveState(imageStore.detections);
   } catch (error) {
     console.error('Error adjusting annotation:', error);
   }

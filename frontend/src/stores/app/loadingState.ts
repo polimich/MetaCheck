@@ -1,125 +1,72 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
-
-// Types for our loading state
-interface LoadingState {
-  isLoading: boolean;
-  message: string;
-  source: string;
-  timestamp: number;
-}
+import { ref, computed } from 'vue';
 
 export const useLoadingState = defineStore('loadingState', () => {
-  // State
-  const loadingStates = ref<Record<string, LoadingState>>({});
-  const loadingHistory = ref<LoadingState[]>([]);
-  const maxHistorySize = 50;
+  // Store all active loading operations by ID
+  const loadingOperations = ref<Record<string, { message: string }>>({});
 
-  // Getters
-  const isLoading = computed(() => {
-    return Object.values(loadingStates.value).some((state) => state.isLoading);
-  });
+  // Store component-specific loading states
+  const componentLoadingStates = ref<Record<string, boolean>>({});
 
+  // Track current operation (most recent operation started)
+  const currentOperation = ref<string>('');
+
+  // Computed property to check if ANY loading operation is active
+  const isLoading = computed(
+    () => Object.keys(loadingOperations.value).length > 0,
+  );
+
+  // Get the message of the most recent loading operation
   const currentLoadingMessage = computed(() => {
-    // Get the most recent loading message
-    const loadingItems = Object.values(loadingStates.value)
-      .filter((state) => state.isLoading)
-      .sort((a, b) => b.timestamp - a.timestamp);
-
-    return loadingItems.length > 0 ? loadingItems[0].message : '';
+    const operations = Object.values(loadingOperations.value);
+    return operations.length > 0
+      ? operations[operations.length - 1].message
+      : '';
   });
 
-  const loadingSources = computed(() => {
-    return Object.values(loadingStates.value)
-      .filter((state) => state.isLoading)
-      .map((state) => state.source);
-  });
-
-  // Actions
-  const startLoading = (source: string, message = 'Loading...') => {
-    console.log(`Loading started: ${source} - ${message}`);
-
-    const loadingEvent: LoadingState = {
-      isLoading: true,
-      message,
-      source,
-      timestamp: Date.now(),
-    };
-
-    // Update the state
-    loadingStates.value = {
-      ...loadingStates.value,
-      [source]: loadingEvent,
-    };
-
-    // Add to history
-    addToHistory(loadingEvent);
-
-    return loadingEvent;
+  // Check if a specific component is loading
+  const isComponentLoading = (componentId: string): boolean => {
+    return componentLoadingStates.value[componentId] || false;
   };
 
-  const stopLoading = (source: string) => {
-    if (!loadingStates.value[source]) {
-      console.warn(
-        `Attempted to stop loading for ${source}, but it wasn't loading`,
-      );
-      return;
-    }
-
-    console.log(`Loading stopped: ${source}`);
-
-    const loadingEvent: LoadingState = {
-      ...loadingStates.value[source],
-      isLoading: false,
-      timestamp: Date.now(),
-    };
-
-    // Update the state
-    loadingStates.value = {
-      ...loadingStates.value,
-      [source]: loadingEvent,
-    };
-
-    // Add to history
-    addToHistory(loadingEvent);
-
-    return loadingEvent;
+  // Check if a particular source is loading (backward compatibility method)
+  const isSourceLoading = (source: string): boolean => {
+    return !!loadingOperations.value[source];
   };
 
-  const resetLoading = () => {
-    console.log('Resetting all loading states');
-    loadingStates.value = {};
+  // Start a global loading operation
+  const startLoading = (id: string, message: string): void => {
+    loadingOperations.value[id] = { message };
+    currentOperation.value = id;
   };
 
-  // Helper to add to history and maintain max size
-  const addToHistory = (state: LoadingState) => {
-    loadingHistory.value.unshift(state);
-
-    // Trim history if needed
-    if (loadingHistory.value.length > maxHistorySize) {
-      loadingHistory.value = loadingHistory.value.slice(0, maxHistorySize);
-    }
+  // Stop a global loading operation
+  const stopLoading = (id: string): void => {
+    delete loadingOperations.value[id];
+    // Update current operation to the most recent one or empty if none left
+    const operations = Object.keys(loadingOperations.value);
+    currentOperation.value =
+      operations.length > 0 ? operations[operations.length - 1] : '';
   };
 
-  // Check if a particular source is loading
-  const isSourceLoading = (source: string) => {
-    return loadingStates.value[source]?.isLoading || false;
+  // Set loading state for a specific component
+  const setComponentLoading = (
+    componentId: string,
+    isLoading: boolean,
+  ): void => {
+    componentLoadingStates.value[componentId] = isLoading;
   };
 
   return {
-    // State
-    loadingStates,
-    loadingHistory,
-
-    // Getters
+    loadingOperations,
+    componentLoadingStates,
+    currentOperation,
     isLoading,
     currentLoadingMessage,
-    loadingSources,
-
-    // Actions
+    isComponentLoading,
+    isSourceLoading,
     startLoading,
     stopLoading,
-    resetLoading,
-    isSourceLoading,
+    setComponentLoading,
   };
 });

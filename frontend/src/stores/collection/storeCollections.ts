@@ -3,15 +3,6 @@ import { defineStore } from 'pinia';
 import { Collection, CollectionAddDto } from './types';
 import { Image, ImageAddDto } from 'src/stores';
 import { useCollectionDataAccess } from 'stores/data-access';
-import {
-  getCollections,
-  addCollection as apiAddCollection,
-  editCollection as apiEditCollection,
-  deleteCollection as apiDeleteCollection,
-  getCollectionImages,
-  uploadImage,
-  importCollection as apiImportCollection,
-} from 'src/api/services';
 
 export const useCollectionStore = defineStore('collections', () => {
   const collectionDA = useCollectionDataAccess();
@@ -37,8 +28,7 @@ export const useCollectionStore = defineStore('collections', () => {
     loading.value = isLoading;
   };
 
-  // API Calls
-  // Collection
+  // API Calls through collectionDA
   const init = () => {
     return;
   };
@@ -47,12 +37,12 @@ export const useCollectionStore = defineStore('collections', () => {
     setLoading(true);
     error.value = '';
     try {
-      const response = await getCollections();
-      if (response.error) {
-        error.value = response.error;
-        console.error(response.error);
+      const result = await collectionDA.loadCollections();
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
       } else {
-        collections.value = response.data;
+        collections.value = collectionDA.collections as Collection[];
       }
     } catch (e) {
       error.value = 'Failed to load collections';
@@ -66,10 +56,10 @@ export const useCollectionStore = defineStore('collections', () => {
     setLoading(true);
     error.value = '';
     try {
-      const errorMsg = await apiAddCollection(collection);
-      if (errorMsg) {
-        error.value = errorMsg;
-        console.error(errorMsg);
+      const result = await collectionDA.addCollection(collection);
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
       } else {
         await loadCollections(); // Reload collections after adding
       }
@@ -85,10 +75,10 @@ export const useCollectionStore = defineStore('collections', () => {
     setLoading(true);
     error.value = '';
     try {
-      const errorMsg = await apiEditCollection(collection);
-      if (errorMsg) {
-        error.value = errorMsg;
-        console.error(errorMsg);
+      const result = await collectionDA.editCollection(collection);
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
       } else {
         await loadCollections(); // Reload collections after editing
       }
@@ -104,10 +94,10 @@ export const useCollectionStore = defineStore('collections', () => {
     setLoading(true);
     error.value = '';
     try {
-      const errorMsg = await apiDeleteCollection(id);
-      if (errorMsg) {
-        error.value = errorMsg;
-        console.error(errorMsg);
+      const result = await collectionDA.deleteCollection(id);
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
       } else {
         await loadCollections(); // Reload collections after deletion
       }
@@ -123,12 +113,12 @@ export const useCollectionStore = defineStore('collections', () => {
     setLoading(true);
     error.value = '';
     try {
-      const response = await getCollectionImages(collectionId);
-      if (response.error) {
-        error.value = response.error;
-        console.error(response.error);
+      const result = await collectionDA.loadCollectionImages(collectionId);
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
       } else {
-        images.value = response.data;
+        images.value = result.data as Image[];
       }
     } catch (e) {
       error.value = 'Failed to load collection images';
@@ -139,13 +129,15 @@ export const useCollectionStore = defineStore('collections', () => {
   };
 
   //Images
-
   const loadImagesInCollection = async (collectionId: string) => {
     setLoading(true);
     error.value = '';
     try {
-      await collectionDA.loadCollection(collectionId);
-      if (collectionDA?.collection?.images) {
+      const result = await collectionDA.loadCollection(collectionId);
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
+      } else if (collectionDA?.collection?.images) {
         images.value = collectionDA.collection.images as Image[];
       } else {
         error.value = 'No images found in collection';
@@ -162,10 +154,10 @@ export const useCollectionStore = defineStore('collections', () => {
     setLoading(true);
     error.value = '';
     try {
-      const errorMsg = await uploadImage(imageToAdd);
-      if (errorMsg) {
-        error.value = errorMsg;
-        console.error(errorMsg);
+      const result = await collectionDA.uploadImageToCollection(imageToAdd);
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
       } else {
         await loadImagesInCollection(imageToAdd.collection_id);
       }
@@ -181,10 +173,10 @@ export const useCollectionStore = defineStore('collections', () => {
     setLoading(true);
     error.value = '';
     try {
-      const errorMsg = await apiImportCollection(file);
-      if (errorMsg) {
-        error.value = errorMsg;
-        console.error(errorMsg);
+      const result = await collectionDA.importCollection(file);
+      if (result.error) {
+        error.value = result.error;
+        console.error(result.error);
       } else {
         await loadCollections();
       }

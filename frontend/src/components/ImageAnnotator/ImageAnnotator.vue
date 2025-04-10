@@ -13,6 +13,8 @@ import {
   onUnmounted,
 } from 'vue';
 import { useImageStore } from 'src/stores';
+import { useLoadingState } from 'src/stores/app/loadingState';
+import { ImageSkeleton } from 'src/components';
 import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Stage } from 'konva/lib/Stage';
 import { Annotator, leaveAnnotatorBox } from 'src/service/annotator.ts';
@@ -37,6 +39,7 @@ const props = defineProps({
 
 const route = useRoute();
 const imageStore = useImageStore();
+const loadingState = useLoadingState();
 const currentImageId = ref(props.imageId ?? (route.params.imageId as string));
 const currentCollectionId = ref(
   props.collectionId ?? (route.params.collectionId as string),
@@ -49,15 +52,28 @@ const imageUrl = computed(() => {
 const annotatorBox: Ref<HTMLDivElement | null> = ref(null);
 const isMounted = ref(false);
 const stage = ref<Stage | null>(null);
-const loading = ref(false);
 const dataLoaded = ref(false);
+const loadingMessage = ref('Loading image...');
 const annotator = reactive(new Annotator());
+
+// Register component loading with loadingState
+const componentId = computed(
+  () => `imageAnnotator_${currentImageId.value}_${currentCollectionId.value}`,
+);
+const isLoading = computed(() =>
+  loadingState.isComponentLoading(componentId.value),
+);
 
 // Watch for changes in image ID and reload data
 watch(
   () => props.imageId,
   async (newImageId) => {
     if (newImageId && newImageId !== currentImageId.value) {
+      // Reset loading state when image changes
+      if (loadingState.isComponentLoading(componentId.value)) {
+        loadingState.setComponentLoading(componentId.value, false);
+      }
+
       currentImageId.value = newImageId;
       resetLayerPosition();
 
@@ -71,11 +87,15 @@ watch(
   { immediate: true },
 );
 
-// Watch for changes in collection ID and reload data
 watch(
   () => props.collectionId,
   async (newCollectionId) => {
     if (newCollectionId && newCollectionId !== currentCollectionId.value) {
+      // Reset loading state when collection changes
+      if (loadingState.isComponentLoading(componentId.value)) {
+        loadingState.setComponentLoading(componentId.value, false);
+      }
+
       currentCollectionId.value = newCollectionId;
       resetLayerPosition();
 
@@ -88,6 +108,12 @@ watch(
   },
   { immediate: true },
 );
+
+// Update component ID when image ID changes
+watch([currentImageId, currentCollectionId], () => {
+  // This simply logs when the component ID changes, helps with debugging
+  console.log(`Component ID updated: ${componentId.value}`);
+});
 
 // Set up resize observer to handle container size changes
 let resizeObserver: ResizeObserver | null = null;
@@ -104,13 +130,14 @@ function setupResizeObserver() {
 // Load image and detection data from the store
 const reloadImageData = async (): Promise<void> => {
   // Prevent reload if already loading
-  if (loading.value || dataLoaded.value) {
+  if (isLoading.value || dataLoaded.value) {
     console.log('Already loading or data loaded, skipping duplicate reload');
     return;
   }
 
   dataLoaded.value = false;
-  loading.value = true;
+  loadingState.setComponentLoading(componentId.value, true);
+  loadingMessage.value = 'Loading image...';
 
   try {
     if (annotator.transformer) {
@@ -118,6 +145,7 @@ const reloadImageData = async (): Promise<void> => {
     }
 
     await imageStore.loadImage(currentImageId.value, currentCollectionId.value);
+    loadingMessage.value = 'Loading annotations...';
     await imageStore.loadDetections(currentImageId.value);
 
     if (stage.value) {
@@ -133,7 +161,11 @@ const reloadImageData = async (): Promise<void> => {
   } catch (error) {
     console.error('Error loading image data:', error);
   } finally {
-    loading.value = false;
+    // Keep loading until initialization completes
+    if (!stage.value) {
+      await nextTick();
+      await init();
+    }
   }
 };
 
@@ -143,35 +175,34 @@ const init = async (): Promise<void> => {
   if (!dataLoaded.value) return;
   if (!annotatorBox.value) return;
 
-  const forceReinit = true;
+  loadingState.setComponentLoading(componentId.value, true);
+  loadingMessage.value = 'Initializing annotator...';
 
-  if (forceReinit) {
-    loading.value = true;
-    await nextTick();
+  await nextTick();
 
-    try {
-      if (annotator.stage) {
-        annotator.transformer?.nodes([]);
-        annotator.innerToolBox.hide();
-      }
-
-      await initAnnotator(
-        annotatorBox.value,
-        imageUrl.value,
-        imageStore.detections,
-      );
-
-      if (imageStore.detections && imageStore.detections.length > 0) {
-        annotator.changeAnnotateMode('add');
-        annotator.stage.draw();
-      }
-    } catch (error) {
-      console.error('Error initializing annotator:', error);
-    } finally {
-      setTimeout(() => {
-        loading.value = false;
-      }, 100);
+  try {
+    if (annotator.stage) {
+      annotator.transformer?.nodes([]);
+      annotator.innerToolBox.hide();
     }
+
+    await initAnnotator(
+      annotatorBox.value,
+      imageUrl.value,
+      imageStore.detections,
+    );
+
+    if (imageStore.detections && imageStore.detections.length > 0) {
+      annotator.changeAnnotateMode('add');
+      annotator.stage.draw();
+    }
+  } catch (error) {
+    console.error('Error initializing annotator:', error);
+  } finally {
+    // Short delay to ensure the UI is stable before revealing
+    setTimeout(() => {
+      loadingState.setComponentLoading(componentId.value, false);
+    }, 100);
   }
 };
 
@@ -191,6 +222,7 @@ const initAnnotator = async (
       annotator.innerToolBox.updateAnnotation(annotations[0]);
     }
 
+    await nextTick();
     annotator.stage.draw();
   } catch (error) {
     console.error('Error in initAnnotator:', error);
@@ -217,7 +249,11 @@ onMounted(async () => {
   window.addEventListener('keydown', handleAltKeyDown);
   window.addEventListener('keyup', handleAltKeyUp);
 
-  await init();
+  // Show loading skeleton while initializing
+  loadingState.setComponentLoading(componentId.value, true);
+  loadingMessage.value = 'Initializing annotator...';
+
+  await reloadImageData();
 });
 
 // Clean up event listeners and observers on unmount
@@ -427,11 +463,6 @@ const handleMouseOver = async () => {
   }
 };
 
-// Determine when canvas should be shown
-const showCanvas = computed(() => {
-  return isMounted.value && dataLoaded.value && !loading.value;
-});
-
 // Handle end of dragging the canvas
 const dragLayerEnd = () => {
   if (annotator.mode === 'drag') {
@@ -566,17 +597,21 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
         </q-menu>
       </q-btn>
 
-      <!-- Konva stage for rendering the image and annotations -->
+      <!-- Show skeleton while loading -->
+      <ImageSkeleton v-if="isLoading" :message="loadingMessage" />
+
+      <!-- Show actual canvas when loaded -->
       <v-stage
-        v-show="showCanvas"
-        :config="annotator.stageConfig"
+        v-show="!isLoading && dataLoaded"
         ref="stage"
+        :config="annotator.stageConfig"
         :key="`stage-${currentImageId}`"
         @mousedown="
           (event: KonvaPointerEvent) =>
             startResizeAnnotation(event, annotator, imageStore.detections)
         "
       >
+        <!-- Layer with all the annotations and image -->
         <v-layer
           :config="{
             ...annotator.layerConfig,
@@ -595,6 +630,7 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
           @dragmove="dragLayer"
           @dragend="dragLayerEnd"
         >
+          <!-- Main image -->
           <v-image
             :config="{
               ...annotator.imageConfig,
@@ -604,6 +640,8 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
               createAnnotation(annotator, currentImageId, imageStore.detections)
             "
           />
+
+          <!-- Annotation groups -->
           <v-group
             v-for="item in imageStore.detections"
             :key="item.id"
@@ -635,6 +673,8 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
               "
             />
           </v-group>
+
+          <!-- Transformer for resizing annotations -->
           <v-transformer
             :config="{
               ...annotator.transformerConfig,
@@ -642,11 +682,6 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
           />
         </v-layer>
       </v-stage>
-
-      <!-- Loading spinner overlay -->
-      <div v-if="loading" class="loading-overlay flex flex-center">
-        <q-spinner color="primary" size="48px" />
-      </div>
     </div>
   </div>
 </template>
@@ -661,16 +696,6 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
 .container {
   height: 100%;
   background-color: #f0f0f0;
-}
-
-.loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 255, 0.7);
-  z-index: 10;
 }
 
 .control-panel {

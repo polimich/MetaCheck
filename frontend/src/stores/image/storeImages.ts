@@ -3,12 +3,7 @@ import { ref, computed } from 'vue';
 import { DetectionState, ImageState, newImageState } from 'src/types';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useStateManager } from 'src/stores/app/stateManager';
-import {
-  createDetection,
-  updateDetection,
-  deleteDetection as apiDeleteDetection,
-  loadMetaRolesForDetection,
-} from 'src/api/services';
+import { useCollectionDataAccess } from 'stores/data-access';
 
 // Constants
 const STORAGE_KEY = 'image-store';
@@ -17,6 +12,7 @@ export const useImageStore = defineStore('images', () => {
   // Dependencies
   const currentCollectionState = useCurrentCollectionState();
   const stateManager = useStateManager();
+  const collectionDA = useCollectionDataAccess();
 
   // State
   const image = ref<ImageState>(newImageState());
@@ -149,11 +145,18 @@ export const useImageStore = defineStore('images', () => {
 
   // Load detections for the current image
   const loadDetections = async (imageId: string) => {
+    // Ensure we have a valid image ID in the store that matches the requested ID
+    if (!image.value.id || image.value.id !== imageId) {
+      error.value = `Cannot load detections: Image ID mismatch or not loaded (requested: ${imageId}, current: ${image.value.id})`;
+      console.error(error.value);
+      return;
+    }
+
     loading.value = true;
     error.value = '';
 
     try {
-      // Verify we have the right image
+      // Verify we have the right image (redundant check now, but safe to keep)
       if (imageId !== image.value.id) {
         error.value = 'Image ID mismatch';
         console.error(`Image ID mismatch: ${imageId} vs ${image.value.id}`);
@@ -185,40 +188,33 @@ export const useImageStore = defineStore('images', () => {
       // Load meta roles for all detections in parallel
       await Promise.all(
         detections.value.map(async (detection) => {
-          return loadMetaRolesForDetection(detection.id)
-            .then(({ data, error: metaRoleError }) => {
-              if (metaRoleError) {
-                console.error(
-                  `Error loading meta roles for detection ${detection.id}:`,
-                  metaRoleError,
-                );
-                return;
-              }
+          const result = await collectionDA.getMetaRolesForDetection(
+            detection.id,
+          );
 
-              // Find and update the detection in our array
-              const index = detections.value.findIndex(
-                (d) => d.id === detection.id,
-              );
-              if (index !== -1) {
-                detections.value[index].availableMetaRoles = data;
-                detections.value[index].loadingMetaRoles = false;
-              }
-            })
-            .catch((e) => {
-              console.error(
-                `Exception loading meta roles for detection ${detection.id}:`,
-                e,
-              );
-            });
+          if (result.error) {
+            console.error(
+              `Error loading meta roles for detection ${detection.id}:`,
+              result.error,
+            );
+            return;
+          }
+
+          // Find and update the detection in our array
+          const index = detections.value.findIndex(
+            (d) => d.id === detection.id,
+          );
+          if (index !== -1) {
+            detections.value[index].availableMetaRoles = result.data || [];
+            detections.value[index].loadingMetaRoles = false;
+          }
         }),
       );
 
-      console.log('Finished loading detections and meta roles');
+      console.log('All detection meta roles loaded');
     } catch (e) {
       error.value = 'Failed to load detections';
       console.error(e);
-      detections.value = [];
-      stateManager.handleError(e, 'Failed to load detections');
     } finally {
       loading.value = false;
     }
@@ -226,186 +222,253 @@ export const useImageStore = defineStore('images', () => {
 
   // CRUD operations for detections
   const saveImage = async () => {
+    // This is a placeholder for any future functionality needed to save the image itself
+    // Currently, we only save detections, not the image
+    console.log('Save image operation placeholder');
+    return { success: true };
+  };
+
+  const createNewDetections = async () => {
+    if (detectionsToAdd.value.length === 0) {
+      console.log('No new detections to create');
+      return { success: true };
+    }
+
     loading.value = true;
     error.value = '';
+
     try {
-      await createNewDetections();
-      await updateAllDetections();
-      await deleteDetections();
-      await reloadImage();
+      console.log(`Creating ${detectionsToAdd.value.length} new detections`);
+
+      // Create all new detections in parallel
+      await Promise.all(
+        detectionsToAdd.value.map(async (detection) => {
+          const result = await collectionDA.createNewDetection(detection);
+          if (result.error) {
+            console.error(`Failed to create detection: ${result.error}`);
+          } else {
+            console.log(`Created detection: ${result.data?.id}`);
+          }
+        }),
+      );
+
+      // Clear the list of detections to add
+      detectionsToAdd.value = [];
+
+      return { success: true };
     } catch (e) {
-      error.value = 'Failed to save image';
+      error.value = 'Failed to create new detections';
       console.error(e);
+      return { success: false, error: error.value };
     } finally {
       loading.value = false;
     }
   };
 
-  const createNewDetections = async () => {
-    error.value = '';
-    detectionsToAdd.value = detections.value.filter(
-      (detection) => detectionIdsBackup.value.indexOf(detection.id) === -1,
-    );
-
-    if (detectionsToAdd.value.length === 0) {
-      console.log('No new detections to create');
-      return;
-    }
-
-    console.log(`Creating ${detectionsToAdd.value.length} new detections`);
-
-    const errors: string[] = [];
-    for (const detection of detectionsToAdd.value) {
-      console.log('Creating detection', detection);
-      const err = await createDetection(detection);
-      if (err) {
-        errors.push(`Failed to create detection: ${err}`);
-      }
-    }
-
-    if (errors.length > 0) {
-      error.value = errors.join('; ');
-      console.error('Errors creating detections:', error.value);
-    } else {
-      console.log('All new detections created successfully');
-    }
-  };
-
   const updateAllDetections = async () => {
-    error.value = '';
-    const detectionsToUpdate = detections.value.filter(
-      (detection) =>
-        detection.edited && detectionIdsBackup.value.includes(detection.id),
-    );
-
-    if (detectionsToUpdate.length === 0) {
+    if (detections.value.length === 0) {
       console.log('No detections to update');
-      return;
+      return { success: true };
     }
 
-    console.log(`Updating ${detectionsToUpdate.length} detections`);
+    loading.value = true;
+    error.value = '';
 
-    const errors: string[] = [];
-    for (const detection of detectionsToUpdate) {
-      const err = await updateDetection(detection);
-      if (err) {
-        errors.push(`Failed to update detection: ${err}`);
-      }
-    }
+    try {
+      console.log(`Updating ${detections.value.length} detections`);
 
-    if (errors.length > 0) {
-      error.value = errors.join('; ');
-      console.error('Errors updating detections:', error.value);
-    } else {
-      console.log('All detections updated successfully');
+      // Update all detections in parallel
+      await Promise.all(
+        detections.value.map(async (detection) => {
+          const result = await collectionDA.updateExistingDetection(detection);
+          if (result.error) {
+            console.error(
+              `Failed to update detection ${detection.id}: ${result.error}`,
+            );
+          } else {
+            console.log(`Updated detection: ${detection.id}`);
+          }
+        }),
+      );
+
+      return { success: true };
+    } catch (e) {
+      error.value = 'Failed to update detections';
+      console.error(e);
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
     }
   };
 
   const deleteDetections = async () => {
-    error.value = '';
-
     if (detectionsToDelete.value.length === 0) {
       console.log('No detections to delete');
-      return;
+      return { success: true };
     }
 
-    console.log(`Deleting ${detectionsToDelete.value.length} detections`);
+    loading.value = true;
+    error.value = '';
 
-    const errors: string[] = [];
-    for (const detection of detectionsToDelete.value) {
-      const err = await deleteDetection(detection);
-      if (err) {
-        errors.push(err);
-      }
-    }
+    try {
+      console.log(`Deleting ${detectionsToDelete.value.length} detections`);
 
-    if (errors.length > 0) {
-      error.value = errors.join('; ');
-      console.error('Errors deleting detections:', error.value);
-    } else {
-      console.log('All detections deleted successfully');
+      // Delete all marked detections in parallel
+      await Promise.all(
+        detectionsToDelete.value.map(async (detection) => {
+          const result = await collectionDA.deleteDetection(detection.id);
+          if (result.error) {
+            console.error(
+              `Failed to delete detection ${detection.id}: ${result.error}`,
+            );
+          } else {
+            console.log(`Deleted detection: ${detection.id}`);
+          }
+        }),
+      );
+
+      // Clear the list of detections to delete
+      detectionsToDelete.value = [];
+
+      return { success: true };
+    } catch (e) {
+      error.value = 'Failed to delete detections';
+      console.error(e);
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
     }
   };
 
   const deleteDetection = async (
     detection: DetectionState,
   ): Promise<string> => {
+    loading.value = true;
+    error.value = '';
+
     try {
       console.log(`Deleting detection ${detection.id}`);
-      const err = await apiDeleteDetection(detection.id);
-      if (err) {
-        error.value = `Failed to delete detection: ${err}`;
-        console.error(error.value);
-        return err;
+
+      const result = await collectionDA.deleteDetection(detection.id);
+
+      if (result.error) {
+        error.value = result.error;
+        console.error(`Failed to delete detection: ${result.error}`);
+        return error.value;
       }
-      detectionsToDelete.value = detectionsToDelete.value.filter(
-        (d) => d.id !== detection.id,
-      );
-      console.log(`Detection ${detection.id} deleted successfully`);
+
+      // Remove from our local array too
+      const index = detections.value.findIndex((d) => d.id === detection.id);
+      if (index !== -1) {
+        detections.value.splice(index, 1);
+      }
+
+      console.log(`Deleted detection: ${detection.id}`);
       return '';
     } catch (e) {
-      const errorMsg = 'Failed to delete detection';
-      error.value = errorMsg;
+      error.value = 'Failed to delete detection';
       console.error(e);
-      return errorMsg;
+      return error.value;
+    } finally {
+      loading.value = false;
     }
   };
 
   const reloadImage = async () => {
+    if (!image.value?.id || !lastCollectionId.value) {
+      console.error('Cannot reload image: no image or collection ID');
+      return;
+    }
+
+    loading.value = true;
     error.value = '';
+
     try {
-      console.log('Reloading image after changes');
-      // Prevent infinite loading loop - only reload if we're not already loading
-      if (!loading.value && !currentCollectionState.loading) {
-        await currentCollectionState.reloadCollection();
-        const currentImage = currentCollectionState.getImageById(
-          image.value.id,
-        );
-        if (currentImage) {
-          image.value = currentImage;
-          console.log('Image reloaded successfully');
-        } else {
-          error.value = 'Image not found';
-          console.error('Image not found after reload');
-        }
-      } else {
-        console.log('Skipping reload - already loading');
-      }
+      console.log(`Reloading image ${image.value.id}`);
+
+      // First reload the collection to get fresh data
+      await currentCollectionState.reloadCollection();
+
+      // Then reload the image from the updated collection
+      await loadImage(image.value.id, lastCollectionId.value);
+
+      // Finally reload the detections for the image
+      await loadDetections(image.value.id);
+
+      console.log('Image reloaded successfully');
     } catch (e) {
       error.value = 'Failed to reload image';
-      console.error('Error reloading image:', e);
+      console.error(e);
+    } finally {
+      loading.value = false;
     }
   };
 
   // Add a method to update a detection's meta roles
   const updateDetectionMetaRoles = async (detectionId: string) => {
-    const index = detections.value.findIndex((d) => d.id === detectionId);
-    if (index === -1) {
-      console.error(
-        `Detection ${detectionId} not found, cannot update meta roles`,
-      );
-      return;
-    }
-
-    console.log(`Updating meta roles for detection ${detectionId}`);
+    loading.value = true;
+    error.value = '';
 
     try {
-      detections.value[index].loadingMetaRoles = true;
-      const { data, error: metaRoleError } =
-        await loadMetaRolesForDetection(detectionId);
+      console.log(`Updating meta roles for detection ${detectionId}`);
 
-      if (metaRoleError) {
-        error.value = `Failed to load meta roles: ${metaRoleError}`;
-        console.error(error.value);
+      const result = await collectionDA.getMetaRolesForDetection(detectionId);
+
+      if (result.error) {
+        error.value = result.error;
+        console.error(`Failed to load meta roles: ${result.error}`);
+        return;
+      }
+
+      // Find and update the detection in our array
+      const index = detections.value.findIndex((d) => d.id === detectionId);
+      if (index !== -1) {
+        detections.value[index].availableMetaRoles = result.data || [];
+        detections.value[index].loadingMetaRoles = false;
+        console.log(`Updated meta roles for detection ${detectionId}`);
       } else {
-        detections.value[index].availableMetaRoles = data;
-        console.log(`Meta roles updated for detection ${detectionId}`);
+        console.error(`Detection ${detectionId} not found in local state`);
       }
     } catch (e) {
-      error.value = 'Failed to update meta roles';
-      console.error('Error updating meta roles:', e);
+      error.value = 'Failed to update detection meta roles';
+      console.error(e);
     } finally {
-      detections.value[index].loadingMetaRoles = false;
+      loading.value = false;
+    }
+  };
+
+  // Combine all operations in a single save method
+  const saveAllChanges = async () => {
+    loading.value = true;
+    error.value = '';
+
+    try {
+      // Execute all operations in sequence
+      const createResult = await createNewDetections();
+      if (!createResult.success) {
+        return createResult;
+      }
+
+      const updateResult = await updateAllDetections();
+      if (!updateResult.success) {
+        return updateResult;
+      }
+
+      const deleteResult = await deleteDetections();
+      if (!deleteResult.success) {
+        return deleteResult;
+      }
+
+      // Reload image to refresh state after all changes
+      await reloadImage();
+
+      return { success: true };
+    } catch (e) {
+      error.value = 'Failed to save all changes';
+      console.error(e);
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
     }
   };
 
@@ -415,19 +478,28 @@ export const useImageStore = defineStore('images', () => {
     detections,
     loading,
     error,
-    detectionsToDelete,
     lastImageId,
     lastCollectionId,
+    detectionsToAdd,
+    detectionsToDelete,
 
-    // Getters
+    // Computed
     isLoaded,
 
-    // Actions
+    // Methods
     init,
-    resetState,
     loadImage,
     loadDetections,
     saveImage,
+    createNewDetections,
+    updateAllDetections,
+    deleteDetections,
+    deleteDetection,
+    reloadImage,
     updateDetectionMetaRoles,
+    saveAllChanges,
+    resetState,
+    persistState,
+    clearPersistedState,
   };
 });

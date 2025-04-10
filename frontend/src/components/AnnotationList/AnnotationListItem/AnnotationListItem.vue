@@ -89,11 +89,14 @@ const saveDetection = async () => {
     'Saving annotation...',
   );
   try {
-    console.log(`Saving detection ${detection.value.id}`);
-    await imageStore.saveImage();
-    console.log(`Detection ${detection.value.id} saved`);
+    console.log(`Saving changes for detection ${detection.value.id}`);
+    await imageStore.saveAllChanges();
+    console.log(`Changes involving detection ${detection.value.id} saved`);
   } catch (error) {
-    console.error(`Error saving detection ${detection.value.id}:`, error);
+    console.error(
+      `Error saving changes for detection ${detection.value.id}:`,
+      error,
+    );
   } finally {
     loadingState.stopLoading(`saveDetection-${detection.value.id}`);
   }

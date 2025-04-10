@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import {
   useImageConfidence,
@@ -22,8 +21,6 @@ const emit = defineEmits<{
   (e: 'select-image', imageId: string): void;
 }>();
 
-const router = useRouter();
-const route = useRoute();
 const currentCollection = useCurrentCollectionState();
 
 // View mode options
@@ -81,7 +78,7 @@ const {
 } = selection;
 
 // Current active image
-const activeImageId = computed(() => route.params.imageId as string);
+const activeImageId = computed(() => currentCollection.selectedImageId);
 
 // Load collection data when component mounts or collectionId changes
 watch(() => props.collectionId, loadCollection, { immediate: true });
@@ -91,6 +88,18 @@ const filteredImages = computed(() => filtering.filteredImages.value);
 
 async function loadCollection() {
   if (props.collectionId) {
+    // Check if the collection is already loaded or currently being loaded
+    if (
+      (currentCollection.loaded &&
+        currentCollection.id === props.collectionId) ||
+      currentCollection.loading
+    ) {
+      console.log(
+        `PageList: Collection ${props.collectionId} already loaded or loading, skipping loadCollection call.`,
+      );
+      return;
+    }
+    console.log(`PageList: Loading collection ${props.collectionId}`);
     await currentCollection.loadCollection(props.collectionId);
   }
 }
@@ -99,17 +108,11 @@ function navigateToImage(imageId: string) {
   if (selectMode.value) {
     toggleImageSelection(imageId);
   } else {
+    // Update selected image in the collection state
+    currentCollection.selectImage(imageId);
+
     // Emit the selected image ID to parent component
     emit('select-image', imageId);
-
-    // Navigate to the image
-    router.push({
-      name: 'image',
-      params: {
-        collectionId: props.collectionId,
-        imageId: imageId,
-      },
-    });
   }
 }
 </script>

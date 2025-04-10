@@ -4,6 +4,7 @@ import { ref, watch, onMounted } from 'vue';
 import { Image, ImageAddDto } from 'src/stores';
 import { getPreviewImage } from 'utils';
 import { useCurrentCollectionState } from 'stores/frontend-state';
+import { useLoadingState } from 'src/stores/app/loadingState';
 
 defineOptions({
   name: 'CollectionDetailPage',
@@ -12,9 +13,13 @@ defineOptions({
 const route = useRoute();
 const router = useRouter();
 const currentCollection = useCurrentCollectionState();
+const loadingState = useLoadingState();
 const collectionId = ref(route.params.collectionId as string);
 const grid = ref(true);
 const fileTypes = 'image/*';
+
+// Register this component with the loading state
+const componentId = 'collectionDetail_' + collectionId.value;
 
 const isAddOpen = ref(false);
 const imageToAdd = ref<ImageAddDto>({
@@ -42,7 +47,15 @@ watch(
 
 // Function to load the current collection
 const loadCurrentCollection = async () => {
-  await currentCollection.loadCollection(collectionId.value);
+  loadingState.setComponentLoading(componentId, true);
+
+  try {
+    await currentCollection.loadCollection(collectionId.value);
+  } catch (error) {
+    console.error('Error loading collection:', error);
+  } finally {
+    loadingState.setComponentLoading(componentId, false);
+  }
 };
 
 const onRowClick = (_evt: Event, row: Image) => {
@@ -67,12 +80,28 @@ const onReset = () => {
 <template>
   <q-page>
     <div class="q-pa-md">
+      <!-- Show skeleton when loading -->
+      <div v-if="loadingState.isComponentLoading(componentId)">
+        <div class="text-h6 q-mb-md">Loading Collection...</div>
+        <div class="row q-col-gutter-md">
+          <div v-for="n in 8" :key="n" class="col-xs-12 col-sm-6 col-md-3">
+            <q-card bordered>
+              <q-skeleton height="200px" square />
+              <q-card-section>
+                <q-skeleton type="text" />
+              </q-card-section>
+            </q-card>
+          </div>
+        </div>
+      </div>
+
+      <!-- Show content when loaded -->
       <q-table
+        v-else
         title="Images"
         :grid="grid"
         :rows="currentCollection.collection?.images || []"
         row-key="name"
-        :loading="currentCollection.loading"
         @row-click="onRowClick"
       >
         <template v-slot:top-right>
