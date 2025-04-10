@@ -1,3 +1,4 @@
+import { useQuasar } from 'quasar';
 import axios, { AxiosError } from 'axios';
 
 interface ErrorResponse {
@@ -13,14 +14,18 @@ interface ErrorResponse {
  *
  * @param error The error to handle
  * @param customHandler Optional custom handler for specific error scenarios
+ * @param showNotification Whether to show a notification for this error (default: false)
  * @returns The processed error message
  */
 export function axiosErrorHandler(
   error: AxiosError | unknown,
   customHandler?: (error: AxiosError | unknown) => void,
+  showNotification = false,
 ): string {
   // Default error message
   let errorMessage = 'An unknown error occurred';
+  let notificationType: 'negative' | 'warning' = 'negative';
+  let notificationTimeout = 5000;
 
   if (error === null || error === undefined) {
     errorMessage = 'Unrecoverable error!! Error is null or undefined!';
@@ -39,9 +44,11 @@ export function axiosErrorHandler(
       errorMessage =
         'Network error: Unable to connect to the server. Please check your internet connection.';
       console.error('Connection problems..', error);
+      notificationTimeout = 0; // No timeout for connection errors
     } else if (error.code === 'ERR_CANCELED') {
       errorMessage = 'Request was cancelled';
       console.warn('Connection canceled..', error);
+      notificationType = 'warning';
     } else if (error.code === 'ECONNABORTED') {
       errorMessage =
         'Request timeout: The server took too long to respond. Please try again later.';
@@ -85,6 +92,7 @@ export function axiosErrorHandler(
             errorMessage =
               'Invalid request. Please check your data and try again.';
           }
+          notificationType = 'warning';
           break;
         case 401:
           console.error('Unauthorized:', errorMessage);
@@ -99,6 +107,7 @@ export function axiosErrorHandler(
           console.error('Not found:', errorMessage);
           errorMessage =
             'The requested resource does not exist or has been moved.';
+          notificationType = 'warning';
           break;
         case 408:
           console.error('Request timeout:', errorMessage);
@@ -108,6 +117,7 @@ export function axiosErrorHandler(
           console.error('Conflict:', errorMessage);
           errorMessage =
             'This operation resulted in a conflict. Please refresh and try again.';
+          notificationType = 'warning';
           break;
         case 422:
           console.error('Validation error:', errorMessage, response.data);
@@ -115,6 +125,7 @@ export function axiosErrorHandler(
             errorMessage =
               'Validation failed. Please check your input and try again.';
           }
+          notificationType = 'warning';
           break;
         case 429:
           console.error('Too many requests:', errorMessage);
@@ -146,6 +157,7 @@ export function axiosErrorHandler(
       console.error('No response from server:', error);
       errorMessage =
         'No response received from the server. Please check your connection and try again.';
+      notificationTimeout = 0; // No timeout for connection errors
     }
     // Something happened in setting up the request that triggered an Error
     else if (config) {
@@ -167,6 +179,33 @@ export function axiosErrorHandler(
     } catch (e) {
       errorMessage =
         'An unknown error occurred. Please try again or contact support.';
+    }
+  }
+
+  // Show notification if requested
+  if (showNotification) {
+    try {
+      const $q = useQuasar();
+
+      $q.notify({
+        type: notificationType,
+        message: errorMessage,
+        timeout: notificationTimeout,
+        actions:
+          notificationTimeout === 0
+            ? [
+                {
+                  label: 'Dismiss',
+                  color: 'white',
+                  handler: () => {
+                    /* Just dismiss */
+                  },
+                },
+              ]
+            : undefined,
+      });
+    } catch (e) {
+      console.error('Error showing notification:', e);
     }
   }
 

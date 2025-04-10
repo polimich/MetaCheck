@@ -7,6 +7,7 @@ import { useImageStore } from 'src/stores';
 import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 
+// Create a new annotation when clicking in add mode
 const createAnnotation = async (
   annotator: UnwrapNestedRefs<Annotator> & object,
   imageId: string,
@@ -20,7 +21,6 @@ const createAnnotation = async (
   const maxX = stageWidth / annotator.imageScale;
   const maxY = stageHeight / annotator.imageScale;
 
-  // Use precise positioning with fixed decimal places
   const x = Number(Math.max(0, Math.min(pointerPosition.x, maxX)).toFixed(3));
   const y = Number(Math.max(0, Math.min(pointerPosition.y, maxY)).toFixed(3));
 
@@ -36,16 +36,17 @@ const createAnnotation = async (
   annotator.innerToolBox.updateAnnotation(newAnnotation);
   annotator.isAnnotating = true;
 
-  // Save the current state for undo/redo
   annotator.saveState(annotations);
 };
 
+// Helper to get the most recently added annotation
 function getLatestAnnotation(
   annotations: DetectionState[],
 ): DetectionState | undefined {
   return annotations.at(-1);
 }
 
+// Update annotation dimensions during mouse movement (resizing)
 const startEditAnnotationVolume = (
   annotator: UnwrapNestedRefs<Annotator> & object,
   annotations: DetectionState[],
@@ -62,11 +63,9 @@ const startEditAnnotationVolume = (
   const { x: oldX, y: oldY } = currentAnnotation;
 
   // Allow drawing in any direction (including negative directions)
-  // Instead of clamping, we'll update the position and dimensions later
   const width = Number((newX - oldX).toFixed(3));
   const height = Number((newY - oldY).toFixed(3));
 
-  // Only update if there's an actual change to avoid unnecessary state changes
   if (
     width !== currentAnnotation.width ||
     height !== currentAnnotation.height
@@ -77,6 +76,7 @@ const startEditAnnotationVolume = (
   }
 };
 
+// Finalize annotation on mouse up, handling normalization and boundaries
 const stopEditAnnotationVolume = async (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
@@ -88,8 +88,7 @@ const stopEditAnnotationVolume = async (
   const currentAnnotation = getLatestAnnotation(imageStore.detections);
   if (!currentAnnotation) return;
 
-  // Before checking size, normalize negative dimensions
-  // This ensures we have proper width/height for size check
+  // Normalize negative dimensions
   if (currentAnnotation.width < 0) {
     currentAnnotation.x += currentAnnotation.width;
     currentAnnotation.width = Math.abs(currentAnnotation.width);
@@ -100,7 +99,7 @@ const stopEditAnnotationVolume = async (
     currentAnnotation.height = Math.abs(currentAnnotation.height);
   }
 
-  // Now handle case when the annotation is too small
+  // Handle case when the annotation is too small
   if (currentAnnotation.height < 5 || currentAnnotation.width < 5) {
     await removeAnnotation({
       id: currentAnnotation.id,
@@ -111,21 +110,17 @@ const stopEditAnnotationVolume = async (
     return;
   }
 
-  // Use direct draw for more consistent rendering
   annotator.stage.draw();
-
-  // Adjust annotations to ensure they're within the boundaries
   adjustAnnotation(annotator, currentAnnotation, imageStore);
 
   if (annotator.transformer.nodes().length == 0)
     annotator.innerToolBox.updateAnnotation(currentAnnotation);
 
   annotator.innerToolBox.show(event.evt);
-
-  // Save state for undo/redo
   annotator.saveState(imageStore.detections);
 };
 
+// Remove an annotation and update the UI and data stores
 async function removeAnnotation({
   id,
   annotator,
@@ -150,15 +145,11 @@ async function removeAnnotation({
       return;
     }
 
-    // Destroy the visual representation
     parent.destroy();
-
-    // Clear transformer and selection
     annotator.transformer.nodes([]);
     annotator.deselectAll();
     annotator.innerToolBox.hide();
 
-    // Find and remove the annotation from the store
     const targetIndex = imageStore.detections.findIndex(
       (item) => item.id === id,
     );
@@ -167,18 +158,13 @@ async function removeAnnotation({
       return;
     }
 
-    // Add to delete list for backend sync
     imageStore.detectionsToDelete.push(imageStore.detections[targetIndex]);
-
-    // Remove from current detections
     imageStore.detections.splice(targetIndex, 1);
 
-    // Update the toolbox if we have any detections left
     if (imageStore.detections.length > 0) {
       annotator.innerToolBox.updateAnnotation(imageStore.detections.at(-1)!);
     }
 
-    // Save state for undo/redo, but only if it's a deliberate deletion (not a zero-volume case)
     if (!isNoVolume) {
       annotator.saveState(imageStore.detections);
     }
@@ -187,6 +173,7 @@ async function removeAnnotation({
   }
 }
 
+// Adjust annotation to ensure it's within bounds and handle negative dimensions
 function adjustAnnotation(
   annotator: UnwrapNestedRefs<Annotator> & object,
   currentAnnotation: DetectionState,
@@ -211,7 +198,6 @@ function adjustAnnotation(
       height: shapeHeight,
     } = annotationNode.attrs;
 
-    // Prepare all changes to apply in one batch
     const nodeAttrs: Record<string, number> = {};
 
     // Handle negative width
@@ -239,7 +225,6 @@ function adjustAnnotation(
     const maxX = stageWidth / annotator.imageScale - currentAnnotation.width;
     const maxY = stageHeight / annotator.imageScale - currentAnnotation.height;
 
-    // Only adjust if outside boundaries to maintain precision
     if (currentAnnotation.x < 0) {
       currentAnnotation.x = 0;
       nodeAttrs.x = 0;
@@ -256,14 +241,11 @@ function adjustAnnotation(
       nodeAttrs.y = currentAnnotation.y;
     }
 
-    // Apply all changes at once to minimize redraws
     if (Object.keys(nodeAttrs).length > 0) {
       annotationNode.setAttrs(nodeAttrs);
-      // Use direct draw instead of batch draw
       annotator.stage.draw();
     }
 
-    // Update store with the adjusted annotation
     const targetIndex = imageStore.detections.findIndex(
       (item) => item.id === currentAnnotation.id,
     );
@@ -275,7 +257,6 @@ function adjustAnnotation(
       return;
     }
 
-    // Update all properties on the store version
     imageStore.detections[targetIndex].x = currentAnnotation.x;
     imageStore.detections[targetIndex].y = currentAnnotation.y;
     imageStore.detections[targetIndex].width = currentAnnotation.width;
@@ -286,7 +267,7 @@ function adjustAnnotation(
   }
 }
 
-// drag
+// Update annotation position during dragging
 const startDragAnnotation = (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
@@ -301,6 +282,7 @@ const startDragAnnotation = (
   currentAnnotation.y = y;
 };
 
+// Helper to find annotation by ID
 function getAnnotationById(
   id: string,
   annotations: DetectionState[],
@@ -308,7 +290,7 @@ function getAnnotationById(
   return annotations.find((item) => item.id === id);
 }
 
-// Add a utility function for grid snapping
+// Utility for grid snapping (if enabled)
 function snapToGrid(
   value: number,
   gridSize: number,
@@ -318,6 +300,7 @@ function snapToGrid(
   return Math.round(value / gridSize) * gridSize;
 }
 
+// Process end of drag action and ensure annotation is within bounds
 const stopDragAnnotation = async (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
@@ -327,26 +310,22 @@ const stopDragAnnotation = async (
   const { height: stageHeight, width: stageWidth } = annotator.stageConfig;
   const currentAnnotation = getAnnotationById(id, annotations);
 
-  // check if the annotation is out of the stage
   if (!currentAnnotation) return;
 
   // Calculate boundaries
   const maxY = stageHeight / annotator.imageScale - height;
   const maxX = stageWidth / annotator.imageScale - width;
 
-  // Define whether to use grid snapping - we'll set to false to maintain precision
-  const enableGridSnapping = false; // Set to true if you want grid snapping
-  const gridSize = 10; // Grid size in pixels, only used if enableGridSnapping is true
+  const enableGridSnapping = false;
+  const gridSize = 10;
 
-  // Store original position
   const originalX = x;
   const originalY = y;
 
-  // Apply constraints but maintain precise position unless outside boundaries
   let newX = originalX;
   let newY = originalY;
 
-  // Apply boundary constraints only
+  // Apply boundary constraints
   if (newX < 0) {
     newX = 0;
   } else if (newX > maxX) {
@@ -359,18 +338,16 @@ const stopDragAnnotation = async (
     newY = maxY;
   }
 
-  // Apply grid snapping only if explicitly enabled
+  // Apply grid snapping if enabled
   if (enableGridSnapping) {
     newX = snapToGrid(newX, gridSize, enableGridSnapping);
     newY = snapToGrid(newY, gridSize, enableGridSnapping);
   }
 
-  // Update the model with exact values
   currentAnnotation.x = newX;
   currentAnnotation.y = newY;
   currentAnnotation.edited = true;
 
-  // Only update the Konva node if position actually changed
   if (newX !== originalX || newY !== originalY) {
     event.target.setAttrs({
       x: newX,
@@ -378,16 +355,12 @@ const stopDragAnnotation = async (
     });
   }
 
-  // Use direct draw instead of batch draw
   annotator.stage.draw();
-
   annotator.innerToolBox.show(event.evt);
-
-  // Save state for undo/redo
   annotator.saveState(annotations);
 };
 
-// resize
+// Handle selection of annotations and multi-select with shift key
 const startResizeAnnotation = (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
@@ -397,7 +370,6 @@ const startResizeAnnotation = (
   const isShiftPressed = event.evt.shiftKey;
 
   if (target.getClassName() !== 'Rect') {
-    // If not clicking on a rectangle and not holding shift, deselect all
     if (!isShiftPressed) {
       annotator.deselectAll();
     }
@@ -407,22 +379,19 @@ const startResizeAnnotation = (
   const currentAnnotation = getAnnotationById(target.attrs.id, annotations);
   if (!currentAnnotation) return;
 
-  // Update the inner toolbox with the current annotation details
   annotator.innerToolBox.updateAnnotation(currentAnnotation);
 
   // Handle multi-selection with shift key
   if (isShiftPressed) {
-    // Add to existing selection if shift is pressed
     annotator.selectAnnotation(currentAnnotation.id, true);
   } else {
-    // Otherwise select only this one
     annotator.selectAnnotation(currentAnnotation.id, false);
   }
 
-  // Show the toolbox at the event position
   annotator.innerToolBox.show(event.evt);
 };
 
+// Process the end of a resize operation, updating dimensions and position
 const stopResizeAnnotation = async (
   event: KonvaPointerEvent,
   annotator: UnwrapNestedRefs<Annotator> & object,
@@ -442,20 +411,16 @@ const stopResizeAnnotation = async (
   const currentAnnotation = getAnnotationById(eventId, annotations);
   if (!currentAnnotation) return;
 
-  // Calculate final dimensions with exact precision
   const newWidth = Number((eventWidth * scaleX).toFixed(3));
   const newHeight = Number((eventHeight * scaleY).toFixed(3));
 
-  // Apply boundary constraints with precise values
   const { width: stageWidth, height: stageHeight } = annotator.stageConfig;
   const maxX = stageWidth / annotator.imageScale - newWidth;
   const maxY = stageHeight / annotator.imageScale - newHeight;
 
-  // Get original values to check if we need to update
   const originalX = eventX;
   const originalY = eventY;
 
-  // Calculate new positions with constraints
   let newX = originalX;
   let newY = originalY;
 
@@ -471,14 +436,13 @@ const stopResizeAnnotation = async (
     newY = maxY;
   }
 
-  // Update model with precise values
   currentAnnotation.x = Number(newX.toFixed(3));
   currentAnnotation.y = Number(newY.toFixed(3));
   currentAnnotation.width = newWidth;
   currentAnnotation.height = newHeight;
   currentAnnotation.edited = true;
 
-  // Reset scale to avoid compound scaling and apply precise positioning
+  // Reset scale to avoid compound scaling
   target.setAttrs({
     x: currentAnnotation.x,
     y: currentAnnotation.y,
@@ -488,15 +452,12 @@ const stopResizeAnnotation = async (
     scaleY: 1,
   });
 
-  // Use direct draw instead of batch draw
   annotator.stage.draw();
-
   annotator.innerToolBox.show(event.evt);
-
-  // Save state for undo/redo
   annotator.saveState(annotations);
 };
 
+// Handle case when mouse leaves the canvas during annotation
 const leaveAnnotateRange = (
   annotator: UnwrapNestedRefs<Annotator> & object,
   imageStore: ReturnType<typeof useImageStore>,
@@ -508,7 +469,7 @@ const leaveAnnotateRange = (
   const latestAnnotation = getLatestAnnotation(imageStore.detections);
   if (!latestAnnotation) return;
 
-  // First normalize any negative dimensions
+  // Normalize negative dimensions
   if (latestAnnotation.width < 0) {
     latestAnnotation.x += latestAnnotation.width;
     latestAnnotation.width = Math.abs(latestAnnotation.width);
@@ -523,7 +484,7 @@ const leaveAnnotateRange = (
   const mousePos = annotator.stage.getPointerPosition() as Vector2d;
   const stageConfig = annotator.stageConfig;
 
-  // If mouse position is outside the stage, constrain the annotation dimensions
+  // Constrain dimensions if mouse is outside stage
   if (mousePos.x >= stageConfig.width)
     latestAnnotation.width =
       stageConfig.width / annotator.imageScale - latestAnnotation.x;
@@ -531,7 +492,7 @@ const leaveAnnotateRange = (
     latestAnnotation.height =
       stageConfig.height / annotator.imageScale - latestAnnotation.y;
 
-  // If the annotation has no meaningful size, remove it
+  // Remove annotation if too small
   if (latestAnnotation.width < 5 || latestAnnotation.height < 5) {
     removeAnnotation({
       id: latestAnnotation.id,
@@ -544,8 +505,6 @@ const leaveAnnotateRange = (
 
   adjustAnnotation(annotator, latestAnnotation, imageStore);
   annotator.innerToolBox.hide();
-
-  // Save state for undo/redo
   annotator.saveState(imageStore.detections);
 };
 

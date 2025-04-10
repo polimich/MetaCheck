@@ -57,7 +57,9 @@ export const useCurrentCollectionState = defineStore(
         if (collectionDA.collection) {
           collection.value = CollectionDAtoState(collectionDA.collection);
           loaded.value = true;
-          console.log('loaded collection', collection.value.id);
+          console.log(
+            `Loaded collection ${collection.value.id} with ${collection.value.images?.length || 0} images`,
+          );
         } else {
           error.value = collectionDA.error || 'Failed to load collection';
           console.error('Failed to load collection:', error.value);
@@ -85,24 +87,28 @@ export const useCurrentCollectionState = defineStore(
     };
 
     const getImageById = (imageId: string) => {
-      setLoading(true);
-      if (collection.value && collection.value.images) {
-        const image = collection.value.images.find((i) => i.id === imageId);
-        if (image) {
-          setLoading(false);
+      console.log(`Getting image ${imageId} from collection`);
 
-          return image;
-        } else {
-          setLoading(false);
-
-          console.error('Image not found');
-          return null;
-        }
-      } else {
-        setLoading(false);
+      if (!loaded.value) {
         console.error('Collection not loaded');
         return null;
       }
+
+      if (!collection.value?.images) {
+        console.error('No images in collection');
+        return null;
+      }
+
+      const image = collection.value.images.find((i) => i.id === imageId);
+      if (image) {
+        console.log(
+          `Found image ${imageId} with ${image.detections?.length || 0} detections`,
+        );
+        return image;
+      }
+
+      console.error(`Image ${imageId} not found in collection`);
+      return null;
     };
 
     const reloadCollection = async () => {

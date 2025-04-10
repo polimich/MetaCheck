@@ -7,16 +7,23 @@ import { Node } from 'konva/lib/Node';
 import { NodeConfig } from 'konva/lib/Node';
 import Konva from 'konva';
 
+// Stores image dimensions and element for rendering
 class ImageInfo {
   element!: HTMLImageElement;
   width = 0;
   height = 0;
 }
 
+// Controls the toolbox that appears when an annotation is selected
 class InnerToolBox {
   public boxStyle = 'display:none;';
   private annotation = newDetectionState();
   private visible = false;
+  private annotator: Annotator | null = null;
+
+  constructor(annotator: Annotator) {
+    this.annotator = annotator;
+  }
 
   public getAnnotationId(): string {
     return this.annotation.id;
@@ -27,7 +34,9 @@ class InnerToolBox {
   }
 
   public show(mouseEvent: MouseEvent): void {
-    if (this.visible) return;
+    // Don't show toolbox when in drag mode
+    if (this.visible || (this.annotator && this.annotator.mode === 'drag'))
+      return;
 
     const offsetFormX = mouseEvent.offsetX;
     const offsetFromY = mouseEvent.offsetY;
@@ -47,11 +56,11 @@ class InnerToolBox {
   }
 }
 
+// Main class for annotation functionality, manages canvas, modes and state
 class Annotator {
   mode = '';
   isAnnotating = false;
-  innerToolBox = new InnerToolBox();
-  // konva settings
+  innerToolBox = new InnerToolBox(this);
   imageScale = 1;
   stage: Stage = new Stage({ container: document.createElement('div') });
   stageConfig = { id: 'stage', width: 1, height: 1 };
@@ -61,15 +70,15 @@ class Annotator {
     draggable: true,
     scaleX: 1,
     scaleY: 1,
-    clearBeforeDraw: true, // Prevent clearing before redraw
-    imageSmoothingEnabled: true, // Disable image smoothing for better performance
+    clearBeforeDraw: true,
+    imageSmoothingEnabled: true,
   };
 
   imageConfig = {
     image: new Image(),
     scaleX: this.imageScale,
     scaleY: this.imageScale,
-    imageSmoothingEnabled: true, // Disable image smoothing
+    imageSmoothingEnabled: true,
   };
   transformer: Transformer = new Transformer();
   transformerConfig = {
@@ -86,19 +95,16 @@ class Annotator {
       'middle-left',
     ],
     ignoreStroke: true,
-    perfectDrawEnabled: false, // Prevent excessive redraws
+    perfectDrawEnabled: false,
   };
 
-  // Undo/redo stacks
+  // Undo/redo state management
   undoStack: DetectionState[][] = [];
   redoStack: DetectionState[][] = [];
-
-  // Multi-select support
   selectedAnnotationIds: Set<string> = new Set();
-
-  // Flag to track if stage is already initialized
   private initialized = false;
 
+  // Initialize image settings based on container size and image dimensions
   public async initImageSetting(container: Element, imageUrl: string) {
     const { element, width, height } = await getImageData(imageUrl);
     this.imageScale = Math.min(
@@ -113,64 +119,48 @@ class Annotator {
       image: element,
       scaleX: 1,
       scaleY: 1,
-      imageSmoothingEnabled: false, // Disable image smoothing
+      imageSmoothingEnabled: false,
     };
   }
 
+  // Initialize the canvas and set up initial state
   // eslint-disable-next-line
   public initCanvas(stageRef: any): void {
-    // Set global Konva options to optimize performance
     Konva.pixelRatio = 1;
-
     this.stage = stageRef.getStage();
 
-    // Only initialize once if possible
     if (!this.initialized) {
       this.layer = this.stage.findOne('Layer') as Layer;
       this.transformer = this.stage.findOne('#transformer') as Transformer;
-
-      // Apply optimizations
       this.stage.listening(true);
       this.layer.listening(true);
       this.layer.clearBeforeDraw(true);
-
-      // Optimize rendering
-      Konva.autoDrawEnabled = true;
-
       this.initialized = true;
     }
 
-    // These actions are safe to do on every init
     this.transformer.nodes([]);
     this.innerToolBox.hide();
     this.changeAnnotateMode('add');
-
-    // Clear undo/redo stacks
     this.undoStack = [];
     this.redoStack = [];
     this.selectedAnnotationIds.clear();
-
-    // Force a single redraw
     this.stage.draw();
   }
 
+  // Switch between drag mode (panning) and add mode (creating annotations)
   public changeAnnotateMode(mode: string): void {
-    if (this.mode === mode) return; // No need to change if already in this mode
+    if (this.mode === mode) return;
 
     switch (mode) {
       case 'drag':
-        // Set layer draggable to true to enable panning
         this.layer.setAttrs({ draggable: true });
-        // Disable drag on all annotations when in pan mode
         this.disableAnnotationsDrag();
         this.disableAnnotationsListen();
         document.body.style.cursor = 'grab';
         this.mode = 'drag';
         break;
       case 'add':
-        // Disable layer dragging when in add mode
         this.layer.setAttrs({ draggable: false });
-        // Re-enable drag on all annotations in add mode
         this.enableAnnotationsDrag();
         this.enableAnnotationsListen();
         document.body.style.cursor = 'crosshair';
@@ -180,31 +170,28 @@ class Annotator {
         console.log('out of case');
     }
 
-    // Force a single draw instead of a batch to prevent flicker
     this.stage.draw();
   }
 
-  // Helper methods to control annotation draggability
+  // Prevent annotations from being dragged when in pan mode
   private disableAnnotationsDrag(): void {
     if (!this.stage) return;
-
-    // Find all rectangle annotations and disable dragging
     const annotations = this.stage.find('Rect');
     annotations.forEach((annotation) => {
       annotation.draggable(false);
     });
   }
 
+  // Allow annotations to be dragged when in add mode
   private enableAnnotationsDrag(): void {
     if (!this.stage) return;
-
-    // Find all rectangle annotations and enable dragging
     const annotations = this.stage.find('Rect');
     annotations.forEach((annotation) => {
       annotation.draggable(true);
     });
   }
 
+  // Disable event listening on annotations in drag mode
   private disableAnnotationsListen(): void {
     if (!this.stage) return;
     const annotations = this.stage.find('Rect');
@@ -213,6 +200,7 @@ class Annotator {
     });
   }
 
+  // Enable event listening on annotations in add mode
   private enableAnnotationsListen(): void {
     if (!this.stage) return;
     const annotations = this.stage.find('Rect');
@@ -221,39 +209,34 @@ class Annotator {
     });
   }
 
-  // Undo/redo functionality
+  // Save current state for undo functionality
   public saveState(annotations: DetectionState[]): void {
-    // Save a deep copy of the current state
     this.undoStack.push(JSON.parse(JSON.stringify(annotations)));
-    // Clear redo stack when a new action is performed
     this.redoStack = [];
   }
 
+  // Implement undo functionality
   public undo(annotations: DetectionState[]): DetectionState[] | undefined {
     if (this.undoStack.length === 0) return undefined;
-
-    // Save current state to redo stack
     this.redoStack.push(JSON.parse(JSON.stringify(annotations)));
-    // Pop the last state from undo stack
     return this.undoStack.pop();
   }
 
+  // Implement redo functionality
   public redo(annotations: DetectionState[]): DetectionState[] | undefined {
     if (this.redoStack.length === 0) return undefined;
-
-    // Save current state to undo stack
     this.undoStack.push(JSON.parse(JSON.stringify(annotations)));
-    // Pop the last state from redo stack
     return this.redoStack.pop();
   }
 
-  // Multi-select support
+  // Add an annotation to the selection set
   public selectAnnotation(id: string, addToSelection = false): void {
     if (!addToSelection) this.selectedAnnotationIds.clear();
     this.selectedAnnotationIds.add(id);
     this.updateTransformerWithSelection();
   }
 
+  // Clear all selections
   public deselectAll(): void {
     this.selectedAnnotationIds.clear();
     this.transformer.nodes([]);
@@ -261,6 +244,7 @@ class Annotator {
     this.stage.draw();
   }
 
+  // Update the transformer to show around selected annotations
   private updateTransformerWithSelection(): void {
     const nodes = Array.from(this.selectedAnnotationIds)
       .map((id) => this.stage.findOne(`#${id}`))
@@ -270,6 +254,7 @@ class Annotator {
   }
 }
 
+// Load image data from URL and return dimensions
 async function getImageData(url: string): Promise<ImageInfo> {
   const image = await loadImage(url);
   return {
@@ -279,26 +264,24 @@ async function getImageData(url: string): Promise<ImageInfo> {
   };
 }
 
+// Helper function to load an image and handle the Promise
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new window.Image();
-
-    // Disable image smoothing for better performance
     image.style.imageRendering = 'pixelated';
-
     image.src = url;
     image.onload = () => resolve(image);
     image.onerror = () => reject('image loading error');
   });
 }
 
-// helper functions
-
+// Focus the annotator box for keyboard events
 function enterAnnotatorBox(annotatorBox: HTMLDivElement | null) {
   if (!annotatorBox) return;
   annotatorBox.focus();
 }
 
+// Handle leaving the annotator area
 function leaveAnnotatorBox(annotator: UnwrapNestedRefs<Annotator> & object) {
   document.body.style.cursor = 'default';
   annotator.innerToolBox.hide();

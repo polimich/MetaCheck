@@ -11,10 +11,12 @@ export const getCollections = async (): Promise<{
   error: string;
 }> => {
   try {
+    console.log('API: Fetching all collections');
     const { data } = await axios.get<Collection[]>('collection');
     return { data, error: '' };
   } catch (error) {
-    const errorMessage = axiosErrorHandler(error);
+    // Show notification for this error since it's a critical operation
+    const errorMessage = axiosErrorHandler(error, undefined, true);
     return { data: [], error: errorMessage };
   }
 };
@@ -25,26 +27,47 @@ export const getCollections = async (): Promise<{
 export const getCollection = async (
   collectionId: string,
 ): Promise<{ data: CollectionDA | null; error: string }> => {
+  if (!collectionId) {
+    console.error('No collection ID provided');
+    return { data: null, error: 'No collection ID provided' };
+  }
+
+  // Validate UUID format
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+      collectionId,
+    )
+  ) {
+    console.error(`Invalid collection ID format: ${collectionId}`);
+    return { data: null, error: 'Invalid collection ID format' };
+  }
+
   try {
+    console.log(`API: Fetching collection ${collectionId}`);
     const { data } = await axios.get<CollectionDA>(
       `/collection/${collectionId}`,
     );
+    console.log(`API: Successfully fetched collection ${collectionId}`);
     return { data, error: '' };
   } catch (e) {
-    const errorMessage = axiosErrorHandler(e);
+    // Show notification for this error since it's a critical operation
+    const errorMessage = axiosErrorHandler(e, undefined, true);
     return { data: null, error: errorMessage };
   }
 };
 
 /**
- * Add a new collection
- * @returns Error message if there's an error, empty string if successful
+ * Create a new collection
  */
 export const addCollection = async (
   collection: CollectionAddDto,
 ): Promise<string> => {
   try {
-    await axios.post('collection', collection);
+    const { data } = await axios.post<{ id: string }>(
+      '/collection',
+      collection,
+    );
+    console.log(`API: Created collection with ID ${data.id}`);
     return '';
   } catch (error) {
     return axiosErrorHandler(error);
@@ -70,9 +93,11 @@ export const editCollection = async (
  * Delete a collection
  * @returns Error message if there's an error, empty string if successful
  */
-export const deleteCollection = async (id: string): Promise<string> => {
+export const deleteCollection = async (
+  collectionId: string,
+): Promise<string> => {
   try {
-    await axios.delete(`collection/${id}`);
+    await axios.delete(`/collection/${collectionId}`);
     return '';
   } catch (error) {
     return axiosErrorHandler(error);

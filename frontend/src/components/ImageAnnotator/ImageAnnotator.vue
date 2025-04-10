@@ -15,7 +15,6 @@ import {
 import { useImageStore } from 'src/stores';
 import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { Stage } from 'konva/lib/Stage';
-import Konva from 'konva';
 import { Annotator, leaveAnnotatorBox } from 'src/service/annotator.ts';
 import { Vector2d } from 'konva/lib/types';
 import {
@@ -43,11 +42,10 @@ const currentCollectionId = ref(
   props.collectionId ?? (route.params.collectionId as string),
 );
 const imageUrl = computed(() => {
-  // Add a timestamp or random value to force reload when id changes
   return getRasterImage(currentImageId.value) + `?t=${Date.now()}`;
 });
 
-// Reactive variables
+// Core reactive state for the annotator
 const annotatorBox: Ref<HTMLDivElement | null> = ref(null);
 const isMounted = ref(false);
 const stage = ref<Stage | null>(null);
@@ -55,49 +53,43 @@ const loading = ref(false);
 const dataLoaded = ref(false);
 const annotator = reactive(new Annotator());
 
-// Watch for changes in the imageId prop
+// Watch for changes in image ID and reload data
 watch(
   () => props.imageId,
   async (newImageId) => {
     if (newImageId && newImageId !== currentImageId.value) {
       currentImageId.value = newImageId;
-      // Reset the stage to ensure clean state
       resetLayerPosition();
 
-      // Clear existing data
       imageStore.detections = [];
       annotator.undoStack = [];
       annotator.redoStack = [];
 
-      // Reload image data with the new ID
       await reloadImageData();
     }
   },
   { immediate: true },
 );
 
-// Watch for changes in the collectionId prop
+// Watch for changes in collection ID and reload data
 watch(
   () => props.collectionId,
   async (newCollectionId) => {
     if (newCollectionId && newCollectionId !== currentCollectionId.value) {
       currentCollectionId.value = newCollectionId;
-      // Reset stage and clear data for new collection
       resetLayerPosition();
 
-      // Clear existing data
       imageStore.detections = [];
       annotator.undoStack = [];
       annotator.redoStack = [];
 
-      // Reload image data with the new collection ID
       await reloadImageData();
     }
   },
   { immediate: true },
 );
 
-// resize observer
+// Set up resize observer to handle container size changes
 let resizeObserver: ResizeObserver | null = null;
 function setupResizeObserver() {
   if (!annotatorBox.value) return;
@@ -109,22 +101,25 @@ function setupResizeObserver() {
   resizeObserver.observe(annotatorBox.value);
 }
 
-// functions
+// Load image and detection data from the store
 const reloadImageData = async (): Promise<void> => {
+  // Prevent reload if already loading
+  if (loading.value || dataLoaded.value) {
+    console.log('Already loading or data loaded, skipping duplicate reload');
+    return;
+  }
+
   dataLoaded.value = false;
   loading.value = true;
 
   try {
-    // Clear transformer to avoid ghost selections
     if (annotator.transformer) {
       annotator.transformer.nodes([]);
     }
 
-    // Load the image and detections
     await imageStore.loadImage(currentImageId.value, currentCollectionId.value);
     await imageStore.loadDetections(currentImageId.value);
 
-    // Force a re-initialization of the stage
     if (stage.value) {
       await nextTick();
       await initAnnotator(
@@ -142,22 +137,19 @@ const reloadImageData = async (): Promise<void> => {
   }
 };
 
-// Modify the init function to better handle reinitialization
+// Initialize the annotation interface when data is loaded
 const init = async (): Promise<void> => {
   if (!isMounted.value) return;
   if (!dataLoaded.value) return;
   if (!annotatorBox.value) return;
 
-  // Force reinitialization when image changes
   const forceReinit = true;
 
   if (forceReinit) {
     loading.value = true;
-    // Use nextTick to ensure the DOM is updated before we initialize
     await nextTick();
 
     try {
-      // Force reset of the annotator state
       if (annotator.stage) {
         annotator.transformer?.nodes([]);
         annotator.innerToolBox.hide();
@@ -169,16 +161,13 @@ const init = async (): Promise<void> => {
         imageStore.detections,
       );
 
-      // Draw any loaded annotations
       if (imageStore.detections && imageStore.detections.length > 0) {
-        // Ensure we're in annotation mode
         annotator.changeAnnotateMode('add');
         annotator.stage.draw();
       }
     } catch (error) {
       console.error('Error initializing annotator:', error);
     } finally {
-      // Give the browser a moment to render before removing loading state
       setTimeout(() => {
         loading.value = false;
       }, 100);
@@ -186,7 +175,7 @@ const init = async (): Promise<void> => {
   }
 };
 
-// Improve the initAnnotator function
+// Set up the Konva stage and initialize the annotator
 const initAnnotator = async (
   container: Element,
   url: string,
@@ -195,21 +184,13 @@ const initAnnotator = async (
   console.log(`Initializing annotator with image: ${url}`);
 
   try {
-    // Reset image scale and config
     await annotator.initImageSetting(container, url);
-
-    // Initialize the canvas - this will handle both new and existing stages
     annotator.initCanvas(stage.value);
 
-    // Update with current annotations
     if (annotations && annotations.length >= 1) {
       annotator.innerToolBox.updateAnnotation(annotations[0]);
     }
 
-    // Configure Konva for better performance
-    Konva.pixelRatio = 1; // Lower pixel ratio for better performance
-
-    // Force a redraw after initialization
     annotator.stage.draw();
   } catch (error) {
     console.error('Error in initAnnotator:', error);
@@ -217,64 +198,55 @@ const initAnnotator = async (
   }
 };
 
-// Replace throttled functions with direct implementations
+// Handle layer dragging in pan mode
 const dragLayer = () => {
-  // Only allow dragging in drag mode
   if (annotator.mode !== 'drag') {
     annotator.layer.setAttrs({ draggable: false });
     return;
   }
 
-  // Change cursor while dragging
   document.body.style.cursor = 'grabbing';
-
-  // Hide the toolbox during panning
   annotator.innerToolBox.hide();
 };
 
-// Add event listeners for Alt key to enable wheel zoom without clicking
+// Initialize component on mount
 onMounted(async () => {
   isMounted.value = true;
   setupResizeObserver();
 
-  // Add global event listeners for Alt key to enable wheel zoom
   window.addEventListener('keydown', handleAltKeyDown);
   window.addEventListener('keyup', handleAltKeyUp);
 
   await init();
 });
 
-// Clean up event listeners on component unmount
+// Clean up event listeners and observers on unmount
 onUnmounted(() => {
-  // Remove global event listeners to prevent memory leaks
   window.removeEventListener('keydown', handleAltKeyDown);
   window.removeEventListener('keyup', handleAltKeyUp);
 
-  // Clean up resize observer
   if (resizeObserver) {
     resizeObserver.disconnect();
   }
 });
 
-// Track Alt key state
+// Track Alt key state for zoom functionality
 const isAltKeyPressed = ref(false);
 
-// Handle Alt key down
+// Handle Alt key down event for zoom mode
 const handleAltKeyDown = (event: KeyboardEvent) => {
   if (event.key === 'Alt') {
     isAltKeyPressed.value = true;
-    // Change cursor to indicate zoom mode is available
     if (annotatorBox.value) {
       annotatorBox.value.style.cursor = 'zoom-in';
     }
   }
 };
 
-// Handle Alt key up
+// Handle Alt key up event to exit zoom mode
 const handleAltKeyUp = (event: KeyboardEvent) => {
   if (event.key === 'Alt') {
     isAltKeyPressed.value = false;
-    // Restore cursor to default or current tool cursor
     if (annotatorBox.value) {
       annotatorBox.value.style.cursor =
         annotator.mode === 'add' ? 'crosshair' : 'grab';
@@ -282,23 +254,19 @@ const handleAltKeyUp = (event: KeyboardEvent) => {
   }
 };
 
-// Improved wheel handler that works with Alt key and resets the canvas properly
+// Handle mouse wheel for zooming when Alt is pressed
 let lastWheelTime = 0;
 const wheelResizeLayer = (event: KonvaPointerEvent) => {
-  // Check if Alt key is pressed using the tracked state
   const wheel = event.evt as MouseEvent as WheelEvent;
   wheel.preventDefault();
 
-  // Use either the event's Alt key state or our tracked state
   const altKeyPressed = wheel.altKey || isAltKeyPressed.value;
   if (!altKeyPressed) return;
 
-  // Simple rate limiting - only process wheel events every 20ms
   const now = Date.now();
   if (now - lastWheelTime < 20) return;
   lastWheelTime = now;
 
-  // Get current pointer position for zoom center
   const pointerPosition = annotator.stage.getPointerPosition() as Vector2d;
   if (!pointerPosition) return;
 
@@ -306,29 +274,24 @@ const wheelResizeLayer = (event: KonvaPointerEvent) => {
   const oldScale = annotator.layer.scaleX();
   const scaleBy = 1.05;
 
-  // Calculate new scale based on wheel direction
   const newScale = direction > 0 ? oldScale / scaleBy : oldScale * scaleBy;
 
-  // Calculate mouse point in relation to the layer
   const mousePointTo = {
     x: (pointerPosition.x - annotator.layer.x()) / oldScale,
     y: (pointerPosition.y - annotator.layer.y()) / oldScale,
   };
 
-  // Calculate new position to keep the point under the mouse
   const newPos = {
     x: pointerPosition.x - mousePointTo.x * newScale,
     y: pointerPosition.y - mousePointTo.y * newScale,
   };
 
-  // Apply new scale and position
   annotator.layer.scale({ x: newScale, y: newScale });
   annotator.layer.position(newPos);
-
-  // Force immediate redraw for smoother experience
   annotator.stage.draw();
 };
 
+// Reset layer position and scale to default
 const resetLayerPosition = () => {
   annotator.layer.setAttrs({
     x: 0,
@@ -339,67 +302,56 @@ const resetLayerPosition = () => {
   annotator.innerToolBox.hide();
 };
 
-// Add undo/redo functions
+// Implement undo functionality
 const undo = () => {
-  // Get the previous state from the undo stack
   const previousState = annotator.undo(imageStore.detections);
   if (previousState) {
-    // Replace current detections with the previous state
     imageStore.detections = previousState;
     annotator.stage.draw();
   }
 };
 
+// Implement redo functionality
 const redo = () => {
-  // Get the next state from the redo stack
   const nextState = annotator.redo(imageStore.detections);
   if (nextState) {
-    // Replace current detections with the next state
     imageStore.detections = nextState;
     annotator.stage.draw();
   }
 };
 
-// Update keyboard handler to include save shortcut
+// Handle keyboard shortcuts for tool selection and operations
 async function handleKeyDownEvent(event: KeyboardEvent) {
   const key = event.key.toUpperCase();
-  const isCtrlPressed = event.ctrlKey || event.metaKey; // metaKey for Mac
+  const isCtrlPressed = event.ctrlKey || event.metaKey;
 
-  // Handle keyboard shortcuts with Ctrl
   if (isCtrlPressed) {
     switch (key) {
       case 'Z':
         if (event.shiftKey) {
-          // Ctrl+Shift+Z = Redo
           event.preventDefault();
           redo();
         } else {
-          // Ctrl+Z = Undo
           event.preventDefault();
           undo();
         }
         return;
       case 'Y':
-        // Ctrl+Y = Redo (alternative)
         event.preventDefault();
         redo();
         return;
       case 'S':
-        // Ctrl+S = Save
         event.preventDefault();
         await save();
         return;
     }
   }
 
-  // Handle existing shortcuts
   switch (key) {
     case 'W':
-      // annotating
       annotator.changeAnnotateMode('add');
       break;
     case 'E':
-      // dragging
       annotator.changeAnnotateMode('drag');
       break;
     case 'BACKSPACE':
@@ -421,82 +373,74 @@ async function handleKeyDownEvent(event: KeyboardEvent) {
   }
 }
 
-// lifecycle
+// Initialize data before mounting
 onBeforeMount(async () => {
   await reloadImageData();
 });
 
-// Update watchers to react to store changes
+// Watch data loaded state and initialize when ready
 watch(dataLoaded, async (newValue) => {
   if (newValue) {
     await init();
   }
 });
 
-// Use deep watch on the imageStore for more reliable change detection
+// Watch for changes in the store's image data
 watch(
   () => imageStore.image,
   async () => {
     console.log('Image data changed in store, reinitializing');
-    // Clear canvas state
     if (annotator.transformer) {
       annotator.transformer.nodes([]);
     }
     annotator.innerToolBox.hide();
-
-    // Reinitialize with new data
     await init();
   },
   { deep: true },
 );
 
+// Save annotations to the store/backend
 const save = async () => {
   imageStore.detections.forEach((detection) => {
     console.log(detection.edited);
   });
   console.log(imageStore.detectionsToDelete);
   await imageStore.saveImage();
-  // TODO: go through collectionState, find edited objects call individual endpoints to update, create, delete everything
-  // TODO: from collection from db and fe state
 };
 
+// Add transparency to color for annotation fill
 function addAlpha(color: string, opacity: number) {
-  // coerce values so it is between 0 and 1.
   let _opacity = Math.round(Math.min(Math.max(opacity ?? 1, 0), 1) * 255);
   return color + _opacity.toString(16).toUpperCase();
 }
 
-// More reliable focus handling
+// Empty handler to prevent unnecessary redraws
 const handleFocusIn = () => {
-  // This event handler is now empty to prevent unnecessary redraws
-  // Just let the native focus behavior handle it
+  // Empty handler to prevent unnecessary redraws
 };
 
-// Replace the enterAnnotatorBox function with a proper wrapper
+// Handle mouse entering the annotator area
 const handleMouseOver = async () => {
   if (!annotatorBox.value) return;
   if (document.activeElement !== annotatorBox.value) {
-    // First focus silently without triggering effects
     annotatorBox.value.focus({ preventScroll: true });
   }
 };
 
-// Add this computed property to determine if the canvas should show
+// Determine when canvas should be shown
 const showCanvas = computed(() => {
   return isMounted.value && dataLoaded.value && !loading.value;
 });
 
-// Handle the end of dragging the canvas
+// Handle end of dragging the canvas
 const dragLayerEnd = () => {
   if (annotator.mode === 'drag') {
-    // Return cursor to grab when not actively dragging
     document.body.style.cursor = 'grab';
   }
 };
 
-// Create a separate wheel handler for the annotator box
+// Handle wheel events on the annotator box
 const handleAnnotatorWheel = (e: WheelEvent) => {
-  // We need to create a similar structure to what Konva expects
   const syntheticEvent = {
     evt: e,
   } as unknown as KonvaPointerEvent;
@@ -507,6 +451,7 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
 
 <template>
   <div class="full-width row wrap container">
+    <!-- Main annotator container with event handlers -->
     <div
       class="annotator"
       ref="annotatorBox"
@@ -517,7 +462,7 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
       @keydown="handleKeyDownEvent"
       @wheel="handleAnnotatorWheel"
     >
-      <!-- Move control buttons inside the annotator div -->
+      <!-- Toolbar with annotation controls -->
       <div class="control-panel">
         <q-btn @click="save" icon="save" color="primary" round>
           <q-tooltip>Save (Ctrl+S)</q-tooltip>
@@ -568,7 +513,7 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
         </q-btn>
       </div>
 
-      <!-- Help button also moved inside -->
+      <!-- Help button with keyboard shortcuts info -->
       <q-btn round color="grey-7" class="help-button" icon="help">
         <q-tooltip> Keyboard Shortcuts </q-tooltip>
         <q-menu>
@@ -621,6 +566,7 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
         </q-menu>
       </q-btn>
 
+      <!-- Konva stage for rendering the image and annotations -->
       <v-stage
         v-show="showCanvas"
         :config="annotator.stageConfig"
@@ -634,9 +580,7 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
         <v-layer
           :config="{
             ...annotator.layerConfig,
-            draggable: annotator.mode === 'drag', // Only draggable in drag mode
-            clearBeforeDraw: false /* Prevent clearing before draw to reduce flicker */,
-            imageSmoothingEnabled: false /* Disable image smoothing for better performance */,
+            draggable: annotator.mode === 'drag',
           }"
           :key="`layer-${currentImageId}`"
           @mousemove="
@@ -655,8 +599,6 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
             :config="{
               ...annotator.imageConfig,
               listening: true,
-              perfectDrawEnabled: false,
-              imageSmoothingEnabled: false,
             }"
             @mousedown="
               createAnnotation(annotator, currentImageId, imageStore.detections)
@@ -675,10 +617,8 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
                 stroke: item.computed_color,
                 width: item.width,
                 height: item.height,
-                draggable: annotator.mode === 'add', // Only allow dragging annotations in add mode
+                draggable: annotator.mode === 'add',
                 fill: addAlpha(item.computed_color, 0.3),
-                perfectDrawEnabled: false,
-                hitStrokeWidth: 4,
                 listening: true,
               }"
               @dragmove="
@@ -698,11 +638,12 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
           <v-transformer
             :config="{
               ...annotator.transformerConfig,
-              perfectDrawEnabled: false,
             }"
           />
         </v-layer>
       </v-stage>
+
+      <!-- Loading spinner overlay -->
       <div v-if="loading" class="loading-overlay flex flex-center">
         <q-spinner color="primary" size="48px" />
       </div>
@@ -719,7 +660,7 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
 
 .container {
   height: 100%;
-  background-color: #f0f0f0; /* Match the background color */
+  background-color: #f0f0f0;
 }
 
 .loading-overlay {
@@ -732,7 +673,6 @@ const handleAnnotatorWheel = (e: WheelEvent) => {
   z-index: 10;
 }
 
-/* Control panel styling - updated to be positioned inside annotator */
 .control-panel {
   position: absolute;
   top: 16px;

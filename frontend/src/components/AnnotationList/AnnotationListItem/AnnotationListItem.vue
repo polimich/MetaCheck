@@ -1,27 +1,46 @@
 <script setup lang="ts">
-import { DetectionState, MetaRoleOption } from 'src/types/frontend-state';
-import { ref, onMounted, computed } from 'vue';
+import { DetectionState } from 'src/types/frontend-state';
+import { ref, computed, onMounted } from 'vue';
+import { useImageStore } from 'src/stores/image/storeImages';
+import { useLoadingState } from 'src/stores/app/loadingState';
 
 const props = defineProps<{
   detection: DetectionState;
-  options?: MetaRoleOption[];
   loading?: boolean;
 }>();
 
-// Default values for props
-const defaultOptions: MetaRoleOption[] = [];
-const optionsValue = computed(() => props.options || defaultOptions);
-
 const emit = defineEmits<{
-  (e: 'load-meta-roles'): void;
+  (event: 'load-meta-roles', detectionId: string): void;
 }>();
 
+// Stores
+const imageStore = useImageStore();
+const loadingState = useLoadingState();
+
+// Local state
 const detection = ref<DetectionState>(props.detection);
 const selectValue = ref({
   value: detection.value.computed_type,
   label: detection.value.computed_display_type,
   id: detection.value.computed_type,
   color: detection.value.computed_color,
+});
+
+// Load meta roles if they're not already loaded
+onMounted(() => {
+  if (
+    !detection.value.availableMetaRoles ||
+    detection.value.availableMetaRoles.length === 0
+  ) {
+    // Track if we requested metadata already to prevent infinite loading
+    if (!detection.value.loadingMetaRoles) {
+      console.log(
+        `AnnotationListItem: Loading meta roles for detection ${detection.value.id}`,
+      );
+      detection.value.loadingMetaRoles = true;
+      emit('load-meta-roles', detection.value.id);
+    }
+  }
 });
 
 // Get confidence value with a default of 0
@@ -46,30 +65,38 @@ const attentionLevel = computed(() => {
   return 'low-attention';
 });
 
-// For option 3: slider for verified status
-const verifiedSlider = computed({
-  get: () => (detection.value.annotated ? 1 : 0),
-  set: (val) => {
-    detection.value.annotated = val === 1;
-  },
+// Use availableMetaRoles from detection
+const optionsValue = computed(() => {
+  return detection.value.availableMetaRoles || [];
 });
 
-const handleVerifiedSlider = (val: number | null) => {
-  if (val !== null) {
-    detection.value.annotated = val === 1;
-    updateDetection();
-  }
-};
+// Computed property for loading state
+const isLoading = computed(() => {
+  // Create reactive dependencies explicitly
+  const propsLoading = props.loading;
+  const metaRolesLoading = detection.value.loadingMetaRoles;
+  const detectionId = detection.value.id;
+  const metaRoleUpdateLoading = loadingState.isSourceLoading(
+    `metaRoleUpdate-${detectionId}`,
+  );
 
-// Load meta roles when component is mounted if options are empty
-onMounted(() => {
-  if (!props.options || props.options.length === 0) {
-    emit('load-meta-roles');
-  }
+  return propsLoading || metaRolesLoading || metaRoleUpdateLoading;
 });
 
 const saveDetection = async () => {
-  console.log(detection.value);
+  loadingState.startLoading(
+    `saveDetection-${detection.value.id}`,
+    'Saving annotation...',
+  );
+  try {
+    console.log(`Saving detection ${detection.value.id}`);
+    await imageStore.saveImage();
+    console.log(`Detection ${detection.value.id} saved`);
+  } catch (error) {
+    console.error(`Error saving detection ${detection.value.id}:`, error);
+  } finally {
+    loadingState.stopLoading(`saveDetection-${detection.value.id}`);
+  }
 };
 
 const updateSelectValue = (value: {
@@ -85,6 +112,8 @@ const updateSelectValue = (value: {
   // When the user makes any change, set confidence to 1 (100%) and mark as annotated
   detection.value.confidence = 1;
   detection.value.annotated = true;
+
+  console.log(`Updated detection ${detection.value.id} type to ${value.value}`);
 };
 
 const updateDetection = () => {
@@ -92,6 +121,9 @@ const updateDetection = () => {
 
   // When the user makes any change, set confidence to 1 (100%) and mark as annotated
   detection.value.confidence = 1;
+  detection.value.annotated = true;
+
+  console.log(`Marked detection ${detection.value.id} as edited`);
 };
 </script>
 
@@ -120,7 +152,7 @@ const updateDetection = () => {
             label="Type"
             dense
             outlined
-            :loading="loading"
+            :loading="isLoading"
             @update:model-value="(value) => updateSelectValue(value)"
             hide-bottom-space
             options-dense
@@ -183,6 +215,9 @@ const updateDetection = () => {
             icon="save"
             @click="saveDetection"
             size="sm"
+            :loading="
+              loadingState.isSourceLoading(`saveDetection-${detection.id}`)
+            "
           />
         </div>
 
@@ -207,76 +242,6 @@ const updateDetection = () => {
             />
             <span class="text-caption">Verified</span>
           </q-chip>
-        </div>
-      </div>
-
-      <!-- Option 2: Hidden, toggle with CSS to display -->
-      <div
-        class="row justify-between items-center q-mt-xs action-row options-2 hide-option"
-      >
-        <div class="col-auto">
-          <q-btn
-            flat
-            color="primary"
-            icon-right="save"
-            @click="saveDetection"
-            size="sm"
-            class="save-with-status"
-          >
-            <span class="text-caption">Save</span>
-          </q-btn>
-        </div>
-
-        <div class="col-auto verified-indicator">
-          <q-btn
-            :color="detection.annotated ? 'green' : 'grey-5'"
-            :icon="detection.annotated ? 'verified' : 'pending'"
-            round
-            flat
-            dense
-            @click="
-              detection.annotated = !detection.annotated;
-              updateDetection();
-            "
-            size="sm"
-          >
-            <q-tooltip>{{
-              detection.annotated ? 'Verified' : 'Unverified'
-            }}</q-tooltip>
-          </q-btn>
-        </div>
-      </div>
-
-      <!-- Option 3: Hidden, toggle with CSS to display -->
-      <div class="row items-center q-mt-xs action-row options-3 hide-option">
-        <div class="col">
-          <div class="verified-slider">
-            <q-slider
-              v-model="verifiedSlider"
-              :min="0"
-              :max="1"
-              :step="1"
-              snap
-              markers
-              marker-labels
-              label-always
-              @update:model-value="handleVerifiedSlider"
-              color="green"
-              track-size="4px"
-              thumb-size="18px"
-            />
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-btn
-            round
-            color="primary"
-            icon="save"
-            size="sm"
-            dense
-            flat
-            @click="saveDetection"
-          />
         </div>
       </div>
     </div>
@@ -335,23 +300,6 @@ const updateDetection = () => {
 .verified-chip {
   border-radius: 16px;
   height: 24px;
-}
-
-/* Hide options 2 and 3 by default - use CSS to show the one you prefer */
-.hide-option {
-  display: none;
-}
-
-/* Uncomment one of these to show the option you prefer */
-.options-1 {
-  display: flex;
-}
-/* .options-2 { display: flex !important; } */
-/* .options-3 { display: flex !important; } */
-
-.verified-slider {
-  width: 100px;
-  margin-right: 8px;
 }
 
 /* Attention levels */
