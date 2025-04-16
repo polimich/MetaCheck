@@ -30,7 +30,6 @@ export const newMetaElementState = (): MetaElementState => {
 };
 // Constants matching backend META_ELEMENT_TYPE_IDS for easier identification
 export const META_ELEMENT_TYPES = {
-  PAGE: 'e1000000-0000-4000-a000-000000000001',
   TITLE: 'e1000000-0000-4000-a000-000000000002',
   VOLUME: 'e1000000-0000-4000-a000-000000000003',
   ISSUE: 'e1000000-0000-4000-a000-000000000004',

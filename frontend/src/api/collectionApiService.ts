@@ -1,19 +1,77 @@
 import { axios, axiosErrorHandler } from './index';
-import { Collection, CollectionAddDto } from 'src/stores/collection/types';
-import { Image } from 'src/stores';
-import { CollectionDA } from 'src/types';
+import {
+  CollectionDA,
+  CollectionNewDA,
+  CollectionUpdateDA,
+  ImageDA,
+} from 'src/types/data-access';
+import {
+  CollectionListSchema,
+  CollectionSchema,
+  CollectionNewSchema,
+  CollectionUpdateSchema,
+  ImageSchema,
+} from 'src/types/validation';
+import { z } from 'zod';
+import { normalizeBbox } from 'src/utils/bboxUtils';
+
+/**
+ * Handle Zod validation errors
+ */
+const handleZodError = (error: unknown, entityName: string): string => {
+  if (error instanceof z.ZodError) {
+    console.error(`Invalid ${entityName} data received:`, error.errors);
+    return `Invalid ${entityName} data received from server`;
+  }
+  return '';
+};
+
+/**
+ * Normalize bounding box formats in collection data
+ */
+const normalizeBboxInCollection = (
+  collection: Partial<CollectionDA>,
+): Partial<CollectionDA> => {
+  if (!collection || !collection.images) return collection;
+
+  // Deep clone to avoid mutating the original
+  const normalizedCollection = JSON.parse(JSON.stringify(collection));
+
+  // Normalize all detection bboxes
+  for (const image of normalizedCollection.images) {
+    if (image.detections) {
+      for (const detection of image.detections) {
+        // Empty, null, or undefined bboxes are valid for page number detections
+        // normalizeBbox handles these cases and returns null
+        detection.bbox = normalizeBbox(detection.bbox);
+      }
+    }
+  }
+
+  return normalizedCollection;
+};
 
 /**
  * Get all collections
  */
 export const getCollections = async (): Promise<{
-  data: Collection[];
+  data: CollectionDA[];
   error: string;
 }> => {
   try {
     console.log('API: Fetching all collections');
-    const { data } = await axios.get<Collection[]>('collection');
-    return { data, error: '' };
+    const { data } = await axios.get<CollectionDA[]>('collection');
+    console.log('API: Collections:', data);
+
+    // Validate the response data
+    try {
+      const validatedData = CollectionListSchema.parse(data);
+      return { data: validatedData as unknown as CollectionDA[], error: '' };
+    } catch (validationError) {
+      const errorMessage = handleZodError(validationError, 'collections');
+      console.error('Validation error:', validationError);
+      return { data: [], error: errorMessage || 'Data validation failed' };
+    }
   } catch (error) {
     // Show notification for this error since it's a critical operation
     const errorMessage = axiosErrorHandler(error, undefined, true);
@@ -47,8 +105,25 @@ export const getCollection = async (
     const { data } = await axios.get<CollectionDA>(
       `/collection/${collectionId}`,
     );
-    console.log(`API: Successfully fetched collection ${collectionId}`);
-    return { data, error: '' };
+
+    // Log some sample bbox values for debugging
+    if (data.images?.length > 0 && data.images[0].detections?.length > 0) {
+      console.log('Sample bbox format:', data.images[0].detections[0].bbox);
+    }
+
+    // Normalize bbox formats before validation
+    const normalizedData = normalizeBboxInCollection(data);
+
+    // Validate the response data
+    try {
+      const validatedData = CollectionSchema.parse(normalizedData);
+      console.log(`API: Successfully fetched collection ${collectionId}`);
+      return { data: validatedData as unknown as CollectionDA, error: '' };
+    } catch (validationError) {
+      const errorMessage = handleZodError(validationError, 'collection');
+      console.error('Validation error:', validationError);
+      return { data: null, error: errorMessage || 'Data validation failed' };
+    }
   } catch (e) {
     // Show notification for this error since it's a critical operation
     const errorMessage = axiosErrorHandler(e, undefined, true);
@@ -60,9 +135,17 @@ export const getCollection = async (
  * Create a new collection
  */
 export const addCollection = async (
-  collection: CollectionAddDto,
+  collection: CollectionNewDA,
 ): Promise<string> => {
   try {
+    // Validate the request data
+    try {
+      CollectionNewSchema.parse(collection);
+    } catch (validationError) {
+      const errorMessage = handleZodError(validationError, 'collection');
+      return errorMessage || 'Invalid collection data';
+    }
+
     const { data } = await axios.post<{ id: string }>(
       '/collection',
       collection,
@@ -79,9 +162,17 @@ export const addCollection = async (
  * @returns Error message if there's an error, empty string if successful
  */
 export const editCollection = async (
-  collection: Collection,
+  collection: CollectionUpdateDA,
 ): Promise<string> => {
   try {
+    // Validate the request data
+    try {
+      CollectionUpdateSchema.parse(collection);
+    } catch (validationError) {
+      const errorMessage = handleZodError(validationError, 'collection update');
+      return errorMessage || 'Invalid collection update data';
+    }
+
     await axios.put(`collection/${collection.id}`, collection);
     return '';
   } catch (error) {
@@ -109,12 +200,21 @@ export const deleteCollection = async (
  */
 export const getCollectionImages = async (
   collectionId: string,
-): Promise<{ data: Image[]; error: string }> => {
+): Promise<{ data: ImageDA[]; error: string }> => {
   try {
-    const { data } = await axios.get<Image[]>(
+    const { data } = await axios.get<ImageDA[]>(
       `/collection/${collectionId}/images`,
     );
-    return { data, error: '' };
+
+    // Validate the response data
+    try {
+      const validatedData = z.array(ImageSchema).parse(data);
+      return { data: validatedData as unknown as ImageDA[], error: '' };
+    } catch (validationError) {
+      const errorMessage = handleZodError(validationError, 'images');
+      console.error('Validation error:', validationError);
+      return { data: [], error: errorMessage || 'Data validation failed' };
+    }
   } catch (error) {
     const errorMessage = axiosErrorHandler(error);
     return { data: [], error: errorMessage };
