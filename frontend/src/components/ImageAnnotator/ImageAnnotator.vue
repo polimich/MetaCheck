@@ -23,6 +23,7 @@ import AnnotatorToolbar from './AnnotatorToolbar.vue';
 import { useMetaRoleStore } from 'src/stores/meta-role-store';
 import { DetectionState } from 'src/types';
 import { onClickOutside } from '@vueuse/core';
+import { useNotificationStore } from 'src/stores/app/notificationService';
 
 // Props
 const props = defineProps({
@@ -34,6 +35,7 @@ const props = defineProps({
 const imageStore = useImageStore();
 const currentCollection = useCurrentCollectionState();
 const metaRoleStore = useMetaRoleStore();
+const notificationStore = useNotificationStore();
 
 // Store initial position and scale for reset
 const initialPosition = ref({ x: 0, y: 0 });
@@ -280,63 +282,91 @@ async function initKonva() {
 
 // Save annotations to the store/backend
 async function save() {
-  // Get the current image
-  const currentImage = currentCollection.getImageById(currentImageId.value);
+  try {
+    // Get the current image
+    const currentImage = currentCollection.getImageById(currentImageId.value);
 
-  if (currentImage) {
-    // Get latest data from composable
-    const { annotations: currentAnns, deletedAnnotations: deletedAnns } =
-      annotations.annotationsForSave.value;
+    if (currentImage) {
+      // Get latest data from composable
+      const { annotations: currentAnns, deletedAnnotations: deletedAnns } =
+        annotations.annotationsForSave.value;
 
-    // Process updates and new annotations
-    currentAnns.forEach((ann) => {
-      const existingIndex = currentImage.detections.findIndex(
-        (d) => d.id === ann.id,
-      );
-      if (existingIndex !== -1) {
-        // Update existing detection - only assign properties managed by this component
-        currentImage.detections[existingIndex] = {
-          ...currentImage.detections[existingIndex], // Keep existing properties
-          x: ann.x,
-          y: ann.y,
-          width: ann.width,
-          height: ann.height,
-          value: ann.value,
-          computed_type: ann.computed_type,
-          computed_color: ann.computed_color,
-          computed_display_type: ann.computed_display_type,
-          confidence: ann.confidence, // Assuming confidence might be edited
-          annotated: ann.annotated, // Assuming annotated status might change
-          edited: true, // Mark as edited
-        } as DetectionState;
-      } else {
-        // Add new detection - requires creating a full object matching the store's type
-        // This might require a helper function or more info about the store's type
-        // For now, let's log a warning, as adding might be complex
-        console.warn(
-          `Cannot add new annotation with ID ${ann.id} directly, requires full store object creation.`,
+      // Reset store's arrays for tracking changes
+      imageStore.detectionsToAdd.length = 0;
+      imageStore.detectionsToDelete.length = 0;
+
+      // Process updates and new annotations
+      currentAnns.forEach((ann) => {
+        const existingIndex = currentImage.detections.findIndex(
+          (d) => d.id === ann.id,
         );
-        // Potential implementation (needs correct type from store):
-        // const newDetectionForStore = { ...ann, created_date: new Date(), /* other required fields */ };
-        // currentImage.detections.push(newDetectionForStore);
+        if (existingIndex !== -1) {
+          // Update existing detection - only assign properties managed by this component
+          currentImage.detections[existingIndex] = {
+            ...currentImage.detections[existingIndex], // Keep existing properties
+            x: ann.x,
+            y: ann.y,
+            width: ann.width,
+            height: ann.height,
+            value: ann.value,
+            computed_type: ann.computed_type,
+            computed_color: ann.computed_color,
+            computed_display_type: ann.computed_display_type,
+            confidence: ann.confidence,
+            annotated: ann.annotated,
+            edited: true, // Mark as edited
+          } as DetectionState;
+        } else {
+          // Add new detection to the store's array for adding
+          imageStore.detectionsToAdd.push({
+            ...ann,
+            created_date: new Date().toISOString(),
+            image_id: currentImageId.value,
+            collection_id: currentCollectionId.value,
+          } as DetectionState);
+        }
+      });
+
+      // Process deleted annotations
+      deletedAnns.forEach((ann) => {
+        // Add to store's array for deletion
+        imageStore.detectionsToDelete.push(ann);
+      });
+
+      // Mark image as edited if there were changes
+      if (
+        currentAnns.some((a) => a.edited) ||
+        deletedAnns.length > 0 ||
+        imageStore.detectionsToAdd.length > 0
+      ) {
+        currentImage.edited = true;
       }
-    });
 
-    // Mark image as edited if there were changes
-    if (currentAnns.some((a) => a.edited) || deletedAnns.length > 0) {
-      currentImage.edited = true;
+      // Update imageStore detections for consistency
+      imageStore.detections = [...currentAnns];
+
+      // Save all changes (create new, update existing, delete marked)
+      const saveResult = await imageStore.saveAllChanges();
+
+      if (!saveResult || !saveResult.success) {
+        notificationStore.error(
+          `Failed to save changes: ${saveResult?.error || 'Unknown error'}`,
+        );
+        console.error('Error saving changes:', saveResult?.error);
+      } else {
+        notificationStore.success('Annotations saved successfully');
+        // Clear deleted annotations after successful save
+        annotations.deletedAnnotations.value = [];
+      }
+    } else {
+      notificationStore.error('Cannot save: Image not found');
+      console.error('Cannot save: Current image not found');
     }
-
-    // Update imageStore for backward compatibility (if still needed)
-    // This might need similar logic to update/add instead of direct assignment
-    imageStore.detections = [...currentAnns]; // Keep existing logic for now, but might need refinement
-    imageStore.detectionsToDelete = [...deletedAnns];
-
-    // Save to backend
-    await imageStore.saveImage();
-
-    // Clear deleted annotations after save
-    annotations.deletedAnnotations.value = [];
+  } catch (error) {
+    notificationStore.error(
+      `Error saving annotations: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    );
+    console.error('Error in save function:', error);
   }
 }
 

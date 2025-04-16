@@ -97,7 +97,7 @@ watch(
 
     <!-- Empty state when no detections are available -->
     <div
-      v-else-if="!debouncedDetections.length && hasSeenDetections"
+      v-else-if="!debouncedDetections.length"
       class="empty-state q-pa-md text-center"
     >
       <q-icon name="inbox" size="48px" color="grey-5" />

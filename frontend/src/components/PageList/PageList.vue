@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import {
   useImageConfidence,
@@ -8,6 +8,7 @@ import {
   useImageSelection,
   useImageFiltering,
 } from 'src/composables';
+import { QScrollArea } from 'quasar';
 import PageHeader from './PageHeader.vue';
 import PageStatistics from './PageStatistics.vue';
 import ImageThumbnail from './ImageThumbnail.vue';
@@ -79,6 +80,42 @@ const {
 
 // Current active image
 const activeImageId = computed(() => currentCollection.selectedImageId);
+
+// Ref for the scroll area
+const scrollAreaRef = ref<QScrollArea | null>(null);
+
+// Function to scroll to active image
+const scrollToActiveImage = async () => {
+  if (!activeImageId.value || !scrollAreaRef.value) return;
+
+  // Wait for DOM updates
+  await nextTick();
+
+  // Find the active thumbnail element
+  const activeThumbnail = document.querySelector(
+    '.image-thumbnail.thumbnail-active',
+  ) as HTMLElement;
+
+  if (activeThumbnail) {
+    // Scroll the element into view with smooth behavior
+    scrollAreaRef.value.setScrollPosition(
+      'vertical',
+      activeThumbnail.offsetTop - 100, // Offset for better visibility
+      300, // Duration in ms
+    );
+    console.log('Scrolled to active image:', activeImageId.value);
+  }
+};
+
+// Watch for changes in activeImageId to maintain position if it changes
+watch(
+  activeImageId,
+  () => {
+    // Small delay to ensure DOM is updated
+    setTimeout(scrollToActiveImage, 100);
+  },
+  { immediate: false },
+);
 
 // Load collection data when component mounts or collectionId changes
 watch(() => props.collectionId, loadCollection, { immediate: true });
@@ -154,13 +191,26 @@ function navigateToImage(imageId: string) {
               class="view-toggle"
             />
           </div>
+          <div class="col-auto q-ml-md" v-if="activeImageId">
+            <q-btn
+              icon="my_location"
+              color="primary"
+              flat
+              round
+              dense
+              @click="scrollToActiveImage"
+              :disable="!activeImageId"
+            >
+              <q-tooltip>Scroll to active image</q-tooltip>
+            </q-btn>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Image list with status indicators -->
     <div class="page-list-content">
-      <q-scroll-area class="page-list-scroll">
+      <q-scroll-area class="page-list-scroll" ref="scrollAreaRef">
         <div v-if="currentCollection.loading" class="flex flex-center q-pa-md">
           <q-spinner color="primary" size="40px" />
         </div>

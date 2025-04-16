@@ -4,6 +4,7 @@ import { DetectionState, ImageState, newImageState } from 'src/types';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useStateManager } from 'src/stores/app/stateManager';
 import { useCollectionDataAccess } from 'stores/data-access';
+import { useNotificationStore } from 'src/stores/app/notificationService';
 
 // Constants
 const STORAGE_KEY = 'image-store';
@@ -13,6 +14,7 @@ export const useImageStore = defineStore('images', () => {
   const currentCollectionState = useCurrentCollectionState();
   const stateManager = useStateManager();
   const collectionDA = useCollectionDataAccess();
+  const notificationStore = useNotificationStore();
 
   // State
   const image = ref<ImageState>(newImageState());
@@ -221,10 +223,31 @@ export const useImageStore = defineStore('images', () => {
 
   // CRUD operations for detections
   const saveImage = async () => {
-    // This is a placeholder for any future functionality needed to save the image itself
-    // Currently, we only save detections, not the image
-    console.log('Save image operation placeholder');
-    return { success: true };
+    console.log('Saving image and all associated detections');
+    loading.value = true;
+    error.value = '';
+
+    try {
+      // Use the existing saveAllChanges method to perform the actual saving
+      const result = await saveAllChanges();
+
+      if (result.success) {
+        notificationStore.success('Changes saved successfully');
+        return { success: true };
+      } else {
+        notificationStore.error(`Failed to save changes: ${result.error}`);
+        return { success: false, error: result.error };
+      }
+    } catch (e) {
+      const errorMessage =
+        e instanceof Error ? e.message : 'Unknown error occurred';
+      error.value = `Failed to save image: ${errorMessage}`;
+      notificationStore.error(error.value);
+      console.error('Error saving image:', e);
+      return { success: false, error: error.value };
+    } finally {
+      loading.value = false;
+    }
   };
 
   const createNewDetections = async () => {
@@ -382,6 +405,9 @@ export const useImageStore = defineStore('images', () => {
     loading.value = true;
     error.value = '';
 
+    // Store current image ID and state before reload
+    const currentImageId = image.value.id;
+
     try {
       console.log(`Reloading image ${image.value.id}`);
 
@@ -389,10 +415,15 @@ export const useImageStore = defineStore('images', () => {
       await currentCollectionState.reloadCollection();
 
       // Then reload the image from the updated collection
-      await loadImage(image.value.id, lastCollectionId.value);
+      await loadImage(currentImageId, lastCollectionId.value);
 
       // Finally reload the detections for the image
-      await loadDetections(image.value.id);
+      await loadDetections(currentImageId);
+
+      // Ensure the image remains selected after reload
+      if (currentImageId) {
+        currentCollectionState.selectImage(currentImageId);
+      }
 
       console.log('Image reloaded successfully');
     } catch (e) {
@@ -441,6 +472,9 @@ export const useImageStore = defineStore('images', () => {
     error.value = '';
 
     try {
+      // Store current selected image ID to restore after reload
+      const currentSelectedImageId = currentCollectionState.selectedImageId;
+
       // Execute all operations in sequence
       const createResult = await createNewDetections();
       if (!createResult.success) {
@@ -459,6 +493,11 @@ export const useImageStore = defineStore('images', () => {
 
       // Reload image to refresh state after all changes
       await reloadImage();
+
+      // Restore the selected image after reload
+      if (currentSelectedImageId) {
+        currentCollectionState.selectImage(currentSelectedImageId);
+      }
 
       return { success: true };
     } catch (e) {
