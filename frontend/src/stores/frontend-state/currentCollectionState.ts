@@ -8,6 +8,7 @@ import {
   MetaElementState,
 } from 'src/types';
 import { ImageAddDto } from 'src/stores';
+import { MetaRoleState } from 'src/types/frontend-state/meta_role.state';
 
 export const useCurrentCollectionState = defineStore(
   'currentCollectionState',
@@ -34,6 +35,8 @@ export const useCurrentCollectionState = defineStore(
     const articles = ref<MetaElementState[]>([]);
     const edited = ref(false);
     const selectedImageId = ref<string>('');
+
+    const availableMetaRoles = ref<MetaRoleState[]>([]);
 
     const loading = ref(false);
     const loaded = ref(false);
@@ -66,6 +69,19 @@ export const useCurrentCollectionState = defineStore(
         return images.value;
       } else {
         console.error('Images not found');
+        return [];
+      }
+    });
+
+    const metaRolesOptionsGetter = computed(() => {
+      if (availableMetaRoles.value) {
+        return availableMetaRoles.value.map((role) => ({
+          label: role.computed_display_name,
+          value: role.computed_name,
+          color: role.color,
+        }));
+      } else {
+        console.error('Meta roles not found');
         return [];
       }
     });
@@ -143,6 +159,8 @@ export const useCurrentCollectionState = defineStore(
           // Clear selected image when loading a new collection
           selectedImageId.value = '';
 
+          availableMetaRoles.value = collectionDA.availableMetaRoles;
+
           loaded.value = true;
           console.log(
             `Loaded collection ${id.value} with ${images.value?.length || 0} images`,
@@ -156,6 +174,7 @@ export const useCurrentCollectionState = defineStore(
         console.error('Error in loadCollection:', e);
       } finally {
         setLoading(false);
+        console.log('loaded', images.value);
       }
     };
 
@@ -269,6 +288,8 @@ export const useCurrentCollectionState = defineStore(
       imagesGetter,
       reloadCollection,
       resetState,
+      availableMetaRoles,
+      metaRolesOptionsGetter,
     };
   },
 );

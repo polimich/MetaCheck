@@ -15,4 +15,8 @@ export type ImageDA = BaseDA & {
   detections: DetectionDA[];
   page_meta_element: MetaElementDA;
   order: number;
+  page_index: string;
+  page_index_confidence: number;
+  page_type: string;
+  page_type_confidence: number;
 };

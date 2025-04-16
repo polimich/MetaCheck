@@ -25,7 +25,7 @@ export const useMetaRoleStore = defineStore('metaRole', () => {
     return map;
   });
 
-  const getMetaRoleSelectOptions = computed(() => {
+  const getAllMetaRoleSelectOptions = computed(() => {
     return metaRoles.value.map((role) => ({
       label: role.computed_display_name,
       value: role.computed_name,
@@ -102,7 +102,7 @@ export const useMetaRoleStore = defineStore('metaRole', () => {
 
   return {
     metaRoles,
-    getMetaRoleSelectOptions,
+    getAllMetaRoleSelectOptions,
     getIdByComputedName,
     loading,
     loaded,

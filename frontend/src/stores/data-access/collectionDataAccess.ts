@@ -26,6 +26,7 @@ import {
 } from 'src/stores/collection/types';
 import { ImageAddDto } from 'src/stores/image/types';
 import { DAResponse } from './types';
+import { MetaRoleState } from 'src/types/frontend-state/meta_role.state';
 
 // Cache configuration
 const CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutes
@@ -40,6 +41,7 @@ export const useCollectionDataAccess = defineStore(
     const loaded = ref(false);
     const error = ref('');
     const currentCollectionId = ref('');
+    const availableMetaRoles = ref<MetaRoleState[]>([]);
 
     // Cache management
     const lastCollectionFetch = ref<Record<string, number>>({});
@@ -112,6 +114,7 @@ export const useCollectionDataAccess = defineStore(
               resolve({ error: response.error });
             } else if (response.data) {
               collection.value = response.data;
+              console.log('collection', collection.value);
               loaded.value = true;
               lastCollectionFetch.value[collectionId] = Date.now();
               resolve({ data: response.data, error: undefined });
@@ -196,6 +199,7 @@ export const useCollectionDataAccess = defineStore(
 
       // Store the promise for deduplication
       pendingRequests.value[requestKey] = requestPromise;
+      console.log('requestPromise', requestPromise);
       return requestPromise;
     };
 
@@ -596,6 +600,7 @@ export const useCollectionDataAccess = defineStore(
       loaded,
       error,
       currentCollectionId,
+      availableMetaRoles,
       init,
       loadCollection,
       loadCollections,

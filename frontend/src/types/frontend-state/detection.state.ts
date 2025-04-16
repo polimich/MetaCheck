@@ -1,5 +1,6 @@
 import { BaseState } from 'src/types/frontend-state/base.state.ts';
 import { v4 as uuidv4 } from 'uuid';
+import { ImageState } from '..';
 
 export type MetaRoleOption = {
   id: string;
@@ -26,9 +27,8 @@ export type DetectionState = BaseState & {
   last_change: string;
   last_access: string;
   deleted: boolean;
-
+  page_index_for?: ImageState;
   // Meta role properties
-  availableMetaRoles?: MetaRoleOption[];
   loadingMetaRoles?: boolean;
 };
 
@@ -51,7 +51,6 @@ export const newDetectionState = (): DetectionState => {
     computed_type: '',
     computed_color: '',
     computed_display_type: '',
-    availableMetaRoles: [],
     loadingMetaRoles: true,
   };
 };

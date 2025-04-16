@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { DetectionState } from 'src/types/frontend-state';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useImageStore } from 'src/stores/image/storeImages';
 import { useLoadingState } from 'src/stores/app/loadingState';
 
@@ -9,13 +9,10 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-const emit = defineEmits<{
-  (event: 'load-meta-roles', detectionId: string): void;
-}>();
-
 // Stores
 const imageStore = useImageStore();
 const loadingState = useLoadingState();
+console.log(imageStore.image);
 
 // Local state
 const detection = ref<DetectionState>(props.detection);
@@ -24,23 +21,6 @@ const selectValue = ref({
   label: detection.value.computed_display_type,
   id: detection.value.computed_type,
   color: detection.value.computed_color,
-});
-
-// Load meta roles if they're not already loaded
-onMounted(() => {
-  if (
-    !detection.value.availableMetaRoles ||
-    detection.value.availableMetaRoles.length === 0
-  ) {
-    // Track if we requested metadata already to prevent infinite loading
-    if (!detection.value.loadingMetaRoles) {
-      console.log(
-        `AnnotationListItem: Loading meta roles for detection ${detection.value.id}`,
-      );
-      detection.value.loadingMetaRoles = true;
-      emit('load-meta-roles', detection.value.id);
-    }
-  }
 });
 
 // Get confidence value with a default of 0
@@ -67,7 +47,7 @@ const attentionLevel = computed(() => {
 
 // Use availableMetaRoles from detection
 const optionsValue = computed(() => {
-  return detection.value.availableMetaRoles || [];
+  return imageStore.availableMetaRolesOptions;
 });
 
 // Computed property for loading state

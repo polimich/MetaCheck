@@ -13,6 +13,10 @@ export type ImageState = BaseState & {
   order: number;
   detections: DetectionState[];
   page?: MetaElementState;
+  page_index: string;
+  page_index_confidence: number;
+  page_type: string;
+  page_type_confidence: number;
 };
 
 export const newImageState = (): ImageState => {
@@ -28,5 +32,9 @@ export const newImageState = (): ImageState => {
     detections: [],
     edited: false,
     order: 0,
+    page_index: '',
+    page_index_confidence: 0,
+    page_type: '',
+    page_type_confidence: 0,
   };
 };

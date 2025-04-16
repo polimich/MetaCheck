@@ -123,6 +123,10 @@ function ImageDAtoState(imageDA: ImageDA): ImageState {
     page: page,
     order: imageDA.order,
     edited: false,
+    page_index: imageDA.page_index,
+    page_index_confidence: imageDA.page_index_confidence,
+    page_type: imageDA.page_type,
+    page_type_confidence: imageDA.page_type_confidence,
   };
 }
 

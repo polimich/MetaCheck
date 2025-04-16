@@ -118,7 +118,7 @@ function addAlpha(color: string, opacity: number) {
 }
 
 // --- Metadata Input State ---
-const metaRoles = computed(() => metaRoleStore.getMetaRoleSelectOptions);
+const metaRoles = computed(() => metaRoleStore.getAllMetaRoleSelectOptions);
 const selectedMetaRole = ref<string | null>(null);
 const annotationValue = ref<string>('');
 const metaInputPanelRef = ref<HTMLDivElement | null>(null);

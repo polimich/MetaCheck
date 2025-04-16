@@ -28,6 +28,14 @@ export const useImageStore = defineStore('images', () => {
   const detectionsToDelete = ref<DetectionState[]>([]);
   const detectionsToAdd = ref<DetectionState[]>([]);
 
+  const availableMetaRolesOptions = ref<
+    {
+      label: string;
+      value: string;
+      color: string;
+    }[]
+  >([]);
+
   // Getters
   const isLoaded = computed(() => {
     return image.value.id !== '' && detections.value.length > 0;
@@ -120,6 +128,8 @@ export const useImageStore = defineStore('images', () => {
 
       // Get the image from collection state
       const currentImage = currentCollectionState.getImageById(imageId);
+      availableMetaRolesOptions.value =
+        currentCollectionState.metaRolesOptionsGetter;
 
       if (currentImage) {
         // Set the image in our local state
@@ -178,11 +188,9 @@ export const useImageStore = defineStore('images', () => {
       );
 
       // Initialize detections with meta role properties
-      detections.value = image.value.detections.map((detection) => ({
-        ...detection,
-        availableMetaRoles: [],
-        loadingMetaRoles: true,
-      }));
+      detections.value = image.value.detections.filter(
+        (detection) => detection.page_index_for === undefined,
+      );
 
       // Backup the IDs for later comparison
       detectionIdsBackup.value = detections.value.map((d) => d.id);
@@ -538,5 +546,6 @@ export const useImageStore = defineStore('images', () => {
     resetState,
     persistState,
     clearPersistedState,
+    availableMetaRolesOptions,
   };
 });

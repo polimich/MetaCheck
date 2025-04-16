@@ -106,14 +106,9 @@ export const getCollection = async (
       `/collection/${collectionId}`,
     );
 
-    // Log some sample bbox values for debugging
-    if (data.images?.length > 0 && data.images[0].detections?.length > 0) {
-      console.log('Sample bbox format:', data.images[0].detections[0].bbox);
-    }
-
     // Normalize bbox formats before validation
     const normalizedData = normalizeBboxInCollection(data);
-
+    console.log('normalizedData', normalizedData);
     // Validate the response data
     try {
       const validatedData = CollectionSchema.parse(normalizedData);

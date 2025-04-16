@@ -58,6 +58,10 @@ export const ImageSchema = BaseSchema.extend({
   detections: z.array(DetectionSchema),
   page_meta_element: MetaElementSchema.nullable().optional(),
   order: z.number().int().nonnegative().optional(),
+  page_index: z.string().optional(),
+  page_index_confidence: z.number().min(0).max(1).optional(),
+  page_type: z.string().optional(),
+  page_type_confidence: z.number().min(0).max(1).optional(),
 });
 export type ImageSchemaType = z.infer<typeof ImageSchema>;
 
