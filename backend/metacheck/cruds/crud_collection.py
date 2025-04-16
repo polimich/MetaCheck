@@ -614,107 +614,211 @@ async def _process_detections(db: AsyncSession, metakat_data: dict, collection_i
     """Process all detections, linking them to images and meta elements"""
     logger.info("PHASE 3: Processing detections...")
     
-    all_detections = metakat_data.get("detections", [])
+    regular_detections = metakat_data.get("detections", [])
+    page_number_detections = metakat_data.get("page_number_detections", [])
     
     verification_stats = {
-        "total_detections": len(all_detections),
+        "total_detections": len(regular_detections) + len(page_number_detections),
         "success": 0,
-        "failed": 0
+        "failed": 0,
+        "page_numbers": 0
     }
     
-    if not all_detections:
+    if verification_stats["total_detections"] == 0:
         logger.info("No detections to process")
         return verification_stats
     
-    logger.info(f"Processing {verification_stats['total_detections']} total detections")
+    logger.info(f"Processing {len(regular_detections)} regular detections and {len(page_number_detections)} page number detections")
     
-    async with db.begin():
-        meta_roles_query = await db.execute(select(model.MetaRole))
-        meta_roles = meta_roles_query.unique().scalars().all()
-        
-        meta_roles_by_name = {}
-        for role in meta_roles:
-            if hasattr(role, 'computed_name'):
-                meta_roles_by_name[role.computed_name] = role.id
-        
-        logger.info(f"Found {len(meta_roles_by_name)} meta roles for classification")
-        
-        for detection in all_detections:
-            try:
-                detection_dict = detection.copy()
-                detection_id = UUID(detection_dict.get("id"))
-                
-                detection_check = await db.execute(
-                    select(model.Detection).filter(model.Detection.id == detection_id)
-                )
-                if detection_check.unique().scalar_one_or_none():
-                    logger.info(f"Detection already exists: {detection_id}")
+    # First process regular detections
+    try:
+        async with db.begin():
+            meta_roles_query = await db.execute(select(model.MetaRole))
+            meta_roles = meta_roles_query.unique().scalars().all()
+            
+            meta_roles_by_name = {}
+            for role in meta_roles:
+                if hasattr(role, 'computed_name'):
+                    meta_roles_by_name[role.computed_name] = role.id
+            
+            logger.info(f"Found {len(meta_roles_by_name)} meta roles for classification")
+            
+            # Process regular detections
+            for detection in regular_detections:
+                try:
+                    detection_dict = detection.copy()
+                    detection_id = UUID(detection_dict.get("id"))
+                    
+                    detection_check = await db.execute(
+                        select(model.Detection).filter(model.Detection.id == detection_id)
+                    )
+                    if detection_check.unique().scalar_one_or_none():
+                        logger.info(f"Detection already exists: {detection_id}")
+                        success_counters["detections"] += 1
+                        verification_stats["success"] += 1
+                        continue
+                    
+                    image_id = detection_dict.get("page_id") or detection_dict.get("image_id")
+                    
+                    if not image_id:
+                        logger.warning(f"No image found for detection: {detection_id}, skipping")
+                        continue
+                    
+                    image_check = await db.execute(
+                        select(model.Image).filter(model.Image.id == image_id)
+                    )
+                    db_image = image_check.unique().scalar_one_or_none()
+                    
+                    if not db_image:
+                        logger.warning(f"Image {image_id} doesn't exist for detection {detection_id}")
+                        verification_stats["failed"] += 1
+                        continue
+                    else:
+                        logger.info(f"Found image {image_id} for detection {detection_id}")
+                        mapped_image_id = image_id
+                    
+                    detection_obj = base_objects.DetectionNew(
+                        id=detection_id,
+                        image_id=str(mapped_image_id),
+                        bbox=detection_dict.get("bbox"),
+                        value=detection_dict.get("value"),
+                        confidence=detection_dict.get("confidence")
+                    )
+                    
+                    db_detection = model.Detection(**detection_obj.model_dump())
+                    db.add(db_detection)
                     success_counters["detections"] += 1
                     verification_stats["success"] += 1
-                    continue
-                
-                image_id = detection_dict.get("page_id") or detection_dict.get("image_id")
-                
-                if not image_id:
-                    logger.warning(f"No image found for detection: {detection_id}, skipping")
-                    continue
-                
-                image_check = await db.execute(
-                    select(model.Image).filter(model.Image.id == image_id)
-                )
-                db_image = image_check.unique().scalar_one_or_none()
-                
-                if not db_image:
-                    logger.warning(f"Image {image_id} doesn't exist for detection {detection_id}")
-                    verification_stats["failed"] += 1
-                    continue
-                else:
-                    logger.info(f"Found image {image_id} for detection {detection_id}")
-                    mapped_image_id = image_id
-                
-                detection_obj = base_objects.DetectionNew(
-                    id=detection_id,
-                    image_id=str(mapped_image_id),
-                    bbox=detection_dict.get("bbox"),
-                    value=detection_dict.get("value"),
-                    confidence=detection_dict.get("confidence")
-                )
-                
-                db_detection = model.Detection(**detection_obj.model_dump())
-                db.add(db_detection)
-                success_counters["detections"] += 1
-                verification_stats["success"] += 1
-                logger.info(f"Created detection: {detection_id}")
-                
-                meta_element_id = detection_dict.get("parent_element_id")
-                meta_element_type = detection_dict.get("element_type")
-                meta_attribute_type = detection_dict.get("meta_attribute_type")
-                
-                if not meta_element_id or not meta_element_type or not meta_attribute_type:
-                    logger.warning(f"Missing metadata for detection {detection_id}")
-                    continue
-                
-                computed_name = f"{meta_element_type}.{meta_attribute_type}"
-                meta_role_id = meta_roles_by_name.get(computed_name)
-                if not meta_role_id:
-                    logger.warning(f"No meta role found for {computed_name}")
-                    continue
-                
-                meta_element_detection = base_objects.MetaElementDetectionNew(
-                    id=uuid.uuid4(),
-                    detection_id=detection_id,
-                    meta_element_id=meta_element_id,
-                    meta_role_id=meta_role_id
-                )
-                
-                db_meta_element_detection = model.MetaElementDetection(**meta_element_detection.model_dump())
-                db.add(db_meta_element_detection)  
-                success_counters["meta_element_detections"] += 1
-                logger.info(f"Created meta element detection for {computed_name}")
-                
-            except Exception as e:
-                detection_id = detection.get("id", "unknown")
-                logger.warning(f"Failed to process detection {detection_id}: {e}")
+                    logger.info(f"Created detection: {detection_id}")
+                    
+                    meta_element_id = detection_dict.get("parent_element_id")
+                    meta_element_type = detection_dict.get("element_type")
+                    meta_attribute_type = detection_dict.get("meta_attribute_type")
+                    
+                    if not meta_element_id or not meta_element_type or not meta_attribute_type:
+                        logger.warning(f"Missing metadata for detection {detection_id}")
+                        continue
+                    
+                    computed_name = f"{meta_element_type}.{meta_attribute_type}"
+                    meta_role_id = meta_roles_by_name.get(computed_name)
+                    if not meta_role_id:
+                        logger.warning(f"No meta role found for {computed_name}")
+                        continue
+                    
+                    meta_element_detection = base_objects.MetaElementDetectionNew(
+                        id=uuid.uuid4(),
+                        detection_id=detection_id,
+                        meta_element_id=meta_element_id,
+                        meta_role_id=meta_role_id
+                    )
+                    
+                    db_meta_element_detection = model.MetaElementDetection(**meta_element_detection.model_dump())
+                    db.add(db_meta_element_detection)  
+                    success_counters["meta_element_detections"] += 1
+                    logger.info(f"Created meta element detection for {computed_name}")
+                    
+                except Exception as e:
+                    detection_id = detection.get("id", "unknown")
+                    logger.warning(f"Failed to process detection {detection_id}: {e}")
+    except Exception as e:
+        logger.error(f"Error processing regular detections: {e}")
+    
+    # Process page number detections in two steps
+    detection_ids_created = []
+    detection_to_image_map = {}
+    
+    # Step 1: Create all page number detections first
+    try:
+        async with db.begin():
+            for detection in page_number_detections:
+                try:
+                    detection_dict = detection.copy()
+                    detection_id = UUID(detection_dict.get("id"))
+                    
+                    detection_check = await db.execute(
+                        select(model.Detection).filter(model.Detection.id == detection_id)
+                    )
+                    if detection_check.unique().scalar_one_or_none():
+                        logger.info(f"Page number detection already exists: {detection_id}")
+                        success_counters["detections"] += 1
+                        verification_stats["page_numbers"] += 1
+                        verification_stats["success"] += 1
+                        detection_ids_created.append(detection_id)
+                        continue
+                    
+                    # Get the parent element ID (page) that this detection belongs to
+                    parent_element_id = detection_dict.get("parent_element_id")
+                    if not parent_element_id:
+                        logger.warning(f"No parent element found for page number detection: {detection_id}, skipping")
+                        continue
+                    
+                    # Find the image associated with this parent element
+                    image_check = await db.execute(
+                        select(model.Image).filter(model.Image.id == parent_element_id)
+                    )
+                    db_image = image_check.unique().scalar_one_or_none()
+                    
+                    if not db_image:
+                        logger.warning(f"No image found for parent element {parent_element_id}, skipping")
+                        verification_stats["failed"] += 1
+                        continue
+                    
+                    # Create the detection
+                    detection_obj = base_objects.DetectionNew(
+                        id=detection_id,
+                        image_id=str(db_image.id),
+                        bbox="",  # Empty bbox for page numbers
+                        value=detection_dict.get("value"),
+                        confidence=detection_dict.get("confidence")
+                    )
+                    
+                    db_detection = model.Detection(**detection_obj.model_dump())
+                    db.add(db_detection)
+                    
+                    # Store the ID for later association
+                    detection_ids_created.append(detection_id)
+                    detection_to_image_map[detection_id] = db_image.id
+                    
+                    success_counters["detections"] += 1
+                    verification_stats["page_numbers"] += 1
+                    verification_stats["success"] += 1
+                    logger.info(f"Created page number detection: {detection_id} for image: {db_image.id}")
+                    
+                except Exception as e:
+                    detection_id = detection.get("id", "unknown")
+                    logger.warning(f"Failed to process page number detection {detection_id}: {e}")
+        
+        logger.info(f"Successfully created {len(detection_ids_created)} page number detections")
+    except Exception as e:
+        logger.error(f"Error creating page number detections: {e}")
+    
+    # Step 2: Now update the images to link to the detections in a separate transaction
+    if detection_ids_created:
+        try:
+            async with db.begin():
+                for detection_id, image_id in detection_to_image_map.items():
+                    try:
+                        # Verify the detection exists
+                        detection_check = await db.execute(
+                            select(model.Detection).filter(model.Detection.id == detection_id)
+                        )
+                        if not detection_check.unique().scalar_one_or_none():
+                            logger.warning(f"Detection {detection_id} not found when linking to image")
+                            continue
+                        
+                        # Update the image to link to this detection
+                        await db.execute(
+                            update(model.Image)
+                            .where(model.Image.id == image_id)
+                            .values(page_index_id=detection_id)
+                        )
+                        logger.info(f"Linked detection {detection_id} to image {image_id} as page_index_id")
+                    except Exception as e:
+                        logger.warning(f"Failed to link detection {detection_id} to image {image_id}: {e}")
+            
+            logger.info(f"Successfully linked page number detections to images")
+        except Exception as e:
+            logger.error(f"Error linking page number detections to images: {e}")
     
     return verification_stats
 

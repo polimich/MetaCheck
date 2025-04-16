@@ -35,11 +35,13 @@ ATTRIBUTE_TYPES = [
     "series_name", 
     "series_number", 
     "abstract", 
-    "keywords"
+    "keywords",
+    "page_number"
 ]
 
 # Base colors for element types
 ELEMENT_COLORS = {
+    "page": "#39A40B",      # Green
     "title": "#9B372A",     # Dark Red
     "volume": "#3643F5",    # Blue
     "issue": "#8B4513",     # Brown
@@ -57,6 +59,7 @@ VOLUME_ATTRIBUTES = [
 ]
 
 ELEMENT_ATTRIBUTE_MAPPINGS = {
+    "page": ["page_number"],
     "title": VOLUME_ATTRIBUTES,
     "volume": VOLUME_ATTRIBUTES,
     "issue": [

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import json
 import sys
+import os
 from enum import Enum
 from typing import List, Dict, Tuple, Optional, Union, get_args, get_origin
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, field_validator, model_serializer
+
+# Add the parent directory to sys.path for direct script execution
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from metacheck.schemas.base_objects.enums import PageType
 
@@ -235,6 +240,7 @@ def extract_detections_from_element(element, detection_to_bbox, detection_to_pag
     data = element.model_dump(mode="python")
     model_fields = type(element).model_fields
     detections = []
+    page_number_detections = []
     
     for field_name, field_info in model_fields.items():
         if field_name not in data:
@@ -243,6 +249,10 @@ def extract_detections_from_element(element, detection_to_bbox, detection_to_pag
         value = data[field_name]
         snake_field_name = camel_to_snake(field_name)
         
+        # Print for debugging
+        if field_name == "pageNumber" and value is not None:
+            print(f"Found pageNumber: {value} in element: {data.get('id')}")
+        
         # Single detection
         if isinstance(value, tuple) and len(value) == 3 and isinstance(value[0], str) and \
            isinstance(value[1], float) and isinstance(value[2], UUID):
@@ -250,17 +260,24 @@ def extract_detections_from_element(element, detection_to_bbox, detection_to_pag
             bbox = detection_to_bbox.get(detection_uuid)
             page_id = detection_to_page_mapping.get(detection_uuid)
             
-            if bbox:
-                detections.append({
-                    "id": str(detection_uuid),
-                    "value": text,
-                    "confidence": confidence,
-                    "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}",
-                    "parent_element_id": str(data.get("id")),
-                    "element_type": data.get("type"),
-                    "meta_attribute_type": snake_field_name,
-                    "page_id": page_id
-                })
+            detection_data = {
+                "id": str(detection_uuid),
+                "value": text,
+                "confidence": confidence,
+                "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None,
+                "parent_element_id": str(data.get("id")),
+                "element_type": data.get("type"),
+                "meta_attribute_type": snake_field_name,
+                "page_id": page_id
+            }
+            
+            # Store page number detections separately, regardless of bbox
+            if field_name == "pageNumber":
+                print(f"Adding pageNumber detection: {detection_data}")
+                page_number_detections.append(detection_data)
+            # Add other detections only if they have a bbox
+            elif bbox:
+                detections.append(detection_data)
         
         # List of detections
         elif isinstance(value, list) and value and isinstance(value[0], tuple):
@@ -272,19 +289,25 @@ def extract_detections_from_element(element, detection_to_bbox, detection_to_pag
                     bbox = detection_to_bbox.get(detection_uuid)
                     page_id = detection_to_page_mapping.get(detection_uuid)
                     
-                    if bbox:
-                        detections.append({
-                            "id": str(detection_uuid),
-                            "value": text,
-                            "confidence": confidence,
-                            "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}",
-                            "parent_element_id": str(data.get("id")),
-                            "element_type": data.get("type"),
-                            "meta_attribute_type": snake_field_name,
-                            "page_id": page_id
-                        })
+                    detection_data = {
+                        "id": str(detection_uuid),
+                        "value": text,
+                        "confidence": confidence,
+                        "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None,
+                        "parent_element_id": str(data.get("id")),
+                        "element_type": data.get("type"),
+                        "meta_attribute_type": snake_field_name,
+                        "page_id": page_id
+                    }
+                    
+                    if field_name == "pageNumber":
+                        print(f"Adding pageNumber list detection: {detection_data}")
+                        page_number_detections.append(detection_data)
+                    elif bbox:
+                        detections.append(detection_data)
     
-    return detections
+    print(f"Extracted {len(page_number_detections)} page number detections")
+    return detections, page_number_detections
 
 
 def transform_element_for_output(element, detection_to_bbox, page_to_image_mapping):
@@ -367,16 +390,18 @@ class MetaKatImport(BaseModel):
         # Categorized collections
         elements_by_type = {etype.value: [] for etype in ElementType}
         all_detections = []
+        page_number_detections = []
         
         # Process each element
         for element in self.elements:
             # Extract all detections
-            detections = extract_detections_from_element(
+            detections, element_page_number_detections = extract_detections_from_element(
                 element, 
                 self.detection_to_bbox or {}, 
                 self.detection_to_page_mapping or {}
             )
             all_detections.extend(detections)
+            page_number_detections.extend(element_page_number_detections)
             
             # Transform the element for output
             element_data = transform_element_for_output(
@@ -390,6 +415,8 @@ class MetaKatImport(BaseModel):
             if element_type in elements_by_type:
                 elements_by_type[element_type].append(element_data)
         
+        print(f"Total page number detections gathered: {len(page_number_detections)}")
+        
         # Build final output structure
         result = {
             "batch_id": str(self.batch_id),
@@ -401,6 +428,7 @@ class MetaKatImport(BaseModel):
             "chapters": elements_by_type[ElementType.chapter.value],
             "articles": elements_by_type[ElementType.article.value],
             "detections": all_detections,
+            "page_number_detections": page_number_detections,
         }
         
         # Add page_to_alto_mapping if it exists

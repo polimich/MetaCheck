@@ -44,6 +44,7 @@ async def get_all_images(db: AsyncSession = Depends(get_async_session)):
                     id=img.id,
                     collection_id=img.collection_id,
                     parent_meta_element_id=img.parent_meta_element_id,
+                    page_index_id=img.page_index_id,
                     name=img.name,
                     height=img.height,
                     width=img.width,

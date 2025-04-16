@@ -117,7 +117,7 @@ def sqlalchemy_to_dict(obj, visited=None):
         # Special handling for MetaElement-Image relationship
         elif class_name == 'MetaElement' and key == 'image':
             if value is not None:
-                result[key] = {
+                image_dict = {
                     "id": getattr(value, 'id', None),
                     "created_date": getattr(value, 'created_date', None),
                     "last_change": getattr(value, 'last_change', None),
@@ -132,6 +132,21 @@ def sqlalchemy_to_dict(obj, visited=None):
                     "detection_count": getattr(value, 'detection_count', 0),
                     "annotated_detection_count": getattr(value, 'annotated_detection_count', 0)
                 }
+                
+                # Add page_index relationship if it exists
+                page_index = getattr(value, 'page_index', None)
+                if page_index is not None:
+                    image_dict["page_index"] = {
+                        "id": getattr(page_index, 'id', None),
+                        "created_date": getattr(page_index, 'created_date', None),
+                        "last_change": getattr(page_index, 'last_change', None),
+                        "last_access": getattr(page_index, 'last_access', None),
+                        "deleted": getattr(page_index, 'deleted', False)
+                    }
+                else:
+                    image_dict["page_index"] = None
+                
+                result[key] = image_dict
         # For regular relationships
         elif isinstance(value, list):
             # List relationships
