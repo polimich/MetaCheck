@@ -201,7 +201,15 @@ async def get_image(db: AsyncSession, image_id: UUID) -> base_objects.Image:
 
 
 async def save_image_file(
-    raw_input, image_name, collection_id, image_id, order, db: AsyncSession, page_meta_element_id=None
+    raw_input, 
+    image_name, 
+    collection_id, 
+    image_id, 
+    order, 
+    db: AsyncSession, 
+    parent_meta_element_id=None,
+    page_type=None,
+    page_type_confidence=None
 ):
     contents = np.asarray(bytearray(raw_input), dtype="uint8")
     image = cv2.imdecode(contents, cv2.IMREAD_COLOR)
@@ -229,37 +237,26 @@ async def save_image_file(
         resolution=config.IMAGE_PREVIEW_RESOLUTION,
     )
 
-    # If page_meta_element_id is not provided, we need to create a temporary one
-    if page_meta_element_id is None:
-        # Import here to avoid circular dependencies
-        from metacheck.cruds import crud_meta_element
-        from metacheck.constants import META_ELEMENT_TYPE_IDS
-        from metacheck.schemas.base_objects import MetaElementNew
-        import uuid
-
-        # Create a temporary page element
-        temp_page_id = uuid.uuid4()
-        temp_page = MetaElementNew(
-            id=temp_page_id,
-            collection_id=collection_id,
-            meta_element_type_id=META_ELEMENT_TYPE_IDS["page"],
-            attributes={"placeholder": True}
-        )
-        await crud_meta_element.create_meta_element(db, temp_page)
-        page_meta_element_id = temp_page_id
-
     # Create image record in database
     image_new = {
         "id": image_id,
         "collection_id": collection_id,
-        "page_meta_element_id": page_meta_element_id,
+        "parent_meta_element_id": parent_meta_element_id,
         "name": image_name,
         "width": image.shape[1],
         "height": image.shape[0],
         "deleted": False,
         "imagehash": imagehash,
         "work_state": base_objects.WorkState.NEW,
+        "order": order
     }
+    
+    # Add page type information if provided
+    if page_type:
+        image_new["page_type"] = page_type
+    if page_type_confidence is not None:
+        image_new["page_type_confidence"] = page_type_confidence
+        
     from metacheck.cruds import crud_general
     
     # Check if transaction is active and pass that info to crud_general.new

@@ -52,6 +52,7 @@ class Image(Entity):
         back_populates="page_index_for",
         foreign_keys=[page_index_id],
         lazy="selectin",
+        single_parent=True,
         cascade="all, delete-orphan",
     )
 

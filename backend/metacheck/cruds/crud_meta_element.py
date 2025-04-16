@@ -255,4 +255,4 @@ async def get_parent_elements_up_to_root_from_detection(
         return []
         
     # Use the existing function to get parent elements from the page meta element
-    return await get_parent_elements_up_to_root(db, image.page_meta_element_id) 
+    return await get_parent_elements_up_to_root(db, image.parent_meta_element_id) 

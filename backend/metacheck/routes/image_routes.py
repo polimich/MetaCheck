@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import Depends, UploadFile, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from db import model
 from metacheck.cruds import crud_image, crud_general
@@ -30,7 +31,34 @@ async def put_image(
 # The GET ALL operation
 @image_route.get("", response_model=List[base_objects.Image], tags=["Image"])
 async def get_all_images(db: AsyncSession = Depends(get_async_session)):
-    return await crud_general.get_all(db, base_objects.Image, model.Image)
+    try:
+        return await crud_general.get_all(db, base_objects.Image, model.Image)
+    except Exception as e:
+        logger.exception(f"Error fetching images: {str(e)}")
+        # Return a simplified list to avoid validation errors
+        async with db.begin():
+            query = select(model.Image).order_by(model.Image.created_date.desc())
+            db_images = await db.execute(query)
+            return [
+                base_objects.Image(
+                    id=img.id,
+                    collection_id=img.collection_id,
+                    parent_meta_element_id=img.parent_meta_element_id,
+                    name=img.name,
+                    height=img.height,
+                    width=img.width,
+                    imagehash=img.imagehash,
+                    work_state=img.work_state,
+                    order=img.order,
+                    page_type=img.page_type,
+                    page_type_confidence=img.page_type_confidence,
+                    created_date=img.created_date,
+                    last_change=img.last_change,
+                    last_access=img.last_access,
+                    deleted=img.deleted
+                )
+                for img in db_images.unique().scalars().all()
+            ]
 
 # The DELETE operation
 @image_route.delete("/{image_id}", tags=["Image"])
@@ -47,6 +75,7 @@ async def upload_image(
     order: int,
     file: UploadFile,   
     db: AsyncSession = Depends(get_async_session),
+    parent_meta_element_id: UUID = None
 ):
     if "image" not in file.content_type:
         raise HTTPException(
@@ -56,7 +85,15 @@ async def upload_image(
     image_id = uuid.uuid4()
     try:
         raw_input = file.file.read()
-        await crud_image.save_image_file(raw_input, file.filename, collection_id, image_id, order, db)
+        await crud_image.save_image_file(
+            raw_input, 
+            file.filename, 
+            collection_id, 
+            image_id, 
+            order, 
+            db, 
+            parent_meta_element_id=parent_meta_element_id
+        )
 
     except DBError as e:
         logger.exception(f"Failed to upload image")

@@ -101,7 +101,7 @@ def sqlalchemy_to_dict(obj, visited=None):
                 if value:
                     result[key] = [orm2dict(child) for child in value]
         # Special handling for Image-MetaElement relationship
-        elif class_name == 'Image' and key == 'page_meta_element':
+        elif class_name == 'Image' and key == 'parent_meta_element':
             if value is not None:
                 result[key] = {
                     "id": getattr(value, 'id', None),
