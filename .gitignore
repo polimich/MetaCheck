@@ -165,3 +165,6 @@ backend/.idea
 output_samples/**/*.jpg
 
 .DS_Store
+
+backend/metacheck_data/*
+
