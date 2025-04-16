@@ -17,6 +17,7 @@ from sqlalchemy.orm import joinedload
 
 from db import model
 from metacheck.cruds.crud_aux import update_all, make_preview_from_image
+from metacheck.cruds import crud_general
 from metacheck.database import DBError
 from metacheck.schemas import base_objects
 from metacheck_common.config import config
@@ -178,26 +179,7 @@ async def update_or_create_image_detections(
 
 
 async def get_image(db: AsyncSession, image_id: UUID) -> base_objects.Image:
-    try:
-        async with db.begin():
-            db_image = await db.scalar(
-                select(model.Image)
-                .options(
-                    joinedload(model.Image.detections).joinedload(model.Detection.type)
-                )
-                .filter(model.Image.id == image_id)
-            )
-            image = base_objects.Image(**model.orm2dict(db_image))
-            image.detections = [
-                base_objects.Detection(**model.orm2dict(detection), type=detection.type)
-                for detection in db_image.detections
-            ]
-
-            return image
-
-    except exc.SQLAlchemyError as e:
-        logger.exception(f"Failed reading image from database")
-        raise DBError(f"Failed reading image from database") from e
+    return await crud_general.get(db, base_objects.Image, model.Image, image_id)
 
 
 async def save_image_file(
@@ -209,7 +191,9 @@ async def save_image_file(
     db: AsyncSession, 
     parent_meta_element_id=None,
     page_type=None,
-    page_type_confidence=None
+    page_type_confidence=None,
+    page_index=None,
+    page_index_confidence=None
 ):
     contents = np.asarray(bytearray(raw_input), dtype="uint8")
     image = cv2.imdecode(contents, cv2.IMREAD_COLOR)
@@ -248,7 +232,9 @@ async def save_image_file(
         "deleted": False,
         "imagehash": imagehash,
         "work_state": base_objects.WorkState.NEW,
-        "order": order
+        "order": order,
+        "page_index": page_index,
+        "page_index_confidence": page_index_confidence
     }
     
     # Add page type information if provided

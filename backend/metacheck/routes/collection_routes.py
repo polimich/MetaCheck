@@ -52,3 +52,37 @@ async def import_collection_metakat(
 ):
     """Import a MetaKat formatted dataset"""
     return await crud_collection.import_metakat_collection(file, db)
+
+
+@collection_route.get(
+    "/{collection_id}/full",
+    response_model=base_objects.Collection,
+    tags=["Collection"],
+)
+async def get_collection_full(
+    collection_id: UUID, db: AsyncSession = Depends(get_async_session)
+):
+    """Get a collection with all its images and meta_elements explicitly loaded"""
+    # Get the collection with images and meta_elements
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    
+    query = select(model.Collection).where(model.Collection.id == collection_id)
+    query = query.options(
+        selectinload(model.Collection.images),
+        selectinload(model.Collection.meta_elements)
+    )
+    
+    async with db.begin():
+        result = await db.execute(query)
+        collection = result.unique().scalar_one_or_none()
+        
+        if not collection:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Collection with ID {collection_id} not found")
+        
+        # Convert to dictionary with all relationships
+        collection_dict = crud_general.sqlalchemy_to_dict(collection)
+        
+        # Return Pydantic model
+        return base_objects.Collection.model_validate(collection_dict)

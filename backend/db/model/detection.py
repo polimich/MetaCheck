@@ -36,14 +36,6 @@ class Detection(Entity):
         foreign_keys=[image_id],
     )
     
-    # Relationship for page_index reference (backref from Image.page_index)
-    page_index_for: Mapped[Optional["Image"]] = relationship(
-        "Image",
-        back_populates="page_index",
-        foreign_keys="Image.page_index_id",
-        uselist=False
-    )
-    
     meta_element_detections: Mapped[List["MetaElementDetection"]] = relationship(
         "MetaElementDetection",
         back_populates="detection",

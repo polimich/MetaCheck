@@ -25,10 +25,6 @@ class Image(Entity):
         ForeignKey("meta_elements.id", ondelete="CASCADE", name="fk_images_page_meta_element_id"),
         index=True, nullable=False
     )
-    page_index_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        ForeignKey("detections.id", ondelete="CASCADE", name="fk_images_page_index_id"),
-        index=True, nullable=True
-    )
     
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     height: Mapped[int] = mapped_column(nullable=False)
@@ -45,17 +41,9 @@ class Image(Entity):
         nullable=True
     )
     page_type_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)
+    page_index: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    page_index_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)
     
-    # Use string references to avoid circular imports
-    page_index: Mapped[Optional["Detection"]] = relationship(
-        "Detection",
-        back_populates="page_index_for",
-        foreign_keys=[page_index_id],
-        lazy="selectin",
-        single_parent=True,
-        cascade="all, delete-orphan",
-    )
-
     collection: Mapped["Collection"] = relationship(
         "Collection", 
         back_populates="images", 

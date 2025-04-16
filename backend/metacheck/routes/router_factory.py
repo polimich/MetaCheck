@@ -3,7 +3,7 @@ import inspect
 from typing import Type, Optional, List, Dict, Any, Callable, Union, TypeVar, Generic
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -73,12 +73,35 @@ class CRUDRouter:
             entity_id: UUID, 
             db: AsyncSession = Depends(get_async_session)
         ):
-            return await crud_general.get(
-                db, 
-                self.schema, 
-                self.model_class, 
-                entity_id
-            )
+            from fastapi import HTTPException
+            
+            try:
+                result = await crud_general.get(
+                    db, 
+                    self.schema, 
+                    self.model_class, 
+                    entity_id
+                )
+                
+                if result is None:
+                    raise HTTPException(
+                        status_code=404, 
+                        detail=f"{self.entity_name} with ID {entity_id} not found"
+                    )
+                
+                return result
+            except Exception as e:
+                # Log the error
+                logger.exception(f"Error fetching {self.entity_name} with ID {entity_id}: {str(e)}")
+                
+                # Return a 404 for "not found" cases, 500 for other errors
+                if isinstance(e, HTTPException):
+                    raise e
+                
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to retrieve {self.entity_name}. Server error: {str(e)}"
+                )
         
         @self.router.put("", tags=self.tags)
         async def update_entity(

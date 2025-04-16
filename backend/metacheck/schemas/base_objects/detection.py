@@ -32,7 +32,6 @@ class Detection(DetectionNew, BaseEntity):
     computed_color: Optional[str] = None
     computed_type: Optional[str] = None
     computed_display_type: Optional[str] = None
-    page_index_for: Optional[Image] = None  # Add relationship for page index
     
     class Config:
         from_attributes = True

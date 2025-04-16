@@ -29,5 +29,9 @@ crud_router = CRUDRouter(
 async def get_available_for_detection(detection_id: UUID, session: AsyncSession = Depends(get_async_session)):
     return await crud_meta_role.get_available_for_detection(detection_id, session)
 
+@meta_role_route.get("/available_for_collection/{collection_id}",response_model=list[base_objects.MetaRole], tags=["MetaRole"])
+async def get_available_for_collection(collection_id: UUID, session: AsyncSession = Depends(get_async_session)):
+    return await crud_meta_role.get_available_for_collection(collection_id, session)
+
 # If needed, add custom routes below:
 # @meta_role_route.get("/custom/{param}", ...) 

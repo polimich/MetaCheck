@@ -27,13 +27,8 @@ async def get_collection(
     db: AsyncSession, collection_id: UUID
 ) -> base_objects.Collection:
     try:
-        async with db.begin():
-            db_collection = await db.scalar(
-                select(model.Collection).filter(model.Collection.id == collection_id)
-            )
-            collection = base_objects.Collection(**model.orm2dict(db_collection))
-            return collection
-
+        from metacheck.cruds import crud_general
+        return await crud_general.get(db, base_objects.Collection, model.Collection, collection_id)
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed reading collection from database")
         raise DBError(f"Failed reading collection from database") from e
@@ -129,16 +124,17 @@ async def get_collection_images(
     db: AsyncSession, collection_id: UUID
 ) -> list[base_objects.Image]:
     try:
-        async with db.begin():
-            db_images = await db.execute(
-                select(model.Image).filter(model.Image.collection_id == collection_id)
-            )
-            db_images = db_images.scalars().unique().all()
-            images = [
-                base_objects.Image(**model.orm2dict(image)) for image in db_images
-            ]
-            return images
-
+        # Get the collection with all relationships loaded
+        from metacheck.cruds import crud_general
+        collection = await crud_general.get(db, base_objects.Collection, model.Collection, collection_id)
+        
+        # Check if collection exists
+        if collection is None:
+            logger.warning(f"Collection with ID {collection_id} not found")
+            return []
+        
+        # Return the images directly from the collection
+        return collection.images
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed reading images from database")
         raise DBError(f"Failed reading images from database") from e
@@ -551,6 +547,15 @@ async def _process_images(db: AsyncSession, metakat_data: dict, collection_id: U
                         
                         image_index = page_data.get("pageIndex", 0)
                         
+                        # Extract page number information
+                        page_number_info = page_data.get("pageNumber", {})
+                        page_number_value = None
+                        page_number_confidence = None
+                        
+                        if isinstance(page_number_info, dict):
+                            page_number_value = page_number_info.get("value")
+                            page_number_confidence = page_number_info.get("confidence")
+                        
                         try:
                             await crud_image.save_image_file(
                                 raw_input=raw_image_data, 
@@ -561,13 +566,14 @@ async def _process_images(db: AsyncSession, metakat_data: dict, collection_id: U
                                 db=db,
                                 parent_meta_element_id=parent_meta_element_id,
                                 page_type=page_type_value,
-                                page_type_confidence=page_type_confidence
+                                page_type_confidence=page_type_confidence,
+                                page_index=page_number_value,
+                                page_index_confidence=page_number_confidence
                             )
                             
                             logger.info(f"Added image {image_id} to session")
                             image_id_map[str(image_id)] = image_id
                             success_counters["images"] += 1
-                            
                         except Exception as e:
                             logger.warning(f"Failed to save image {image_id}: {str(e)}")
                     except Exception as e:
@@ -722,103 +728,6 @@ async def _process_detections(db: AsyncSession, metakat_data: dict, collection_i
                     logger.warning(f"Failed to process detection {detection_id}: {e}")
     except Exception as e:
         logger.error(f"Error processing regular detections: {e}")
-    
-    # Process page number detections in two steps
-    detection_ids_created = []
-    detection_to_image_map = {}
-    
-    # Step 1: Create all page number detections first
-    try:
-        async with db.begin():
-            for detection in page_number_detections:
-                try:
-                    detection_dict = detection.copy()
-                    detection_id = UUID(detection_dict.get("id"))
-                    
-                    detection_check = await db.execute(
-                        select(model.Detection).filter(model.Detection.id == detection_id)
-                    )
-                    if detection_check.unique().scalar_one_or_none():
-                        logger.info(f"Page number detection already exists: {detection_id}")
-                        success_counters["detections"] += 1
-                        verification_stats["page_numbers"] += 1
-                        verification_stats["success"] += 1
-                        detection_ids_created.append(detection_id)
-                        continue
-                    
-                    # Get the parent element ID (page) that this detection belongs to
-                    parent_element_id = detection_dict.get("parent_element_id")
-                    if not parent_element_id:
-                        logger.warning(f"No parent element found for page number detection: {detection_id}, skipping")
-                        continue
-                    
-                    # Find the image associated with this parent element
-                    image_check = await db.execute(
-                        select(model.Image).filter(model.Image.id == parent_element_id)
-                    )
-                    db_image = image_check.unique().scalar_one_or_none()
-                    
-                    if not db_image:
-                        logger.warning(f"No image found for parent element {parent_element_id}, skipping")
-                        verification_stats["failed"] += 1
-                        continue
-                    
-                    # Create the detection
-                    detection_obj = base_objects.DetectionNew(
-                        id=detection_id,
-                        image_id=str(db_image.id),
-                        bbox="",  # Empty bbox for page numbers
-                        value=detection_dict.get("value"),
-                        confidence=detection_dict.get("confidence")
-                    )
-                    
-                    db_detection = model.Detection(**detection_obj.model_dump())
-                    db.add(db_detection)
-                    
-                    # Store the ID for later association
-                    detection_ids_created.append(detection_id)
-                    detection_to_image_map[detection_id] = db_image.id
-                    
-                    success_counters["detections"] += 1
-                    verification_stats["page_numbers"] += 1
-                    verification_stats["success"] += 1
-                    logger.info(f"Created page number detection: {detection_id} for image: {db_image.id}")
-                    
-                except Exception as e:
-                    detection_id = detection.get("id", "unknown")
-                    logger.warning(f"Failed to process page number detection {detection_id}: {e}")
-        
-        logger.info(f"Successfully created {len(detection_ids_created)} page number detections")
-    except Exception as e:
-        logger.error(f"Error creating page number detections: {e}")
-    
-    # Step 2: Now update the images to link to the detections in a separate transaction
-    if detection_ids_created:
-        try:
-            async with db.begin():
-                for detection_id, image_id in detection_to_image_map.items():
-                    try:
-                        # Verify the detection exists
-                        detection_check = await db.execute(
-                            select(model.Detection).filter(model.Detection.id == detection_id)
-                        )
-                        if not detection_check.unique().scalar_one_or_none():
-                            logger.warning(f"Detection {detection_id} not found when linking to image")
-                            continue
-                        
-                        # Update the image to link to this detection
-                        await db.execute(
-                            update(model.Image)
-                            .where(model.Image.id == image_id)
-                            .values(page_index_id=detection_id)
-                        )
-                        logger.info(f"Linked detection {detection_id} to image {image_id} as page_index_id")
-                    except Exception as e:
-                        logger.warning(f"Failed to link detection {detection_id} to image {image_id}: {e}")
-            
-            logger.info(f"Successfully linked page number detections to images")
-        except Exception as e:
-            logger.error(f"Error linking page number detections to images: {e}")
     
     return verification_stats
 

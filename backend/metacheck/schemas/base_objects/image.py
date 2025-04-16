@@ -36,7 +36,8 @@ class Image(BaseEntity):
     annotated_detection_count: int
     parent_meta_element: Optional[MetaElement] = None  # Renamed from page_meta_element
     order: int
-    page_index: Optional[Detection] = None  # Add page_index field
+    page_index: Optional[str] = None  # Changed from Detection to string
+    page_index_confidence: Optional[float] = None  # Add page_index_confidence field
     page_type: Optional[PageType] = None  # Add page_type field
     page_type_confidence: Optional[float] = None  # Add page_type_confidence field
     
@@ -52,7 +53,8 @@ class ImageUpdate(BaseModel):
     work_state: Optional[WorkState] = None
     page_type: Optional[PageType] = None  # Add page_type field
     page_type_confidence: Optional[float] = None  # Add page_type_confidence field
-    page_index_id: Optional[UUID] = None  # Add page_index_id field
+    page_index: Optional[str] = None  # Changed from UUID to string
+    page_index_confidence: Optional[float] = None  # Add page_index_confidence field
     last_change: Optional[datetime] = None
     last_access: Optional[datetime] = None
     deleted: Optional[bool] = None

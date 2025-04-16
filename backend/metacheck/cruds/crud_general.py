@@ -63,102 +63,208 @@ def sqlalchemy_to_dict(obj, visited=None):
         logger.warning(f"orm2dict failed for {obj.__class__.__name__}: {str(e)}")
         result = {"id": obj_id} if obj_id else {}
     
+    # Special handling for Image to always include detections
+    class_name = obj.__class__.__name__
+    if class_name == 'Image':
+        # For Images, we need to ensure detections are included
+        try:
+            detections = getattr(obj, 'detections', [])
+            if detections:
+                detections_list = []
+                for detection in detections:
+                    detection_dict = {
+                        "id": getattr(detection, 'id', None),
+                        "created_date": getattr(detection, 'created_date', None),
+                        "last_change": getattr(detection, 'last_change', None),
+                        "last_access": getattr(detection, 'last_access', None),
+                        "deleted": getattr(detection, 'deleted', False),
+                        "image_id": getattr(detection, 'image_id', None),
+                        "bbox": getattr(detection, 'bbox', ""),
+                        "value": getattr(detection, 'value', ""),
+                        "confidence": getattr(detection, 'confidence', None),
+                        "annotated": getattr(detection, 'annotated', False),
+                        "computed_color": getattr(detection, 'computed_color', None),
+                        "computed_type": getattr(detection, 'computed_type', None),
+                        "computed_display_type": getattr(detection, 'computed_display_type', None)
+                    }
+                    detections_list.append(detection_dict)
+                
+                result["detections"] = detections_list
+            else:
+                result["detections"] = []
+        except Exception as e:
+            logger.warning(f"Error handling Image detections: {str(e)}")
+    
+    # Special handling for Collection to ensure images and meta_elements are included
+    elif class_name == 'Collection':
+        try:
+            # Handle images relationship
+            images = getattr(obj, 'images', [])
+            if images:
+                images_list = []
+                for image in images:
+                    # Skip if we've already visited this image to prevent circular references
+                    if str(image.id) in visited:
+                        continue
+                    image_dict = sqlalchemy_to_dict(image, visited.copy())
+                    images_list.append(image_dict)
+                result["images"] = images_list
+            else:
+                result["images"] = []
+                
+            # Handle meta_elements relationship
+            meta_elements = getattr(obj, 'meta_elements', [])
+            if meta_elements:
+                meta_elements_list = []
+                for meta_element in meta_elements:
+                    # Skip if we've already visited this meta_element to prevent circular references
+                    if str(meta_element.id) in visited:
+                        continue
+                    meta_element_dict = sqlalchemy_to_dict(meta_element, visited.copy())
+                    meta_elements_list.append(meta_element_dict)
+                result["meta_elements"] = meta_elements_list
+            else:
+                result["meta_elements"] = []
+        except Exception as e:
+            logger.warning(f"Error handling Collection relationships: {str(e)}")
+    
     # CRITICAL: Only access attributes that are already in __dict__
     # This prevents triggering lazy loads which require async context
     obj_dict = obj.__dict__
     
-    # Get class name for type-specific handling
-    class_name = obj.__class__.__name__
-    
-    # Determine which relationships are already loaded
     # Skip SQLAlchemy internal attributes that start with _
     for key, value in obj_dict.items():
-        if key.startswith('_') or key in result:
+        # Skip SQLAlchemy internal attributes
+        if key.startswith('_sa_'):
             continue
             
-        # Skip if not a proper relationship
-        if not hasattr(obj.__class__, key):
-            continue
+        # Handle SQLAlchemy loaded relationship attributes
+        if key.startswith('_'):
+            # This is a SQLAlchemy relationship attribute, get the real name
+            real_key = key[1:]  # Remove leading underscore
             
-        attr = getattr(obj.__class__, key)
-        if not hasattr(attr, 'prop'):
-            continue
-            
-        # Handle different relationship types safely
-        if value is None:
-            result[key] = None
-            continue
-            
-        # Special handling for MetaElement parent/children to prevent circular refs
-        if class_name == 'MetaElement' and key in ('parent', 'children'):
-            if key == 'parent':
-                # For parent, include basic info without going deeper
-                if value is not None:
-                    parent_dict = orm2dict(value)
-                    result[key] = parent_dict
-            elif key == 'children':
-                # For children, include basic info for each child
-                if value:
-                    result[key] = [orm2dict(child) for child in value]
-        # Special handling for Image-MetaElement relationship
-        elif class_name == 'Image' and key == 'parent_meta_element':
-            if value is not None:
-                result[key] = {
-                    "id": getattr(value, 'id', None),
-                    "created_date": getattr(value, 'created_date', None),
-                    "last_change": getattr(value, 'last_change', None),
-                    "last_access": getattr(value, 'last_access', None),
-                    "deleted": getattr(value, 'deleted', False),
-                    "collection_id": getattr(value, 'collection_id', None),
-                    "meta_element_type_id": getattr(value, 'meta_element_type_id', None),
-                    "parent_id": getattr(value, 'parent_id', None),
-                    "attributes": getattr(value, 'attributes', {})
-                }
-        # Special handling for MetaElement-Image relationship
-        elif class_name == 'MetaElement' and key == 'image':
-            if value is not None:
-                image_dict = {
-                    "id": getattr(value, 'id', None),
-                    "created_date": getattr(value, 'created_date', None),
-                    "last_change": getattr(value, 'last_change', None),
-                    "last_access": getattr(value, 'last_access', None), 
-                    "deleted": getattr(value, 'deleted', False),
-                    "collection_id": getattr(value, 'collection_id', None),
-                    "name": getattr(value, 'name', ""),
-                    "height": getattr(value, 'height', 0),
-                    "width": getattr(value, 'width', 0),
-                    "imagehash": getattr(value, 'imagehash', ""),
-                    "work_state": getattr(value, 'work_state', "new"),
-                    "detection_count": getattr(value, 'detection_count', 0),
-                    "annotated_detection_count": getattr(value, 'annotated_detection_count', 0)
-                }
+            # Skip if we already handled this relationship (e.g., for Image detections)
+            if real_key in result:
+                continue
                 
-                # Add page_index relationship if it exists
-                page_index = getattr(value, 'page_index', None)
-                if page_index is not None:
-                    image_dict["page_index"] = {
-                        "id": getattr(page_index, 'id', None),
-                        "created_date": getattr(page_index, 'created_date', None),
-                        "last_change": getattr(page_index, 'last_change', None),
-                        "last_access": getattr(page_index, 'last_access', None),
-                        "deleted": getattr(page_index, 'deleted', False)
+            if value is None:
+                result[real_key] = None
+                continue
+                
+            # Handle different relationship types based on class and key
+            if isinstance(value, list):
+                # List relationships (handle lists of objects)
+                if value:
+                    # For general list handling
+                    result[real_key] = [sqlalchemy_to_dict(item, visited.copy()) for item in value]
+                else:
+                    result[real_key] = []
+            else:
+                # Single object relationship
+                if class_name == 'MetaElement' and real_key == 'parent':
+                    # For parent, include basic info without going deeper
+                    parent_dict = orm2dict(value)
+                    result[real_key] = parent_dict
+                elif class_name == 'MetaElement' and real_key == 'image':
+                    # Special handling for MetaElement-Image relationship
+                    image_dict = {
+                        "id": getattr(value, 'id', None),
+                        "created_date": getattr(value, 'created_date', None),
+                        "last_change": getattr(value, 'last_change', None),
+                        "last_access": getattr(value, 'last_access', None), 
+                        "deleted": getattr(value, 'deleted', False),
+                        "collection_id": getattr(value, 'collection_id', None),
+                        "name": getattr(value, 'name', ""),
+                        "height": getattr(value, 'height', 0),
+                        "width": getattr(value, 'width', 0),
+                        "work_state": getattr(value, 'work_state', "new"),
+                        "detection_count": getattr(value, 'detection_count', 0),
+                        "annotated_detection_count": getattr(value, 'annotated_detection_count', 0)
+                    }
+                    result[real_key] = image_dict
+                elif class_name == 'Image' and real_key == 'parent_meta_element':
+                    # Special handling for Image-MetaElement relationship
+                    result[real_key] = {
+                        "id": getattr(value, 'id', None),
+                        "created_date": getattr(value, 'created_date', None),
+                        "last_change": getattr(value, 'last_change', None),
+                        "last_access": getattr(value, 'last_access', None),
+                        "deleted": getattr(value, 'deleted', False),
+                        "collection_id": getattr(value, 'collection_id', None),
+                        "meta_element_type_id": getattr(value, 'meta_element_type_id', None),
+                        "parent_id": getattr(value, 'parent_id', None),
+                        "attributes": getattr(value, 'attributes', {})
                     }
                 else:
-                    image_dict["page_index"] = None
-                
-                result[key] = image_dict
-        # For regular relationships
-        elif isinstance(value, list):
-            # List relationships
-            if value:
-                result[key] = [sqlalchemy_to_dict(item, visited.copy()) for item in value]
-            else:
-                result[key] = []
-        else:
-            # Single object relationships
-            result[key] = sqlalchemy_to_dict(value, visited.copy())
-    
+                    # Regular object relationship
+                    result[real_key] = sqlalchemy_to_dict(value, visited.copy())
+        
     return result
+
+
+async def get(
+    db: AsyncSession, 
+    model_class: Type[T], 
+    table: model.Base, 
+    id: UUID,
+) -> Union[T, None]:
+    try:
+        # First step: Get the base object without eager loading
+        query = select(table).where(table.id == id)
+        db_object_result = await db.execute(query)
+        db_object = db_object_result.unique().scalar()
+        
+        if db_object is None:
+            # Object not found - just return None without raising an exception
+            logging.warning(f"Object with ID={id} not found")
+            return None
+        
+        # Second step: Load relationships separately
+        if table.__name__ == "Collection":
+            # Load images
+            from sqlalchemy.orm import selectinload
+            images_query = select(model.Image).where(model.Image.collection_id == id)
+            images_result = await db.execute(images_query)
+            images = images_result.unique().scalars().all()
+            
+            # Set images directly
+            db_object.images = images
+            
+            # Load meta_elements
+            meta_elements_query = select(model.MetaElement).where(model.MetaElement.collection_id == id)
+            meta_elements_result = await db.execute(meta_elements_query)
+            meta_elements = meta_elements_result.unique().scalars().all()
+            
+            # Set meta_elements directly
+            db_object.meta_elements = meta_elements
+            
+            # For images, load detections separately 
+            for img in db_object.images:
+                detections_query = select(model.Detection).where(model.Detection.image_id == img.id)
+                detections_result = await db.execute(detections_query)
+                detections = detections_result.unique().scalars().all()
+                img.detections = detections
+        
+        elif table.__name__ == "Image":
+            # Load detections
+            detections_query = select(model.Detection).where(model.Detection.image_id == id)
+            detections_result = await db.execute(detections_query)
+            detections = detections_result.unique().scalars().all()
+            
+            # Set detections directly
+            db_object.detections = detections
+        
+        # Use our direct conversion approach to create a dictionary without triggering lazy loads
+        obj_dict = sqlalchemy_to_dict(db_object)
+        
+        return model_class.model_validate(obj_dict)
+    except exc.SQLAlchemyError as e:
+        logging.exception(
+            f"Failed fetching object from database due to a database error. ID={id}"
+        )
+        raise DBError(
+            f"Failed fetching object from database due to a database error. ID={id}"
+        ) from e
 
 
 async def get_all(
@@ -169,50 +275,48 @@ async def get_all(
 ) -> List[T]:
     try:
         async with db.begin():
-            # Build and execute the query
+            # Build the base query
             query = select(table).order_by(table.created_date.desc()).limit(limit)
+            
+            # Special handling for different model types
+            if table.__name__ == "Image":
+                from sqlalchemy.orm import selectinload
+                from db.model.detection import Detection
+                # Explicitly load the detections
+                query = query.options(
+                    selectinload(table.detections)
+                )
+            # Eager loading for Collections when listing all collections
+            elif table.__name__ == "Collection":
+                from sqlalchemy.orm import selectinload
+                # Explicitly load the images and meta_elements
+                query = query.options(
+                    selectinload(table.images),
+                    selectinload(table.meta_elements)
+                )
+                
             db_objects = await db.execute(query)
             db_objects = db_objects.unique().scalars().all()
             
             # Convert SQLAlchemy objects to dictionaries with relationships
             result = []
-            for obj in db_objects:
-                # Use our direct conversion approach
-                obj_dict = sqlalchemy_to_dict(obj)
-                result.append(model_class.model_validate(obj_dict))
+            
+            # Process objects based on type
+            if table.__name__ == "Collection":
+                # For collections, use sqlalchemy_to_dict to include the loaded relationships
+                for obj in db_objects:
+                    obj_dict = sqlalchemy_to_dict(obj)  # Use sqlalchemy_to_dict instead of orm2dict
+                    result.append(model_class.model_validate(obj_dict))
+            else:
+                # Normal handling for other objects
+                for obj in db_objects:
+                    obj_dict = sqlalchemy_to_dict(obj)
+                    result.append(model_class.model_validate(obj_dict))
             
             return result
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed fetching objects from database: {str(e)}")
         raise DBError(f"Failed fetching objects from database: {str(e)}") from e
-
-
-async def get(
-    db: AsyncSession, 
-    model_class: Type[T], 
-    table: model.Base, 
-    id: UUID,
-) -> T:
-    try:
-        async with db.begin():
-            # Simple query with ID filter
-            query = select(table).where(table.id == id)
-            db_object = await db.execute(query)
-            db_object = db_object.unique().scalar()
-            
-            if db_object is None:
-                raise exc.SQLAlchemyError(f"Object with ID={id} not found")
-                
-            # Use our direct conversion approach
-            obj_dict = sqlalchemy_to_dict(db_object)
-            return model_class.model_validate(obj_dict)
-    except exc.SQLAlchemyError as e:
-        logging.exception(
-            f"Failed fetching object from database. Object does not exist. ID={id}"
-        )
-        raise DBError(
-            f"Failed fetching object from database. Object does not exist. ID={id}"
-        ) from e
 
 
 async def get_or_none(
@@ -223,16 +327,34 @@ async def get_or_none(
 ) -> Union[T, None]:
     try:
         async with db.begin():
-            # Simple query with ID filter
+            # Build the base query with ID filter
             query = select(table).where(table.id == id)
+            
+            # Special handling for different model types
+            if table.__name__ == "Image":
+                from sqlalchemy.orm import selectinload
+                from db.model.detection import Detection
+                # Explicitly load the detections
+                query = query.options(
+                    selectinload(table.detections)
+                )
+            elif table.__name__ == "Collection":
+                from sqlalchemy.orm import selectinload
+                # For Collections, eagerly load both images and meta_elements
+                query = query.options(
+                    selectinload(table.images).selectinload(model.Image.detections),
+                    selectinload(table.meta_elements)
+                )
+                
             db_object = await db.execute(query)
             db_object = db_object.unique().scalar()
             
             if db_object is None:
                 return None
-                
+            
             # Use our direct conversion approach
             obj_dict = sqlalchemy_to_dict(db_object)
+            
             return model_class.model_validate(obj_dict)
     except exc.SQLAlchemyError as e:
         logging.exception(f"Failed fetching object from database. ID={id}")
