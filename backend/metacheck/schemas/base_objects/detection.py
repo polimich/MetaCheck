@@ -1,9 +1,18 @@
-from typing import Optional
+from __future__ import annotations
+
+from typing import Optional, TYPE_CHECKING, ForwardRef
 from uuid import UUID
 
 from pydantic import BaseModel
 
 from metacheck.schemas.base_objects.base_entity import BaseEntity
+
+# Break circular import using TYPE_CHECKING
+if TYPE_CHECKING:
+    from metacheck.schemas.base_objects.image import Image
+else:
+    # Use ForwardRef for forward references
+    Image = ForwardRef('Image')
 
 
 class DetectionNew(BaseModel):
@@ -23,6 +32,8 @@ class Detection(DetectionNew, BaseEntity):
     computed_color: Optional[str] = None
     computed_type: Optional[str] = None
     computed_display_type: Optional[str] = None
+    page_index_for: Optional[Image] = None  # Add relationship for page index
+    
     class Config:
         from_attributes = True
 

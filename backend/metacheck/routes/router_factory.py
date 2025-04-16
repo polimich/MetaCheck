@@ -64,7 +64,6 @@ class CRUDRouter:
         async def create_entity(
             entity_new: self.schema_new, db: AsyncSession = Depends(get_async_session)
         ):
-            """Create a new entity"""
             entity_dict = entity_new.model_dump()
             await crud_general.new(db, entity_dict, self.model_class)
             return {"message": f"{self.entity_name} created."}
@@ -74,7 +73,6 @@ class CRUDRouter:
             entity_id: UUID, 
             db: AsyncSession = Depends(get_async_session)
         ):
-            """Get a single entity by ID"""
             return await crud_general.get(
                 db, 
                 self.schema, 
@@ -86,7 +84,6 @@ class CRUDRouter:
         async def update_entity(
             entity_update: self.schema_update, db: AsyncSession = Depends(get_async_session)
         ):
-            """Update an existing entity"""
             await crud_general.update_obj(db, entity_update, self.model_class)
             return {"message": f"{self.entity_name} updated."}
         
@@ -95,7 +92,6 @@ class CRUDRouter:
             limit: int = 1000,
             db: AsyncSession = Depends(get_async_session)
         ):
-            """Get all entities with specified limit"""
             return await crud_general.get_all(
                 db, 
                 self.schema, 
@@ -107,7 +103,6 @@ class CRUDRouter:
         async def delete_entity(
             entity_id: UUID, db: AsyncSession = Depends(get_async_session)
         ):
-            """Delete an entity by ID"""
             await crud_general.delete_obj(db, entity_id, self.model_class)
             return {"message": f"{self.entity_name} deleted."}
 
@@ -130,5 +125,4 @@ class CRUDRouter:
 # async def get_articles_by_collection(
 #     collection_id: UUID, db: AsyncSession = Depends(get_async_session)
 # ):
-#     """Get all articles belonging to a specific collection"""
 #     # Custom implementation here 

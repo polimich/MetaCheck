@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
+import pydantic
 from pydantic import BaseModel
 
 from metacheck.schemas.base_objects.base_entity import BaseEntity

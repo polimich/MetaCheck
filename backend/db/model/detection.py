@@ -1,5 +1,5 @@
 import uuid
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, String, select, text, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
@@ -16,8 +16,6 @@ if TYPE_CHECKING:
 
 
 class Detection(Entity):
-    """A detection found in an image."""
-
     __tablename__ = "detections"
 
     # Foreign keys
@@ -36,6 +34,14 @@ class Detection(Entity):
         "Image",
         back_populates="detections",
         foreign_keys=[image_id],
+    )
+    
+    # Relationship for page_index reference (backref from Image.page_index)
+    page_index_for: Mapped[Optional["Image"]] = relationship(
+        "Image",
+        back_populates="page_index",
+        foreign_keys="Image.page_index_id",
+        uselist=False
     )
     
     meta_element_detections: Mapped[List["MetaElementDetection"]] = relationship(
@@ -88,7 +94,6 @@ class Detection(Entity):
 
 @event.listens_for(Detection, "mapper_configured")
 def _add_computed_properties(mapper, cls):
-    """Add computed properties after the mapper is configured to avoid circular references."""
     from db.model.meta_role import MetaRole
     from db.model.meta_element_detection import MetaElementDetection
     

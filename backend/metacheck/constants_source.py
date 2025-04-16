@@ -7,7 +7,6 @@ besides standard Python libraries, as it needs to be importable from migrations.
 # Element type UUIDs as string literals
 # These are shared between the application constants and the migrations
 ELEMENT_TYPE_UUID_STRINGS = {
-    "page": "e1000000-0000-4000-a000-000000000001",
     "title": "e1000000-0000-4000-a000-000000000002",
     "volume": "e1000000-0000-4000-a000-000000000003",
     "issue": "e1000000-0000-4000-a000-000000000004",
@@ -18,10 +17,8 @@ ELEMENT_TYPE_UUID_STRINGS = {
 
 # List of possible attribute types
 ATTRIBUTE_TYPES = [
-    "page_number", 
     "title", 
     "sub_title", 
-    "page_type", 
     "author", 
     "editor", 
     "publisher", 
@@ -43,7 +40,6 @@ ATTRIBUTE_TYPES = [
 
 # Base colors for element types
 ELEMENT_COLORS = {
-    "page": "#39A40B",      # Green
     "title": "#9B372A",     # Dark Red
     "volume": "#3643F5",    # Blue
     "issue": "#8B4513",     # Brown
@@ -61,7 +57,6 @@ VOLUME_ATTRIBUTES = [
 ]
 
 ELEMENT_ATTRIBUTE_MAPPINGS = {
-    "page": ["page_number", "page_type"],
     "title": VOLUME_ATTRIBUTES,
     "volume": VOLUME_ATTRIBUTES,
     "issue": [

@@ -61,67 +61,52 @@ class MetaElement(Entity):
         lazy="joined"  # Use joined loading for children to prevent recursion issues
     )
     
+    images: Mapped[List["Image"]] = relationship(
+        "Image",
+        back_populates="parent_meta_element",
+        foreign_keys="Image.parent_meta_element_id",
+        lazy="selectin",
+        cascade="all, delete-orphan"
+    )
+    
     # JSONB attribute to store type-specific properties
     attributes: Mapped[Dict[str, Any]] = mapped_column(
         JSONB, default=dict, nullable=False, server_default="{}"
     )
     
-    # Relationship to Image for page elements - using string reference
-    image: Mapped[Optional["Image"]] = relationship(
-        "Image",
-        back_populates="page_meta_element",
-        foreign_keys="Image.page_meta_element_id",
-        uselist=False,  # One-to-one relationship
-        lazy="selectin"
-    )
-    
-    @property
-    def is_page(self) -> bool:
-        """Check if this meta element is a page type."""
-        return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["page"]
-    
     @property
     def is_title(self) -> bool:
-        """Check if this meta element is a title type."""
         return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["title"]
     
     @property
     def is_volume(self) -> bool:
-        """Check if this meta element is a volume type."""
         return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["volume"]
     
     @property
     def is_issue(self) -> bool:
-        """Check if this meta element is an issue type."""
         return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["issue"]
     
     @property
     def is_supplement(self) -> bool:
-        """Check if this meta element is a supplement type."""
         return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["supplement"]
     
     @property
     def is_chapter(self) -> bool:
-        """Check if this meta element is a chapter type."""
         return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["chapter"]
     
     @property
     def is_article(self) -> bool:
-        """Check if this meta element is an article type."""
         return self.meta_element_type_id == META_ELEMENT_TYPE_IDS["article"]
     
     # Helper methods to provide type-safe access to attributes
     
     def get_attribute(self, key: str, default: Any = None) -> Any:
-        """Get an attribute value with a default fallback."""
         return self.attributes.get(key, default)
     
     def set_attribute(self, key: str, value: Any) -> None:
-        """Set an attribute value."""
         self.attributes[key] = value
         
     def delete_attribute(self, key: str) -> None:
-        """Delete an attribute if it exists."""
         if key in self.attributes:
             del self.attributes[key]
 

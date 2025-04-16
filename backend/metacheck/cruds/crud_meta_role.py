@@ -10,8 +10,10 @@ async def get_available_for_detection(detection_id: UUID, session: AsyncSession)
     # First get the detection and its associated image
     detection = await session.get(Detection, detection_id)
     if not detection:
-        return []
-        
+        # If detection doesn't exist, return all meta roles
+        stmt = select(MetaRole)
+        result = await session.execute(stmt)
+        return result.scalars().all()
     # Get the image and its page meta element
     image = await session.get(Image, detection.image_id)
     if not image:

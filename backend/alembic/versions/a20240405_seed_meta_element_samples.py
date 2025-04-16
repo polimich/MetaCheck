@@ -196,23 +196,6 @@ def upgrade() -> None:
             "deleted": False
         },
         
-        # Page element (child of issue)
-        {
-            "id": page_id,
-            "collection_id": collection_id,
-            "meta_element_type_id": uuid.UUID(META_ELEMENT_TYPE_IDS["page"]),
-            "parent_id": issue_id,
-            "attributes": {
-                "pageIndex": 42,
-                "pageNumber": ["42", 0.98, generate_uuid()],
-                "pageType": ["NormalPage", 0.96]
-            },
-            "created_date": now,
-            "last_change": now,
-            "last_access": now,
-            "deleted": False
-        },
-        
         # Supplement element (child of issue)
         {
             "id": supplement_id,

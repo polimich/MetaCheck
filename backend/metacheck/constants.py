@@ -26,7 +26,6 @@ META_ELEMENT_TYPE_NAMES = {str(v): k for k, v in META_ELEMENT_TYPE_IDS.items()}
 
 class ElementTypeEnum(str, Enum):
     """Enum for element types."""
-    PAGE = "page"
     TITLE = "title"
     VOLUME = "volume"
     ISSUE = "issue"

@@ -95,15 +95,15 @@ async def unicorn_exception_handler(request: Request, exc: Exception):
         return Response(status_code=500)
 
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:9000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 if config.PRODUCTION:
     logging.warning(f"PRODUCTION")
 else:
     logging.warning(f"DEVELOPMENT")
-    # set allow origins to [URL of frontend app]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:9000"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )

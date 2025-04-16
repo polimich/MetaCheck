@@ -17,7 +17,7 @@ class ProcessingState(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class PageType(enum.Enum):
+class PageType(str, enum.Enum):
     ABSTRACT = "Abstract"
     ADVERTISEMENT = "Advertisement"
     APPENDIX = "Appendix"
