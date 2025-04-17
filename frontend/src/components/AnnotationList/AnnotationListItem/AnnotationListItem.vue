@@ -3,6 +3,7 @@ import { DetectionState } from 'src/types/frontend-state';
 import { ref, computed } from 'vue';
 import { useImageStore } from 'src/stores/image/storeImages';
 import { useLoadingState } from 'src/stores/app/loadingState';
+import { updateSingleDetection } from 'src/api/detectionApiService';
 
 const props = defineProps<{
   detection: DetectionState;
@@ -12,7 +13,6 @@ const props = defineProps<{
 // Stores
 const imageStore = useImageStore();
 const loadingState = useLoadingState();
-console.log(imageStore.image);
 
 // Local state
 const detection = ref<DetectionState>(props.detection);
@@ -70,8 +70,18 @@ const saveDetection = async () => {
   );
   try {
     console.log(`Saving changes for detection ${detection.value.id}`);
-    await imageStore.saveAllChanges();
-    console.log(`Changes involving detection ${detection.value.id} saved`);
+
+    // Use the new single detection update API instead of saving all changes
+    const { success, error } = await updateSingleDetection(detection.value);
+
+    if (success) {
+      console.log(`Detection ${detection.value.id} saved successfully`);
+      // Mark as no longer edited after save
+      detection.value.edited = false;
+    } else {
+      console.error(`Error saving detection ${detection.value.id}: ${error}`);
+      throw new Error(error);
+    }
   } catch (error) {
     console.error(
       `Error saving changes for detection ${detection.value.id}:`,

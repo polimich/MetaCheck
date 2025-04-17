@@ -20,6 +20,7 @@ import {
   deleteDetection as apiDeleteDetection,
   loadMetaRolesForDetection as apiLoadMetaRolesForDetection,
 } from 'src/api/services';
+import { getMetaRolesForCollection } from 'src/api/metaRoleApiService';
 import {
   CollectionAddDto,
   Collection as CollectionType,
@@ -58,6 +59,7 @@ export const useCollectionDataAccess = defineStore(
       collection.value = undefined;
       loaded.value = false;
       error.value = '';
+      availableMetaRoles.value = []; // Reset meta roles when resetting state
     };
 
     const isCacheValid = (cacheTime: number): boolean => {
@@ -117,6 +119,21 @@ export const useCollectionDataAccess = defineStore(
               console.log('collection', collection.value);
               loaded.value = true;
               lastCollectionFetch.value[collectionId] = Date.now();
+
+              // Load meta roles for the collection
+              const metaRolesResponse =
+                await getMetaRolesForCollection(collectionId);
+              if (metaRolesResponse.data && metaRolesResponse.data.length > 0) {
+                availableMetaRoles.value = metaRolesResponse.data;
+                console.log(
+                  `Loaded ${availableMetaRoles.value.length} meta roles for collection ${collectionId}`,
+                );
+              } else if (metaRolesResponse.error) {
+                console.error(
+                  `Failed to load meta roles for collection: ${metaRolesResponse.error}`,
+                );
+              }
+
               resolve({ data: response.data, error: undefined });
             } else {
               const errorMsg = 'No collection data received';

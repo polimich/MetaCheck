@@ -2,6 +2,7 @@
 export * from './imageApiService';
 export * from './collectionApiService';
 export * from './metaRoleApiService';
+export * from './detectionApiService';
 
 // Health check service - using meta roles endpoint as it's lightweight and needed anyway
 import { axios, axiosErrorHandler } from './index';

@@ -33,6 +33,7 @@ export const useImageStore = defineStore('images', () => {
       label: string;
       value: string;
       color: string;
+      id: string;
     }[]
   >([]);
 

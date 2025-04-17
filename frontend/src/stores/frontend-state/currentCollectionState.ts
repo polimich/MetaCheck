@@ -79,6 +79,7 @@ export const useCurrentCollectionState = defineStore(
           label: role.computed_display_name,
           value: role.computed_name,
           color: role.color,
+          id: role.id,
         }));
       } else {
         console.error('Meta roles not found');
