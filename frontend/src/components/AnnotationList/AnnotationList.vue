@@ -5,6 +5,7 @@ import { AnnotationListItem } from './AnnotationListItem';
 import { useAnnotationFilters } from './composables/useAnnotationFilters';
 import { useAnnotationStatistics } from './composables/useAnnotationStatistics';
 import { useDebouncedDetections } from './composables/useDebouncedDetections';
+import { ANNOTATION_EVENTS } from 'src/constants/events';
 
 const props = defineProps<{
   detections: DetectionState[];
@@ -12,21 +13,27 @@ const props = defineProps<{
 }>();
 
 // Define emits for parent component
-const emit = defineEmits(['scrollToAnnotation', 'selectAnnotation']);
+const emit = defineEmits([
+  ANNOTATION_EVENTS.SCROLL_TO,
+  ANNOTATION_EVENTS.SELECT,
+]);
 
 // Handle scroll to annotation event from list item
 const handleScrollToAnnotation = (detection: DetectionState) => {
   console.log(
-    'Forwarding scrollToAnnotation event for detection:',
+    `Forwarding ${ANNOTATION_EVENTS.SCROLL_TO} event for detection:`,
     detection.id,
   );
-  emit('scrollToAnnotation', detection);
+  emit(ANNOTATION_EVENTS.SCROLL_TO, detection);
 };
 
 // Handle select annotation event from list item
 const handleSelectAnnotation = (detection: DetectionState) => {
-  console.log('Forwarding selectAnnotation event for detection:', detection.id);
-  emit('selectAnnotation', detection);
+  console.log(
+    `Forwarding ${ANNOTATION_EVENTS.SELECT} event for detection:`,
+    detection.id,
+  );
+  emit(ANNOTATION_EVENTS.SELECT, detection);
 };
 
 // For debugging

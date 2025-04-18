@@ -4,6 +4,7 @@ import { ref, computed, watch } from 'vue';
 import { useImageStore } from 'src/stores/image/storeImages';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { updateSingleDetection } from 'src/api/detectionApiService';
+import { ANNOTATION_EVENTS } from 'src/constants/events';
 
 const props = defineProps<{
   detection: DetectionState;
@@ -11,7 +12,10 @@ const props = defineProps<{
 }>();
 
 // Define emits for parent component communication
-const emit = defineEmits(['scrollToAnnotation', 'selectAnnotation']);
+const emit = defineEmits([
+  ANNOTATION_EVENTS.SCROLL_TO,
+  ANNOTATION_EVENTS.SELECT,
+]);
 
 // Stores
 const imageStore = useImageStore();
@@ -98,7 +102,7 @@ const handleSelectDetection = () => {
     imageStore.selectDetection(detection.value.id);
 
     // Emit event to notify parent about selection (without zoom)
-    emit('selectAnnotation', detection.value);
+    emit(ANNOTATION_EVENTS.SELECT, detection.value);
   }
 };
 
@@ -113,7 +117,7 @@ const handleZoomToDetection = (event: Event) => {
   }
 
   // Emit event for parent to handle zooming to this annotation
-  emit('scrollToAnnotation', detection.value);
+  emit(ANNOTATION_EVENTS.SCROLL_TO, detection.value);
 };
 
 const saveDetection = async () => {

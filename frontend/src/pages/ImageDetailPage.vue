@@ -11,6 +11,8 @@ import {
 } from 'src/stores';
 import { useCurrentCollectionState } from 'src/stores/frontend-state';
 import { DetectionState } from 'src/types';
+import { useSynchronization } from 'src/components/ImageAnnotator/composables/useSynchronization';
+import { ANNOTATION_EVENTS, IMAGE_EVENTS } from 'src/constants/events';
 
 // Define the interface for the ImageAnnotator instance
 interface ImageAnnotatorInstance {
@@ -32,6 +34,9 @@ const loadingState = useLoadingState();
 const stateManager = useStateManager();
 const notificationStore = useNotificationStore();
 const currentCollection = useCurrentCollectionState();
+
+// Use the synchronization composable
+const synchronization = useSynchronization();
 
 // Computed properties
 const detections = computed(() => imageStore.detectionsGetter);
@@ -65,6 +70,13 @@ const imageId = computed({
 
 // Refs for component instances - properly typed now
 const annotatorRef = ref<ImageAnnotatorInstance | null>(null);
+
+// Set the annotator ref in the synchronization composable once it's mounted
+watch(annotatorRef, (newRef) => {
+  if (newRef) {
+    synchronization.setAnnotatorRef(newRef);
+  }
+});
 
 // Load image and detections when component mounts
 onMounted(async () => {
@@ -229,33 +241,50 @@ const loadImageData = async () => {
 // Handle image selection from PageList
 const handleSelectImage = async (selectedImageId: string) => {
   if (selectedImageId !== imageId.value) {
+    // Update the imageId (which updates currentCollection.selectedImageId)
     imageId.value = selectedImageId;
-  }
-};
 
-// Handle selecting annotation (without zooming)
-const handleSelectAnnotation = (detection: DetectionState) => {
-  console.log('Handle select annotation:', detection.id);
+    // Directly load the image and detections via the imageStore
+    // This ensures immediate synchronization between stores
+    console.log(
+      `Directly loading image ${selectedImageId} from collection ${collectionId.value}`,
+    );
 
-  // Update the store to reflect the selection
-  imageStore.selectDetection(detection.id);
+    // Set component-specific loading states
+    loadingState.setComponentLoading(`annotator_${selectedImageId}`, true);
+    loadingState.setComponentLoading(`annotationList_${selectedImageId}`, true);
 
-  // Call the imageAnnotator's selectAnnotation method to highlight the annotation
-  if (annotatorRef.value) {
-    annotatorRef.value.handleSelectAnnotation(detection.id, false);
-  }
-};
+    try {
+      // Load image data directly from the imageStore
+      await imageStore.loadImage(selectedImageId, collectionId.value);
 
-// Handle scrolling to annotation in the image annotator (with zooming)
-const handleScrollToAnnotation = (detection: DetectionState) => {
-  console.log('Handle scroll to annotation in image annotator:', detection.id);
+      // Then load the detections
+      if (imageStore.image.id) {
+        await imageStore.loadDetections(selectedImageId);
 
-  // First ensure the detection is selected in the store
-  imageStore.selectDetection(detection.id);
+        // Show appropriate notifications based on detection count
+        if (imageStore.detections.length === 0) {
+          notificationStore.warning('No annotations found for this image');
+        } else {
+          notificationStore.success(
+            `Loaded ${imageStore.detections.length} annotations`,
+          );
+        }
 
-  // Then call a method on the annotator component to scroll/zoom to this annotation
-  if (annotatorRef.value) {
-    annotatorRef.value.scrollToAnnotation(detection);
+        // Update state manager with new IDs
+        stateManager.updateState(collectionId.value, selectedImageId);
+      }
+    } catch (error) {
+      console.error('Error loading image data:', error);
+      notificationStore.error('Error loading image data');
+    } finally {
+      // Clear component-specific loading states
+      loadingState.setComponentLoading(`annotator_${selectedImageId}`, false);
+      loadingState.setComponentLoading(
+        `annotationList_${selectedImageId}`,
+        false,
+      );
+    }
   }
 };
 </script>
@@ -286,7 +315,7 @@ const handleScrollToAnnotation = (detection: DetectionState) => {
       <div class="col-3 flex justify-center">
         <PageList
           :collection-id="collectionId"
-          @select-image="handleSelectImage"
+          @[IMAGE_EVENTS.SELECT]="handleSelectImage"
         />
       </div>
 
@@ -330,7 +359,7 @@ const handleScrollToAnnotation = (detection: DetectionState) => {
       <!-- Annotation list column -->
       <div class="col-3 justify-center overflow-hidden">
         <div class="text-h6 q-pa-sm">Label Editor</div>
-        <q-scroll-area style="height: calc(100vh - 150px); max-width: 100%">
+        <q-scroll-area style="height: calc(100vh - 180px); max-width: 100%">
           <AnnotationList
             :detections="detections"
             :loading="
@@ -338,8 +367,10 @@ const handleScrollToAnnotation = (detection: DetectionState) => {
                 `annotationList_${currentCollection.selectedImageId}`,
               )
             "
-            @scroll-to-annotation="handleScrollToAnnotation"
-            @select-annotation="handleSelectAnnotation"
+            @[ANNOTATION_EVENTS.SCROLL_TO]="
+              synchronization.handleScrollToAnnotation
+            "
+            @[ANNOTATION_EVENTS.SELECT]="synchronization.handleSelectAnnotation"
           />
         </q-scroll-area>
       </div>
@@ -369,5 +400,9 @@ const handleScrollToAnnotation = (detection: DetectionState) => {
   z-index: 900;
   font-family: monospace;
   opacity: 0.7;
+}
+
+.full-height {
+  height: calc(100vh - 180px);
 }
 </style>

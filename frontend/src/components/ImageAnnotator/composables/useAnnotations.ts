@@ -3,95 +3,85 @@ import { v4 as uuidv4 } from 'uuid';
 import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 import { useImageCanvas } from './useImageCanvas';
-
-// Separate selection management concerns
-function useSelectionManagement() {
-  const selectedIds = ref<Set<string>>(new Set());
-
-  function selectAnnotation(id: string, addToSelection = false) {
-    console.log(
-      'Selecting annotation:',
-      id,
-      'Add to selection:',
-      addToSelection,
-    );
-
-    // If not adding to selection, clear current selection
-    if (!addToSelection) {
-      selectedIds.value.clear();
-    }
-
-    // Add the annotation to selection
-    selectedIds.value.add(id);
-  }
-
-  function deselectAll() {
-    console.log('Deselecting all annotations');
-    selectedIds.value.clear();
-  }
-
-  return {
-    selectedIds,
-    selectAnnotation,
-    deselectAll,
-  };
-}
+import { useSelectionManagement } from './useSelectionManagement';
 
 // Separate history management concerns
 function useHistoryManagement(
   annotations: ReturnType<typeof ref<DetectionState[]>>,
   selectedIds: ReturnType<typeof ref<Set<string>>>,
 ) {
-  const undoStack = ref<string[]>([]);
-  const redoStack = ref<string[]>([]);
+  // History state
+  const undoStack = ref<
+    { annotations: DetectionState[]; selectedIds: Set<string> }[]
+  >([]);
+  const redoStack = ref<
+    { annotations: DetectionState[]; selectedIds: Set<string> }[]
+  >([]);
 
+  // Save current state for undo/redo
   function saveState() {
-    // Limit undo stack size (optional)
-    const MAX_HISTORY = 50;
-    if (undoStack.value.length >= MAX_HISTORY) {
-      undoStack.value.shift(); // Remove oldest entry
-    }
-    undoStack.value.push(JSON.stringify(annotations.value));
-    redoStack.value = []; // Clear redo stack on new action
-    console.log('Saved state, undo stack size:', undoStack.value.length);
+    const cloneAnnotations = annotations.value?.map((a) => ({ ...a })) || [];
+    undoStack.value.push({
+      annotations: cloneAnnotations,
+      selectedIds: new Set(selectedIds.value || new Set<string>()),
+    });
+    redoStack.value = []; // Clear redo stack when making a new change
+    console.log(
+      'Saved state to undo stack, stack size:',
+      undoStack.value.length,
+      'Selected IDs:',
+      Array.from(selectedIds.value || new Set<string>()),
+    );
   }
 
+  // Undo last action
   function undo() {
     if (undoStack.value.length === 0) return;
 
-    // Save current state in redo stack
-    redoStack.value.push(JSON.stringify(annotations.value));
+    // Get last state from stack
+    const prevState = undoStack.value.pop();
+    if (!prevState) return;
+
+    // Save current state to redo stack
+    redoStack.value.push({
+      annotations: annotations.value?.map((a) => ({ ...a })) || [],
+      selectedIds: new Set(selectedIds.value || new Set<string>()),
+    });
 
     // Restore previous state
-    const prevState = undoStack.value.pop();
-    if (prevState) {
-      annotations.value = JSON.parse(prevState);
-    }
-
-    // Clear selection as it may no longer be valid
-    if (selectedIds.value) {
-      selectedIds.value.clear();
-    }
-    console.log('Undo complete, undo stack size:', undoStack.value.length);
+    annotations.value = prevState.annotations;
+    selectedIds.value = prevState.selectedIds;
+    console.log(
+      'Undo: restored state, undo stack size:',
+      undoStack.value.length,
+      'redo stack size:',
+      redoStack.value.length,
+    );
   }
 
+  // Redo previously undone action
   function redo() {
     if (redoStack.value.length === 0) return;
 
-    // Save current state in undo stack
-    undoStack.value.push(JSON.stringify(annotations.value));
+    // Get last state from redo stack
+    const nextState = redoStack.value.pop();
+    if (!nextState) return;
+
+    // Save current state to undo stack
+    undoStack.value.push({
+      annotations: annotations.value?.map((a) => ({ ...a })) || [],
+      selectedIds: new Set(selectedIds.value || new Set<string>()),
+    });
 
     // Restore next state
-    const nextState = redoStack.value.pop();
-    if (nextState) {
-      annotations.value = JSON.parse(nextState);
-    }
-
-    // Clear selection as it may have changed
-    if (selectedIds.value) {
-      selectedIds.value.clear();
-    }
-    console.log('Redo complete, redo stack size:', redoStack.value.length);
+    annotations.value = nextState.annotations;
+    selectedIds.value = nextState.selectedIds;
+    console.log(
+      'Redo: restored state, undo stack size:',
+      undoStack.value.length,
+      'redo stack size:',
+      redoStack.value.length,
+    );
   }
 
   return {
@@ -103,63 +93,48 @@ function useHistoryManagement(
   };
 }
 
-// Separate annotation normalization concern
+// Separate annotation normalization concerns
 function useAnnotationNormalization(
   imageCanvas: ReturnType<typeof useImageCanvas>,
 ) {
-  function normalizeAnnotation(annotation: DetectionState) {
-    // Handle negative width
-    if (annotation.width < 0) {
-      annotation.x += annotation.width;
-      annotation.width = Math.abs(annotation.width);
+  // Normalize annotation dimensions (handle negative w/h)
+  function normalizeAnnotation(annotation: DetectionState): DetectionState {
+    let { x, y, width, height } = annotation;
+
+    // Handle negative width/height (drag from bottom-right to top-left)
+    if (width < 0) {
+      x += width;
+      width = Math.abs(width);
     }
 
-    // Handle negative height
-    if (annotation.height < 0) {
-      annotation.y += annotation.height;
-      annotation.height = Math.abs(annotation.height);
+    if (height < 0) {
+      y += height;
+      height = Math.abs(height);
     }
 
-    // Ensure annotation stays within ORIGINAL image boundaries
-    const imageWidth = imageCanvas.dimensions.value?.originalWidth || 0;
-    const imageHeight = imageCanvas.dimensions.value?.originalHeight || 0;
+    // Enforce minimum size (prevent zero-size annotations)
+    width = Math.max(width, 5);
+    height = Math.max(height, 5);
 
-    // Clip left edge
-    if (annotation.x < 0) {
-      annotation.width += annotation.x; // Reduce width by the amount it's off-screen
-      annotation.x = 0;
+    // Constrain to image bounds if we have image dimensions
+    if (imageCanvas.dimensions.value) {
+      const imgWidth = imageCanvas.dimensions.value.originalWidth;
+      const imgHeight = imageCanvas.dimensions.value.originalHeight;
+
+      x = Math.max(0, Math.min(x, imgWidth - width));
+      y = Math.max(0, Math.min(y, imgHeight - height));
     }
 
-    // Clip top edge
-    if (annotation.y < 0) {
-      annotation.height += annotation.y; // Reduce height by the amount it's off-screen
-      annotation.y = 0;
-    }
-
-    // Clip right edge
-    if (annotation.x + annotation.width > imageWidth) {
-      annotation.width = imageWidth - annotation.x;
-    }
-
-    // Clip bottom edge
-    if (annotation.y + annotation.height > imageHeight) {
-      annotation.height = imageHeight - annotation.y;
-    }
-
-    // Prevent zero or negative dimensions after clipping
-    annotation.width = Math.max(0, annotation.width);
-    annotation.height = Math.max(0, annotation.height);
-
-    // Round to precision of 3 decimal places
-    annotation.x = Number(annotation.x.toFixed(3));
-    annotation.y = Number(annotation.y.toFixed(3));
-    annotation.width = Number(annotation.width.toFixed(3));
-    annotation.height = Number(annotation.height.toFixed(3));
+    return {
+      ...annotation,
+      x,
+      y,
+      width,
+      height,
+    };
   }
 
-  return {
-    normalizeAnnotation,
-  };
+  return { normalizeAnnotation };
 }
 
 /**
@@ -173,12 +148,13 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
   const startPoint = reactive({ x: 0, y: 0 });
   const pendingMetaAnnotationId = ref<string | null>(null);
 
-  // Use separated composables
+  // Use the shared selection management composable
   const {
     selectedIds,
-    selectAnnotation,
+    selectDetection,
     deselectAll: deselectAllInternal,
   } = useSelectionManagement();
+
   const { undoStack, redoStack, saveState, undo, redo } = useHistoryManagement(
     annotations,
     selectedIds,
@@ -202,131 +178,109 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     };
   });
 
-  // Create new annotation
-  function startCreate(point: Vector2d, imageId: string) {
-    // Clear pending meta if starting a new one
-    cancelAnnotationMeta();
-    deselectAll();
+  // Start creating a new annotation
+  function startCreate(startPos: Vector2d, imageId: string) {
+    if (isCreating.value) return;
 
-    saveState();
+    console.log('Start creating annotation at:', startPos);
+    startPoint.x = startPos.x;
+    startPoint.y = startPos.y;
 
-    isCreating.value = true;
+    // Create a new annotation
     const newAnnotation = newDetectionState();
-    newAnnotation.id = uuidv4();
+    newAnnotation.id = `temp_${uuidv4()}`; // Temporary ID until saved
     newAnnotation.image_id = imageId;
-    newAnnotation.x = point.x;
-    newAnnotation.y = point.y;
+    newAnnotation.x = startPos.x;
+    newAnnotation.y = startPos.y;
     newAnnotation.width = 0;
     newAnnotation.height = 0;
-    newAnnotation.computed_display_type = 'box'; // Assuming box for now
-    newAnnotation.computed_type = 'box';
-    newAnnotation.computed_color = '#FF0000'; // Default color
+    newAnnotation.created_date = new Date().toISOString();
+    newAnnotation.confidence = 1.0; // New annotations are fully confident
+    newAnnotation.edited = true; // Mark as edited since it's new
+    newAnnotation.annotated = true;
 
+    // Default meta values (will be overridden after creation)
+    // @TODO: Get defaults from app settings or previous selection
+    newAnnotation.computed_type = 'unknown';
+    newAnnotation.computed_color = '#ff0000'; // Red
+    newAnnotation.computed_display_type = 'Unknown';
+
+    // Save state before adding the new annotation
+    saveState();
+
+    // Start tracking the new annotation
     creatingAnnotation.value = newAnnotation;
-    startPoint.x = point.x;
-    startPoint.y = point.y;
+    isCreating.value = true;
+
     annotations.value.push(newAnnotation);
   }
 
-  // Update during drag
-  function updateCreating(point: Vector2d) {
+  // Update annotation being created
+  function updateCreating(currentPos: Vector2d) {
     if (!isCreating.value || !creatingAnnotation.value) return;
 
-    creatingAnnotation.value.width = point.x - startPoint.x;
-    creatingAnnotation.value.height = point.y - startPoint.y;
-
-    // No normalization here, only on finish
+    // Update with current mouse position
+    const annotation = creatingAnnotation.value;
+    annotation.width = currentPos.x - startPoint.x;
+    annotation.height = currentPos.y - startPoint.y;
   }
 
-  // Finish creating annotation - Now sets pending ID
+  // Finish creating annotation
   function finishCreate() {
     if (!isCreating.value || !creatingAnnotation.value) return;
 
-    const finishedAnnotation = creatingAnnotation.value;
-    normalizeAnnotation(finishedAnnotation);
+    console.log('Finish creating annotation');
 
-    if (finishedAnnotation.width < 5 || finishedAnnotation.height < 5) {
-      annotations.value = annotations.value.filter(
-        (a) => a.id !== finishedAnnotation.id,
-      );
-      undoStack.value.pop();
-      console.log('Invalid annotation removed, popped state from undo stack.');
-      isCreating.value = false;
-      creatingAnnotation.value = null;
-    } else {
-      // Annotation is valid, set it as pending meta input
-      pendingMetaAnnotationId.value = finishedAnnotation.id;
-      // Don't mark as edited yet, wait for confirmation
-      console.log(
-        'Valid annotation finished, pending meta input for ID:',
-        finishedAnnotation.id,
-      );
-      isCreating.value = false;
-      creatingAnnotation.value = null;
-      // Select the new annotation visually while pending meta
-      selectAnnotation(finishedAnnotation.id);
-    }
+    const annotation = creatingAnnotation.value;
+
+    // Normalize dimensions (handle negative width/height)
+    const normalized = normalizeAnnotation(annotation);
+    Object.assign(annotation, normalized);
+
+    // Set a real ID that will be used for server storage
+    annotation.id = uuidv4();
+
+    // Clear creation state
+    isCreating.value = false;
+    creatingAnnotation.value = null;
+
+    // Clear any current selection and select this new annotation
+    selectedIds.value.clear();
+    selectedIds.value.add(annotation.id);
+
+    console.log('Created annotation:', annotation);
+
+    // Set pending meta ID so user can input metadata
+    pendingMetaAnnotationId.value = annotation.id;
+    console.log('Awaiting metadata input for annotation:', annotation.id);
   }
 
-  // Cancel creation process
+  // Cancel annotation creation
   function cancelCreate() {
     if (!isCreating.value || !creatingAnnotation.value) return;
 
+    console.log('Cancelling annotation creation');
+
     // Remove the annotation being created
-    annotations.value = annotations.value.filter(
-      (a) => a.id !== creatingAnnotation.value?.id,
-    );
+    const id = creatingAnnotation.value.id;
+    annotations.value = annotations.value.filter((a) => a.id !== id);
 
-    // Pop the state saved when starting creation
-    undoStack.value.pop();
-
-    // Reset creation state
+    // Clear creation state
     isCreating.value = false;
     creatingAnnotation.value = null;
   }
 
-  // Move selected annotations (boundary check uses ORIGINAL dimensions)
+  // Move an annotation
   function moveAnnotation(id: string, delta: Vector2d) {
     const annotation = annotations.value.find((a) => a.id === id);
     if (!annotation) return;
 
-    // Save state before moving
-    // Note: Dragging generates many events, might need debouncing or save on drag end
-    // saveState();
-
-    // Apply movement
     annotation.x += delta.x;
     annotation.y += delta.y;
-
-    // Mark as edited
     annotation.edited = true;
-
-    // Ensure within ORIGINAL image bounds
-    const imageWidth = imageCanvas.dimensions.value?.originalWidth || 0;
-    const imageHeight = imageCanvas.dimensions.value?.originalHeight || 0;
-
-    // Prevent moving past left edge
-    if (annotation.x < 0) {
-      annotation.x = 0;
-    }
-
-    // Prevent moving past top edge
-    if (annotation.y < 0) {
-      annotation.y = 0;
-    }
-
-    // Prevent moving past right edge
-    if (annotation.x + annotation.width > imageWidth) {
-      annotation.x = imageWidth - annotation.width;
-    }
-
-    // Prevent moving past bottom edge
-    if (annotation.y + annotation.height > imageHeight) {
-      annotation.y = imageHeight - annotation.height;
-    }
   }
 
-  // Update annotation dimensions directly (for Konva transformer)
+  // Update annotation dimensions (after transform or drag)
   function updateAnnotationDimensions(
     id: string,
     newDimensions: { x: number; y: number; width: number; height: number },
@@ -334,20 +288,16 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     const annotation = annotations.value.find((a) => a.id === id);
     if (!annotation) return;
 
-    // Save current state for undo before applying transform changes
     saveState();
 
-    // Update dimensions
-    annotation.x = newDimensions.x;
-    annotation.y = newDimensions.y;
-    annotation.width = newDimensions.width;
-    annotation.height = newDimensions.height;
-
-    // Mark as edited
+    Object.assign(annotation, newDimensions);
     annotation.edited = true;
 
-    // Ensure annotation stays within image boundaries after transform
-    normalizeAnnotation(annotation);
+    // Normalize to handle any negative dimensions
+    const normalized = normalizeAnnotation(annotation);
+    Object.assign(annotation, normalized);
+
+    console.log('Updated annotation dimensions:', annotation);
   }
 
   // Delete selected annotations
@@ -442,9 +392,9 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     deselectAllInternal();
   }
 
-  function selectAnnotationAndClearPending(id: string, addToSelection = false) {
+  function selectAnnotation(id: string, addToSelection = false) {
     clearPendingMeta();
-    selectAnnotation(id, addToSelection);
+    selectDetection(id, addToSelection);
   }
 
   // Confirm Metadata for the pending annotation
@@ -521,7 +471,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     updateCreating,
     finishCreate,
     cancelCreate,
-    selectAnnotation: selectAnnotationAndClearPending,
+    selectAnnotation,
     deselectAll,
     moveAnnotation,
     updateAnnotationDimensions,

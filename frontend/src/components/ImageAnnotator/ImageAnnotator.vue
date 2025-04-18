@@ -24,14 +24,10 @@ import { useMetaRoleStore } from 'src/stores/meta-role-store';
 import { DetectionState } from 'src/types';
 import { onClickOutside } from '@vueuse/core';
 import { useNotificationStore } from 'src/stores/app/notificationService';
+import MetadataInputPanel from './MetadataInputPanel.vue';
+import { useSynchronization } from './composables/useSynchronization';
 
-// Props
-const props = defineProps({
-  imageId: String,
-  collectionId: String,
-});
-
-// Use currentCollectionState instead of route
+// Use stores for state management instead of props
 const imageStore = useImageStore();
 const currentCollection = useCurrentCollectionState();
 const metaRoleStore = useMetaRoleStore();
@@ -41,22 +37,9 @@ const notificationStore = useNotificationStore();
 const initialPosition = ref({ x: 0, y: 0 });
 const initialScale = ref(1);
 
-// Current image and collection IDs
-const currentImageId = computed(() => {
-  // Try props first, then currentCollection
-  return props.imageId || currentCollection.selectedImageId;
-});
-
-const currentCollectionId = computed(() => {
-  // Try props first, then currentCollection
-  return props.collectionId || currentCollection.id;
-});
-
-// Image URL
-const imageUrl = computed(() => {
-  if (!currentImageId.value) return '';
-  return getRasterImage(currentImageId.value) + `?t=${Date.now()}`;
-});
+// Current image and collection IDs from store
+const currentImageId = computed(() => currentCollection.selectedImageId);
+const currentCollectionId = computed(() => currentCollection.id);
 
 // Set up composables
 const annotatorBox = ref<HTMLDivElement | null>(null);
@@ -71,6 +54,7 @@ const { updateTransformer } = useTransformerManagement(
   konvaLayer,
   annotations.selectedIds,
 );
+const synchronization = useSynchronization();
 
 // Use Konva event handlers composable
 const konvaEventHandlers = useKonvaEventHandlers(
@@ -119,13 +103,75 @@ function addAlpha(color: string, opacity: number) {
 
 // --- Metadata Input State ---
 const metaRoles = computed(() => metaRoleStore.getAllMetaRoleSelectOptions);
-const selectedMetaRole = ref<string | null>(null);
-const annotationValue = ref<string>('');
 const metaInputPanelRef = ref<HTMLDivElement | null>(null);
+
+// --- Metadata Input Positioning Logic ---
+const pendingAnnotation = computed(() => {
+  if (!annotations.pendingMetaAnnotationId.value) return null;
+
+  // Find the annotation and ensure we return null if not found (instead of undefined)
+  return (
+    annotations.annotations.value.find(
+      (a) => a.id === annotations.pendingMetaAnnotationId.value,
+    ) || null
+  );
+});
+
+const metaInputPosition = computed(() => {
+  if (!pendingAnnotation.value || !imageCanvas.image.value) {
+    // Return a style object compatible with CSSProperties
+    return { display: 'none' } as CSSProperties;
+  }
+
+  // Convert annotation bottom-left corner (in image coords) to screen coords
+  const imageCoords = {
+    x: pendingAnnotation.value.x,
+    y: pendingAnnotation.value.y + pendingAnnotation.value.height,
+  };
+  const screenCoords = imageCanvas.imageToScreenCoords(imageCoords);
+
+  return {
+    display: 'block',
+    position: 'absolute' as const, // Explicitly cast position
+    left: `${screenCoords.x}px`,
+    top: `${screenCoords.y + 5}px`,
+    zIndex: 11,
+  } as CSSProperties; // Assert the whole object as CSSProperties
+});
+
+// --- Metadata Input Actions ---
+function handleConfirmMeta(metaRole: string | null, value: string) {
+  annotations.confirmAnnotationMeta(metaRole, value);
+}
+
+function handleCancelMeta() {
+  annotations.cancelAnnotationMeta();
+}
+
+// --- onClickOutside Logic for MetadataInputPanel ---
+onClickOutside(metaInputPanelRef, (event) => {
+  // Check if the click target is part of the Konva canvas/stage
+  // This prevents immediate cancellation when clicking to draw a new box
+  const targetElement = event.target as HTMLElement;
+  if (targetElement.closest('.konvajs-content')) {
+    console.log(
+      'onClickOutside: Click inside Konva canvas detected, ignoring.',
+    );
+    return;
+  }
+
+  // If panel is visible and pending annotation exists, cancel it
+  if (annotations.pendingMetaAnnotationId.value) {
+    console.log(
+      'onClickOutside: Detected click outside meta panel. Cancelling annotation.',
+    );
+    handleCancelMeta();
+  }
+});
 
 // Fetch meta roles on mount
 onMounted(async () => {
-  console.log('NewImageAnnotator mounted');
+  console.log('ImageAnnotator mounted');
   isMounted.value = true;
 
   nextTick(() => {
@@ -174,21 +220,15 @@ onMounted(async () => {
   });
 });
 
-// Watch for changes in props imageId and reload data
-watch(
-  () => props.imageId,
-  async (newImageId) => {
-    if (newImageId && newImageId !== currentImageId.value) {
-      await loadImageData();
-    }
-  },
-);
-
 // Watch for changes in currentCollection selectedImageId
 watch(
   () => currentCollection.selectedImageId,
-  async (newImageId) => {
-    if (newImageId && !props.imageId) {
+  async (newImageId, oldImageId) => {
+    if (newImageId && newImageId !== oldImageId) {
+      console.log(
+        `ImageAnnotator: currentCollection.selectedImageId changed to ${newImageId}, reloading data`,
+      );
+      // Always reload when store changes
       await loadImageData();
     }
   },
@@ -196,9 +236,14 @@ watch(
 
 // Watch for changes in collection ID and reload data
 watch(
-  () => [props.collectionId, currentCollection.id],
-  async () => {
-    await loadImageData();
+  () => currentCollection.id,
+  async (newCollectionId, oldCollectionId) => {
+    if (newCollectionId && newCollectionId !== oldCollectionId) {
+      console.log(
+        `ImageAnnotator: collection ID changed to ${newCollectionId}, reloading data`,
+      );
+      await loadImageData();
+    }
   },
 );
 
@@ -230,9 +275,30 @@ watch(
   },
 );
 
+// Watch for changes in imageStore detections to sync with external changes
+watch(
+  () => imageStore.detections,
+  (newDetections) => {
+    console.log(
+      `ImageAnnotator: Detected ${newDetections.length} detections in store, updating annotations`,
+    );
+    // Always update annotations when detections change, regardless of current count
+    annotations.loadAnnotations(imageStore.detectionsGetter);
+
+    // Update transformer if needed
+    nextTick(() => {
+      updateTransformer();
+    });
+  },
+  { deep: true },
+);
+
 // Load image and annotation data
 async function loadImageData() {
   if (!currentImageId.value) {
+    console.warn(
+      'ImageAnnotator: No currentImageId available, cannot load data',
+    );
     isLoading.value = false;
     return;
   }
@@ -241,39 +307,60 @@ async function loadImageData() {
   loadingMessage.value = 'Loading image...';
 
   try {
+    console.log(
+      `ImageAnnotator: Loading data for image ${currentImageId.value}`,
+    );
+
     // Reset view
     imageCanvas.resetView();
 
-    // Load image
-    await imageCanvas.loadImage(imageUrl.value);
+    // Reset annotations to clear existing state
+    // Use deselectAll and reset annotations manually instead of clearAll
+    annotations.deselectAll();
+    annotations.loadAnnotations([]);
 
-    // Store initial position and scale after image load
-    initialPosition.value = {
-      x: imageCanvas.position.x,
-      y: imageCanvas.position.y,
-    };
-    initialScale.value = imageCanvas.scale.value || 1;
-    console.log(
-      'Stored initial position:',
-      initialPosition.value,
-      'and scale:',
-      initialScale.value,
-    );
-
-    // Load annotations
-    loadingMessage.value = 'Loading annotations...';
-
-    // Load the image and detections directly from the store
+    // Always load fresh from the store when image changes
+    console.log('ImageAnnotator: Loading image and detections from store');
     await imageStore.loadImage(currentImageId.value, currentCollectionId.value);
     await imageStore.loadDetections(currentImageId.value);
 
-    // Use the enhanced detectionsGetter with isSelected property
+    // Try to load image from image URL
+    try {
+      // Force reload of image by adding timestamp to URL
+      await imageCanvas.loadImage(
+        getRasterImage(currentImageId.value) + `?t=${Date.now()}`,
+      );
+      console.log('ImageAnnotator: Canvas image loaded successfully');
+
+      // Store initial position and scale after image load
+      initialPosition.value = {
+        x: imageCanvas.position.x,
+        y: imageCanvas.position.y,
+      };
+      initialScale.value = imageCanvas.scale.value || 1;
+    } catch (error) {
+      console.error('ImageAnnotator: Error loading image into canvas:', error);
+      // Continue execution to still try loading annotations
+    }
+
+    loadingMessage.value = 'Loading annotations...';
+
+    // Always reload annotations from store
     annotations.loadAnnotations(imageStore.detectionsGetter);
+    console.log(
+      `ImageAnnotator: Loaded ${annotations.annotations.value.length} annotations from store`,
+    );
 
     // Initialize Konva stage if needed
     await initKonva();
+
+    // Force redraw of the Konva stage
+    if (konvaStage.value) {
+      konvaStage.value.batchDraw();
+    }
   } catch (error) {
-    console.error('Error loading image data:', error);
+    console.error('ImageAnnotator: Error loading image data:', error);
+    loadingMessage.value = 'Error loading image data';
   } finally {
     isLoading.value = false;
   }
@@ -463,20 +550,19 @@ defineExpose({
 });
 
 function handleSelectAnnotation(id: string, shift = false) {
-  console.log(`Selecting annotation ${id}, shift:`, shift);
+  console.log(`ImageAnnotator: Selecting annotation ${id}, shift:`, shift);
 
   // Select in annotations
   annotations.selectAnnotation(id, shift);
 
-  // Update the store's selected detection
-  if (!shift) {
-    // In single-select mode, set the selected detection
-    imageStore.selectDetection(id);
-  } else {
-    // In multi-select mode with shift, we need to be careful
-    // For now, just deselect in store when using shift
-    imageStore.selectDetection(null);
-  }
+  // Sync with synchronization composable, which will update the store
+  // This helps prevent circular update loops
+  synchronization.syncSelectionFromAnnotator(id);
+
+  // Update transformer
+  nextTick(() => {
+    updateTransformer();
+  });
 }
 
 // Method to scroll/zoom to a specific annotation
@@ -557,101 +643,6 @@ function handleResetView() {
     updateTransformer();
   });
 }
-
-// --- Metadata Input Positioning Logic ---
-const pendingAnnotation = computed(() => {
-  if (!annotations.pendingMetaAnnotationId.value) return null;
-  return annotations.annotations.value.find(
-    (a) => a.id === annotations.pendingMetaAnnotationId.value,
-  );
-});
-
-const metaInputPosition = computed(() => {
-  if (!pendingAnnotation.value || !imageCanvas.image.value) {
-    // Return a style object compatible with CSSProperties
-    return { display: 'none' } as CSSProperties;
-  }
-
-  // Convert annotation bottom-left corner (in image coords) to screen coords
-  const imageCoords = {
-    x: pendingAnnotation.value.x,
-    y: pendingAnnotation.value.y + pendingAnnotation.value.height,
-  };
-  const screenCoords = imageCanvas.imageToScreenCoords(imageCoords);
-
-  return {
-    display: 'block',
-    position: 'absolute' as const, // Explicitly cast position
-    left: `${screenCoords.x}px`,
-    top: `${screenCoords.y + 5}px`,
-    zIndex: 11,
-    backgroundColor: 'white',
-    padding: '5px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-    minWidth: '200px',
-  } as CSSProperties; // Assert the whole object as CSSProperties
-});
-
-// --- Metadata Input Actions ---
-function handleConfirmMeta() {
-  annotations.confirmAnnotationMeta(
-    selectedMetaRole.value,
-    annotationValue.value,
-  );
-  // Reset local state
-  selectedMetaRole.value = null;
-  annotationValue.value = '';
-}
-
-function handleCancelMeta() {
-  annotations.cancelAnnotationMeta();
-  // Reset local state
-  selectedMetaRole.value = null;
-  annotationValue.value = '';
-}
-
-// Reset meta inputs if pending ID changes externally (e.g., undo/redo, load)
-watch(annotations.pendingMetaAnnotationId, (newId) => {
-  if (!newId) {
-    selectedMetaRole.value = null;
-    annotationValue.value = '';
-  }
-});
-
-// --- onClickOutside Logic ---
-// Register onClickOutside handler
-onClickOutside(metaInputPanelRef, (event) => {
-  // Check if the click target is part of the Konva canvas/stage
-  // This prevents immediate cancellation when clicking to draw a new box
-  const targetElement = event.target as HTMLElement;
-  if (targetElement.closest('.konvajs-content')) {
-    console.log(
-      'onClickOutside: Click inside Konva canvas detected, ignoring.',
-    );
-    return;
-  }
-
-  // Only cancel if the panel is visible (pendingMetaAnnotationId is set)
-  // and both inputs are empty
-  if (
-    annotations.pendingMetaAnnotationId.value &&
-    !selectedMetaRole.value &&
-    !annotationValue.value
-  ) {
-    console.log(
-      'onClickOutside: Detected click outside empty meta panel. Cancelling annotation.',
-    );
-    handleCancelMeta(); // Use the existing cancel function
-  } else if (annotations.pendingMetaAnnotationId.value) {
-    console.log(
-      'onClickOutside: Click outside meta panel, but inputs have values or not pending. Doing nothing.',
-    );
-    // Optionally, you could choose to just hide the panel without cancelling
-    // annotations.clearPendingMeta(); // You'd need to expose this from useAnnotations
-  }
-});
 </script>
 
 <template>
@@ -667,7 +658,7 @@ onClickOutside(metaInputPanelRef, (event) => {
       @wheel.prevent
       :style="{
         cursor: navigationMode.getCursorStyle.value,
-        height: 'calc(100vh - 150px)',
+        height: '100%',
         overflow: 'hidden',
         position: 'relative',
       }"
@@ -686,55 +677,15 @@ onClickOutside(metaInputPanelRef, (event) => {
       />
 
       <!-- Metadata Input Panel (conditionally displayed) -->
-      <div
+      <MetadataInputPanel
         ref="metaInputPanelRef"
-        v-if="annotations.pendingMetaAnnotationId.value"
-        :style="metaInputPosition"
-      >
-        <q-select
-          v-model="selectedMetaRole"
-          :options="metaRoles"
-          label="Meta Role"
-          dense
-          options-dense
-          clearable
-          use-input
-          hide-selected
-          fill-input
-          input-debounce="0"
-          @filter="
-            (val, update) => {
-              update(() => {});
-            }
-          "
-          class="q-mb-sm"
-        />
-        <q-input
-          v-model="annotationValue"
-          label="Value"
-          dense
-          outlined
-          class="q-mb-sm"
-          @keyup.enter="handleConfirmMeta"
-        />
-        <div class="row justify-end q-gutter-sm">
-          <q-btn
-            label="Cancel"
-            color="negative"
-            flat
-            dense
-            @click="handleCancelMeta"
-            size="sm"
-          />
-          <q-btn
-            label="Confirm"
-            color="primary"
-            dense
-            @click="handleConfirmMeta"
-            size="sm"
-          />
-        </div>
-      </div>
+        :pending-annotation="pendingAnnotation"
+        :meta-roles="metaRoles"
+        :position="metaInputPosition"
+        :visible="!!annotations.pendingMetaAnnotationId.value"
+        @confirm="handleConfirmMeta"
+        @cancel="handleCancelMeta"
+      />
 
       <!-- Show skeleton while loading -->
       <ImageSkeleton v-if="isLoading" :message="loadingMessage" />
