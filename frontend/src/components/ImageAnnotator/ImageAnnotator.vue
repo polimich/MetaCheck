@@ -5,113 +5,186 @@ import {
   onMounted,
   watch,
   nextTick,
-  Ref,
   CSSProperties,
+  Ref,
+  onBeforeUnmount,
 } from 'vue';
+import { Stage } from 'konva/lib/Stage';
+import { Layer } from 'konva/lib/Layer';
+import { onClickOutside as useClickOutside } from '@vueuse/core';
+
+// --- Stores --- //
 import { useImageStore } from 'src/stores';
 import { useCurrentCollectionState } from 'src/stores/frontend-state';
+import { useMetaRoleStore } from 'src/stores/meta-role-store';
+import { useNotificationStore } from 'src/stores/app/notificationService';
+import { DetectionState } from 'src/types';
+
+// --- Composables --- //
 import { useImageCanvas } from './composables/useImageCanvas';
 import { useAnnotations } from './composables/useAnnotations';
 import { useNavigationMode } from './composables/useNavigationMode';
 import { useTransformerManagement } from './composables/useTransformerManagement';
 import { useKonvaEventHandlers } from './composables/useKonvaEventHandlers';
-import { getRasterImage } from 'utils';
-import { Stage } from 'konva/lib/Stage';
-import { Layer } from 'konva/lib/Layer';
-import { ImageSkeleton } from 'src/components';
-import AnnotatorToolbar from './AnnotatorToolbar.vue';
-import { useMetaRoleStore } from 'src/stores/meta-role-store';
-import { DetectionState } from 'src/types';
-import { onClickOutside } from '@vueuse/core';
-import { useNotificationStore } from 'src/stores/app/notificationService';
-import MetadataInputPanel from './MetadataInputPanel.vue';
-import { useSynchronization } from './composables/useSynchronization';
 
-// Use stores for state management instead of props
+// --- Components --- //
+import AnnotatorToolbar from './AnnotatorToolbar.vue';
+import MetadataInputPanel from './MetadataInputPanel.vue';
+
+// --- Utils & Types --- //
+import { getRasterImage } from 'utils';
+
+// ==========================================================================
+// Setup: Stores, Refs, State
+// ==========================================================================
+
+// --- Store Instances --- //
 const imageStore = useImageStore();
 const currentCollection = useCurrentCollectionState();
 const metaRoleStore = useMetaRoleStore();
 const notificationStore = useNotificationStore();
 
-// Store initial position and scale for reset
-const initialPosition = ref({ x: 0, y: 0 });
-const initialScale = ref(1);
-
-// Current image and collection IDs from store
-const currentImageId = computed(() => currentCollection.selectedImageId);
-const currentCollectionId = computed(() => currentCollection.id);
-
-// Set up composables
-const annotatorBox = ref<HTMLDivElement | null>(null);
+// --- Component Refs --- //
+const annotatorBox = ref<HTMLDivElement | null>(null); // Main container div
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const stage = ref<any>(null); // Ref for the v-stage component instance
-const konvaStage = ref<Stage | null>(null) as Ref<Stage | null>;
-const konvaLayer = ref<Layer | null>(null) as Ref<Layer | null>;
-const imageCanvas = useImageCanvas();
-const navigationMode = useNavigationMode();
-const annotations = useAnnotations(imageCanvas);
-const { updateTransformer } = useTransformerManagement(
-  konvaLayer,
-  annotations.selectedIds,
-);
-const synchronization = useSynchronization();
+const stage = ref<any>(null);
 
-// Use Konva event handlers composable
+const konvaStage = ref<Stage | null>(null) as Ref<Stage | null>; // Actual Konva Stage object
+const konvaLayer = ref<Layer | null>(null) as Ref<Layer | null>; // Actual Konva Layer object
+const metaInputPanelRef = ref<HTMLDivElement | null>(null); // Metadata panel div
+
+// --- Local State --- //
+// Replace multiple loading states with a single state machine
+const LoadingState = {
+  IDLE: 'idle',
+  INITIALIZING: 'initializing',
+  LOADING_IMAGE: 'loading_image',
+  LOADING_ANNOTATIONS: 'loading_annotations',
+  READY: 'ready',
+  ERROR: 'error',
+};
+
+// Single source of truth for loading state
+const loadingState = ref(LoadingState.INITIALIZING);
+// Keep compatibility with existing code
+const isLoading = computed(() => {
+  return (
+    loadingState.value !== LoadingState.READY &&
+    loadingState.value !== LoadingState.IDLE &&
+    loadingState.value !== LoadingState.ERROR
+  );
+});
+
+// Convert loading message to computed based on state
+const loadingMessage = computed(() => {
+  switch (loadingState.value) {
+    case LoadingState.INITIALIZING:
+      return 'Initializing annotator...';
+    case LoadingState.LOADING_IMAGE:
+      return 'Loading image...';
+    case LoadingState.LOADING_ANNOTATIONS:
+      return 'Processing annotations...';
+    case LoadingState.ERROR:
+      return 'Error loading content';
+    default:
+      return '';
+  }
+});
+
+const loadingStartTime = ref<number>(Date.now());
+const isMounted = ref(false);
+const debugState = ref<string>('initial');
+
+// Add a reactive timer
+const currentTime = ref(Date.now());
+const elapsedTime = computed(() => {
+  return Math.floor((currentTime.value - loadingStartTime.value) / 1000);
+});
+
+// Add method to update time
+function updateTime() {
+  currentTime.value = Date.now();
+}
+
+// Add additional debug info for v-stage rendering
+const stageRenderingBlocked = computed(() => {
+  // Return the reason why v-stage isn't rendering
+  if (isLoading.value) return 'isLoading is true';
+  if (imageCanvas.loadError.value)
+    return `loadError: ${imageCanvas.loadError.value}`;
+  if (!isMounted.value) return 'component not mounted';
+  return 'none - should render';
+});
+
+// Fix the timeout for retry button
+const showRetryButton = computed(() => {
+  // Show retry button after 3 seconds of loading
+  return (
+    (isLoading.value || !stage.value) &&
+    Date.now() - loadingStartTime.value > 3000
+  );
+});
+
+// --- Composables Initialization --- //
+const imageCanvas = useImageCanvas(); // Handles canvas zoom, pan, coordinate conversion
+const navigationMode = useNavigationMode(); // Remove annotatorBox argument
+const annotations = useAnnotations(imageCanvas); // Manages local annotation state, selection, history
+const { updateTransformer } = useTransformerManagement(
+  // Pass konvaLayer, not the v-transformer ref
+  konvaLayer,
+  annotations.selectedIds, // Directly use selectedIds from useAnnotations
+);
 const konvaEventHandlers = useKonvaEventHandlers(
+  // Sets up Konva event listeners
   konvaStage,
   konvaLayer,
   navigationMode,
-  annotations,
+  annotations, // Pass the unified annotations composable
   imageCanvas,
+  // Remove updateTransformer, it's called internally where needed
 );
 
-// Component loading state
-const isLoading = ref(true);
-const loadingMessage = ref('Loading image...');
-const isMounted = ref(false);
+// --- Local State --- //
+const isSaving = ref(false); // Track saving state
 
-// Modify stageConfig for stage dragging
+// ==========================================================================
+// Computed Properties
+// ==========================================================================
+
+// --- Global State Accessors --- //
+const currentImageId = computed(() => currentCollection.selectedImageId);
+
+// Konva Stage Configuration
 const stageConfig = computed(() => ({
   width: annotatorBox.value?.clientWidth || 800,
   height: annotatorBox.value?.clientHeight || 600,
-  draggable: navigationMode.mode.value === 'drag', // Make STAGE draggable
+  draggable: navigationMode.mode.value === 'drag', // Stage draggable only in 'drag' mode
 }));
 
-// Modify layerConfig - ensure layer is NOT draggable
+// Konva Layer Configuration (position/scale driven by imageCanvas composable)
 const layerConfig = computed(() => ({
   x: imageCanvas.position.x,
   y: imageCanvas.position.y,
   scaleX: imageCanvas.scale.value,
   scaleY: imageCanvas.scale.value,
-  // draggable: false, // Explicitly not needed as default is false
 }));
 
-// Image config for v-image
+// Konva Image Configuration
 const imageConfig = computed(() => ({
   image: imageCanvas.image.value,
   width: imageCanvas.dimensions.value?.originalWidth || 0,
   height: imageCanvas.dimensions.value?.originalHeight || 0,
-  listening: false, // Image itself shouldn't capture clicks, layer/stage should
-  name: 'image', // Assign name for hit detection check
+  listening: false, // Image itself doesn't handle events
+  name: 'image',
 }));
 
-// Add transparency to color for annotation fill
-function addAlpha(color: string, opacity: number) {
-  let _opacity = Math.round(Math.min(Math.max(opacity ?? 1, 0), 1) * 255);
-  return color + _opacity.toString(16).toUpperCase();
-}
-
-// --- Metadata Input State ---
+// Metadata Input Panel State & Logic
 const metaRoles = computed(() => metaRoleStore.getAllMetaRoleSelectOptions);
-const metaInputPanelRef = ref<HTMLDivElement | null>(null);
-const metaSelectedRole = ref<string | null>(null);
-const metaInputValue = ref<string>('');
-
-// --- Metadata Input Positioning Logic ---
+const metaSelectedRole = ref<string | null>(null); // v-model for role selection
+const metaInputValue = ref<string>(''); // v-model for value input
 const pendingAnnotation = computed(() => {
+  // Find the annotation waiting for metadata
   if (!annotations.pendingMetaAnnotationId.value) return null;
-
-  // Find the annotation and ensure we return null if not found (instead of undefined)
   return (
     annotations.annotations.value.find(
       (a) => a.id === annotations.pendingMetaAnnotationId.value,
@@ -119,47 +192,138 @@ const pendingAnnotation = computed(() => {
   );
 });
 
-const metaInputPosition = computed(() => {
-  if (!pendingAnnotation.value || !imageCanvas.image.value) {
-    // Return a style object compatible with CSSProperties
-    return { display: 'none' } as CSSProperties;
+// Metadata panel position - completely new approach
+const metaInputPosition = computed<CSSProperties>(() => {
+  if (!pendingAnnotation.value || !konvaStage.value) {
+    return { display: 'none' };
   }
 
-  // Convert annotation bottom-left corner (in image coords) to screen coords
-  const imageCoords = {
-    x: pendingAnnotation.value.x,
-    y: pendingAnnotation.value.y + pendingAnnotation.value.height,
-  };
-  const screenCoords = imageCanvas.imageToScreenCoords(imageCoords);
+  try {
+    // Find the actual Konva node for the annotation by name
+    const node = konvaStage.value.findOne(
+      `.annotation_${annotations.pendingMetaAnnotationId.value}`,
+    );
 
-  return {
-    display: 'block',
-    position: 'absolute' as const, // Explicitly cast position
-    left: `${screenCoords.x}px`,
-    top: `${screenCoords.y + 5}px`,
-    zIndex: 11,
-  } as CSSProperties; // Assert the whole object as CSSProperties
+    if (!node) {
+      console.warn('[Annotator] Could not find annotation node in DOM');
+      return { display: 'none' };
+    }
+
+    // Get the client rect of the Konva stage container
+    const stageRect = konvaStage.value.container().getBoundingClientRect();
+
+    // Calculate annotation center in stage coordinates
+    const annotationRect = node.getClientRect() as DOMRect;
+
+    // Position panel centered below the annotation
+    const panelWidth = 250;
+    const panelLeft = Math.max(
+      stageRect.left + 10,
+      Math.min(
+        stageRect.right - panelWidth - 10,
+        annotationRect.left + annotationRect.width / 2 - panelWidth / 2,
+      ),
+    );
+    const panelTop = annotationRect.bottom + 5;
+
+    console.log(
+      '[Annotator] Positioning metadata panel at:',
+      panelLeft,
+      panelTop,
+    );
+
+    return {
+      display: 'block',
+      position: 'fixed',
+      left: `${panelLeft}px`,
+      top: `${panelTop}px`,
+      zIndex: 1100,
+    };
+  } catch (error) {
+    console.error('[Annotator] Error calculating panel position:', error);
+    return { display: 'none' };
+  }
 });
 
-// --- Metadata Input Actions ---
+// ==========================================================================
+// Methods
+// ==========================================================================
+
+// --- Keyboard Event Handling --- //
+function handleKeyDown(event: KeyboardEvent) {
+  // Prevent default browser behavior for keys we handle (e.g., Backspace navigating back)
+  if (
+    ['Delete', 'Backspace', 'z', 'y', 'Shift', 'Alt', ' '].includes(event.key)
+  ) {
+    // Allow input if focus is within an input/textarea
+    const target = event.target as HTMLElement;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+    event.preventDefault();
+  }
+
+  if (event.key === 'Shift') {
+    // Refs might be read-only, remove setters
+    // navigationMode.setShiftKeyPressed(true);
+  } else if (event.key === 'Alt') {
+    // navigationMode.setAltKeyPressed(true);
+  } else if (event.key === ' ') {
+    // Space key
+    navigationMode.startSpacebarPan();
+  } else if (event.key === 'Delete' || event.key === 'Backspace') {
+    if (annotations.hasSelection.value) {
+      annotations.deleteSelected(); // Call deleteSelected directly
+    }
+  } else if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+    annotations.undo(); // Call undo
+  } else if ((event.ctrlKey || event.metaKey) && event.key === 'y') {
+    annotations.redo(); // Call redo
+  } else if (event.key === 'z' || event.key === 'Z') {
+    // Reset view when Z key is pressed (not with Ctrl or Meta key)
+    if (!(event.ctrlKey || event.metaKey)) {
+      resetViewWithRefresh();
+    }
+  } else if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+    // Save on Ctrl+S or Command+S
+    event.preventDefault(); // Prevent browser's save dialog
+    save();
+  }
+}
+
+function handleKeyUp(event: KeyboardEvent) {
+  if (event.key === 'Shift') {
+    // Refs might be read-only, remove setters
+    // navigationMode.setShiftKeyPressed(false);
+  } else if (event.key === 'Alt') {
+    // navigationMode.setAltKeyPressed(false);
+  } else if (event.key === ' ') {
+    // Space key
+    navigationMode.stopSpacebarPan();
+  }
+}
+
+// --- Metadata Handling --- //
 function handleConfirmMeta(metaRole: string | null, value: string) {
-  // Store the ID before it gets cleared
   const confirmedAnnotationId = annotations.pendingMetaAnnotationId.value;
   if (!confirmedAnnotationId) {
-    console.error('Cannot confirm meta: No pending annotation ID found.');
+    console.error(
+      '[Annotator] Cannot confirm meta: No pending annotation ID found.',
+    );
     return;
   }
 
-  // First confirm annotation using the annotations composable (this will clear pendingMetaAnnotationId)
+  // First confirm the metadata in the local annotation state with undo/redo tracking
   annotations.confirmAnnotationMeta(metaRole, value);
 
-  // Now find the annotation using the stored ID
+  // Then update the store
   const confirmedAnnotation = annotations.annotations.value.find(
     (a) => a.id === confirmedAnnotationId,
   );
-
   if (confirmedAnnotation) {
-    // Look up the meta role object to get color and display type
     let metaRoleObj = null;
     if (metaRole) {
       metaRoleObj = metaRoles.value.find((role) => role.value === metaRole) as
@@ -171,330 +335,150 @@ function handleConfirmMeta(metaRole: string | null, value: string) {
           }
         | undefined;
     }
-
-    // Set computed properties based on meta role if available
     if (metaRoleObj) {
       confirmedAnnotation.computed_color = metaRoleObj.color || '#ff0000';
-      // Use the label for the display type
       confirmedAnnotation.computed_display_type = metaRoleObj.label;
-      // Use the value for the computed_type
       confirmedAnnotation.computed_type = metaRoleObj.value;
     } else if (metaRole) {
-      // If we have a metaRole string but couldn't find the object
       confirmedAnnotation.computed_type = metaRole;
       confirmedAnnotation.computed_display_type = metaRole;
+      confirmedAnnotation.computed_color = '#ff0000';
     }
 
-    // Ensure the annotation is in the store's detections
+    // Add to image store
     const existingIndex = imageStore.detections.findIndex(
       (d) => d.id === confirmedAnnotation.id,
     );
+    const storePayload = {
+      ...confirmedAnnotation,
+      created_date:
+        confirmedAnnotation.created_date || new Date().toISOString(),
+      last_change: new Date().toISOString(),
+      last_access: new Date().toISOString(),
+      edited: true,
+      loadingMetaRoles: false,
+    };
 
     if (existingIndex === -1) {
-      // Add to the store's detections array
-      imageStore.detections.push({
-        ...confirmedAnnotation,
-        // Ensure these fields are properly set
-        created_date:
-          confirmedAnnotation.created_date || new Date().toISOString(),
-        last_change: new Date().toISOString(),
-        last_access: new Date().toISOString(),
-        edited: true,
-        loadingMetaRoles: false,
-      });
+      // Add to detections array (for local rendering)
+      imageStore.detections.push(storePayload);
 
-      // Also add to the detectionsToAdd array for backend persistence
-      imageStore.detectionsToAdd.push({
-        ...confirmedAnnotation,
-        created_date:
-          confirmedAnnotation.created_date || new Date().toISOString(),
-        last_change: new Date().toISOString(),
-        last_access: new Date().toISOString(),
-        image_id: currentImageId.value,
-        loadingMetaRoles: false,
-      });
-
-      console.log(
-        `Added new annotation ${confirmedAnnotation.id} to image store`,
-      );
+      // Add to detectionsToAdd array (for backend persistence)
+      // Only add if not already there
+      if (
+        !imageStore.detectionsToAdd.some((d) => d.id === confirmedAnnotation.id)
+      ) {
+        imageStore.detectionsToAdd.push({
+          ...storePayload,
+          image_id: currentImageId.value ?? '',
+        });
+        console.log(
+          `[Annotator] Added new annotation ${confirmedAnnotation.id} to image store`,
+        );
+      } else {
+        console.log(
+          `[Annotator] Annotation ${confirmedAnnotation.id} already in detectionsToAdd, updating`,
+        );
+        // Update the existing entry
+        const index = imageStore.detectionsToAdd.findIndex(
+          (d) => d.id === confirmedAnnotation.id,
+        );
+        if (index !== -1) {
+          imageStore.detectionsToAdd[index] = {
+            ...storePayload,
+            image_id: currentImageId.value ?? '',
+          };
+        }
+      }
     } else {
-      // Update the existing detection in the store
-      imageStore.detections[existingIndex] = {
-        ...confirmedAnnotation,
-        last_change: new Date().toISOString(),
-        edited: true,
-        loadingMetaRoles: false,
-      };
+      // Update existing detection
+      imageStore.detections[existingIndex] = storePayload;
       console.log(
-        `Updated existing annotation ${confirmedAnnotation.id} in image store`,
+        `[Annotator] Updated existing annotation ${confirmedAnnotation.id} in image store`,
       );
     }
   } else {
     console.error(
-      `Could not find confirmed annotation with ID: ${confirmedAnnotationId}`,
+      `[Annotator] Could not find confirmed annotation locally with ID: ${confirmedAnnotationId}`,
     );
   }
-
-  // Reset our form values
   metaSelectedRole.value = null;
   metaInputValue.value = '';
 }
 
 function handleCancelMeta() {
   annotations.cancelAnnotationMeta();
-  // Reset our form values
   metaSelectedRole.value = null;
   metaInputValue.value = '';
 }
 
-// --- onClickOutside Logic for MetadataInputPanel ---
-onClickOutside(metaInputPanelRef, (event) => {
-  // Check if the click target is part of the Konva canvas/stage
-  // This prevents immediate cancellation when clicking to draw a new box
-  const targetElement = event.target as HTMLElement;
-
-  // Check if click is on Konva canvas
-  if (targetElement.closest('.konvajs-content')) {
-    console.log(
-      'onClickOutside: Click inside Konva canvas detected, ignoring.',
-    );
-    return;
-  }
-
-  // Check if click is on any q-menu (dropdowns)
-  if (
-    targetElement.closest('.q-menu') ||
-    targetElement.closest('.q-dialog') ||
-    document.querySelector('.q-menu')?.contains(targetElement)
-  ) {
-    console.log(
-      'onClickOutside: Click on dropdown or dialog detected, ignoring.',
-    );
-    return;
-  }
-
-  // If panel is visible and pending annotation exists, cancel it
-  if (annotations.pendingMetaAnnotationId.value) {
-    console.log(
-      'onClickOutside: Detected click outside meta panel. Cancelling annotation.',
-    );
-    handleCancelMeta();
-  }
-});
-
-// Fetch meta roles on mount
-onMounted(async () => {
-  console.log('ImageAnnotator mounted');
-  isMounted.value = true;
-
-  nextTick(() => {
-    if (annotatorBox.value) {
-      imageCanvas.setContainer(annotatorBox.value);
-      console.log('ImageCanvas container set.');
-    } else {
-      console.error('Annotator box ref is not available after mount');
-    }
-
-    if (stage.value) {
-      konvaStage.value = stage.value.getStage();
-      console.log('Konva Stage obtained:', konvaStage.value ? 'yes' : 'no');
-
-      if (konvaStage.value) {
-        konvaLayer.value = konvaStage.value.findOne('Layer') as Layer | null;
-        console.log('Konva Layer obtained:', konvaLayer.value ? 'yes' : 'no');
-
-        // Initial transformer update after layer is obtained
-        if ((annotations.selectedIds.value?.size || 0) > 0) {
-          console.log(
-            'Initial selection present on mount, updating transformer',
-          );
-          updateTransformer(); // Call the function from the composable
-        }
-      } else {
-        console.error('Failed to get Konva Stage object from ref');
-      }
-
-      // @ts-expect-error setStage method exists but not in type definition
-      imageCanvas.setStage?.(konvaStage.value);
-      console.log(
-        'Stage set:',
-        konvaStage.value ? 'available' : 'not available',
-      );
-    } else {
-      console.error('Stage ref is not available after mount');
-    }
-
-    if (currentImageId.value) {
-      console.log('Loading image data for:', currentImageId.value);
-      loadImageData();
-    } else {
-      console.log('No current image ID available');
-    }
-  });
-});
-
-// Watch for changes in currentCollection selectedImageId
-watch(
-  () => currentCollection.selectedImageId,
-  async (newImageId, oldImageId) => {
-    if (newImageId && newImageId !== oldImageId) {
-      console.log(
-        `ImageAnnotator: currentCollection.selectedImageId changed to ${newImageId}, reloading data`,
-      );
-      // Always reload when store changes
-      await loadImageData();
-    }
-  },
-);
-
-// Watch for changes in collection ID and reload data
-watch(
-  () => currentCollection.id,
-  async (newCollectionId, oldCollectionId) => {
-    if (newCollectionId && newCollectionId !== oldCollectionId) {
-      console.log(
-        `ImageAnnotator: collection ID changed to ${newCollectionId}, reloading data`,
-      );
-      await loadImageData();
-    }
-  },
-);
-
-// Watch for changes in the store's selected detection
-watch(
-  () => imageStore.selectedDetectionId,
-  (newSelectedId) => {
-    if (newSelectedId) {
-      // Check if this detection exists in our annotations
-      const exists = annotations.annotations.value.some(
-        (ann) => ann.id === newSelectedId,
-      );
-      if (exists) {
-        // Sync with the annotations composable
-        annotations.syncSelectionWithStore(newSelectedId);
-        // Update transformer
-        nextTick(() => {
-          updateTransformer();
-        });
-      }
-    } else {
-      // Clear selection
-      annotations.deselectAll();
-      // Update transformer to remove it
-      nextTick(() => {
-        updateTransformer();
-      });
-    }
-  },
-);
-
-// Watch for changes in imageStore detections to sync with external changes
-watch(
-  () => imageStore.detections,
-  (newDetections) => {
-    console.log(
-      `ImageAnnotator: Detected ${newDetections.length} detections in store, updating annotations`,
-    );
-    // Always update annotations when detections change, regardless of current count
-    annotations.loadAnnotations(imageStore.detectionsGetter);
-
-    // Update transformer if needed
-    nextTick(() => {
-      updateTransformer();
-    });
-  },
-  { deep: true },
-);
-
-// Load image and annotation data
+// --- Data Loading & Initialization --- //
 async function loadImageData() {
-  if (!currentImageId.value) {
+  debugState.value = 'loadImageData';
+  console.log('[Annotator DEBUG] loadImageData called');
+
+  // Set loading state and reset timer
+  loadingState.value = LoadingState.LOADING_IMAGE;
+  loadingStartTime.value = Date.now();
+
+  // Exit early if still initializing
+  if (!konvaStage.value || !konvaLayer.value) {
     console.warn(
-      'ImageAnnotator: No currentImageId available, cannot load data',
+      '[Annotator DEBUG] Attempted to load image before Konva initialization',
     );
-    isLoading.value = false;
+    loadingState.value = LoadingState.ERROR;
     return;
   }
 
-  isLoading.value = true;
-  loadingMessage.value = 'Loading image...';
+  // Get the current image from the store directly
+  if (!imageStore.image.id) {
+    console.error('[Annotator DEBUG] No image data in store');
+    loadingState.value = LoadingState.ERROR;
+    return;
+  }
 
   try {
+    console.log('[Annotator DEBUG] Loading image:', imageStore.image.id);
+
+    // Construct URL using the ID from store
+    const imageUrl = getRasterImage(imageStore.image.id) + `?t=${Date.now()}`;
+    await imageCanvas.loadImage(imageUrl);
+    console.log('[Annotator DEBUG] Image loaded into canvas successfully');
+
+    loadingState.value = LoadingState.LOADING_ANNOTATIONS;
+
+    // Load annotations from store
+    annotations.loadAnnotations(imageStore.detections || []);
     console.log(
-      `ImageAnnotator: Loading data for image ${currentImageId.value}`,
+      '[Annotator DEBUG] Loaded annotations:',
+      imageStore.detections.length,
     );
 
-    // Reset view
+    // Reset view and refresh transformer
     imageCanvas.resetView();
+    await nextTick();
+    updateTransformer();
 
-    // Reset annotations to clear existing state
-    // Use deselectAll and reset annotations manually instead of clearAll
-    annotations.deselectAll();
-    annotations.loadAnnotations([]);
-
-    // Always load fresh from the store when image changes
-    console.log('ImageAnnotator: Loading image and detections from store');
-    await imageStore.loadImage(currentImageId.value, currentCollectionId.value);
-    await imageStore.loadDetections(currentImageId.value);
-
-    // Try to load image from image URL
-    try {
-      // Force reload of image by adding timestamp to URL
-      await imageCanvas.loadImage(
-        getRasterImage(currentImageId.value) + `?t=${Date.now()}`,
-      );
-      console.log('ImageAnnotator: Canvas image loaded successfully');
-
-      // Store initial position and scale after image load
-      initialPosition.value = {
-        x: imageCanvas.position.x,
-        y: imageCanvas.position.y,
-      };
-      initialScale.value = imageCanvas.scale.value || 1;
-    } catch (error) {
-      console.error('ImageAnnotator: Error loading image into canvas:', error);
-      // Continue execution to still try loading annotations
-    }
-
-    loadingMessage.value = 'Loading annotations...';
-
-    // Always reload annotations from store
-    annotations.loadAnnotations(imageStore.detectionsGetter);
-    console.log(
-      `ImageAnnotator: Loaded ${annotations.annotations.value.length} annotations from store`,
-    );
-
-    // Initialize Konva stage if needed
-    await initKonva();
-
-    // Force redraw of the Konva stage
-    if (konvaStage.value) {
-      konvaStage.value.batchDraw();
-    }
+    // Mark as ready
+    debugState.value = 'ready';
+    loadingState.value = LoadingState.READY;
+    console.log('[Annotator DEBUG] Image and annotations fully loaded');
   } catch (error) {
-    console.error('ImageAnnotator: Error loading image data:', error);
-    loadingMessage.value = 'Error loading image data';
-  } finally {
-    isLoading.value = false;
+    console.error('[Annotator DEBUG] Error in loadImageData:', error);
+    debugState.value = 'error';
+    loadingState.value = LoadingState.ERROR;
+    notificationStore.error('Error loading image or annotations');
+    annotations.loadAnnotations([]);
   }
 }
 
-// Initialize Konva stage and layers
-async function initKonva() {
-  // Ensure konvaStage/Layer is available
-  if (!konvaStage.value || !konvaLayer.value || !imageCanvas.image.value) {
-    console.log('initKonva skipped: Konva stage, layer or image not ready');
-    return;
-  }
-
-  console.log('Initializing Konva stage/layer...');
-  await nextTick(); // Ensure DOM is updated if needed
-  konvaLayer.value.draw(); // Draw the layer containing image and annotations
-  console.log('Konva stage/layer initialized and drawn.');
-}
-
-// Save annotations to the store/backend
+// --- Placeholder Save Action --- //
 async function save() {
+  console.log('[Annotator] Save function called');
+
+  // Set saving state
+  isSaving.value = true;
+
   try {
     // Get the current image from the store - it should be up-to-date
     const currentImage = imageStore.image;
@@ -511,9 +495,20 @@ async function save() {
       ) {
         // We might need a way to mark the image itself as edited in the store
         // For now, we rely on the detection flags.
-        console.log('Save initiated with pending changes.');
+        console.log(
+          '[Annotator] Save initiated with pending changes:',
+          imageStore.detectionsToAdd.length,
+          'to add,',
+          imageStore.detectionsToDelete.length,
+          'to delete,',
+          imageStore.detections.filter((d) => d.edited).length,
+          'edited',
+        );
+
+        notificationStore.info('Saving changes...');
       } else {
         notificationStore.info('No changes to save.');
+        isSaving.value = false; // Reset saving state
         return; // Nothing to save
       }
 
@@ -524,7 +519,7 @@ async function save() {
         notificationStore.error(
           `Failed to save changes: ${saveResult?.error || 'Unknown error'}`,
         );
-        console.error('Error saving changes:', saveResult?.error);
+        console.error('[Annotator] Error saving changes:', saveResult?.error);
       } else {
         notificationStore.success('Annotations saved successfully');
         // No need to clear local deleted annotations list anymore
@@ -533,304 +528,918 @@ async function save() {
     } else {
       notificationStore.error('Cannot save: Image not found or ID mismatch');
       console.error(
-        `Cannot save: Current image not found or ID mismatch. Store: ${imageStore.image?.id}, Expected: ${currentImageId.value}`,
+        `[Annotator] Cannot save: Current image not found or ID mismatch. Store: ${imageStore.image?.id}, Expected: ${currentImageId.value}`,
       );
     }
   } catch (error) {
     notificationStore.error(
       `Error saving annotations: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
-    console.error('Error in save function:', error);
+    console.error('[Annotator] Error in save function:', error);
+  } finally {
+    // Reset saving state
+    isSaving.value = false;
   }
 }
 
-// Handle keyboard events
-function handleKeyDown(event: KeyboardEvent) {
-  // Ignore key events if focused on an input element
-  if (
-    event.target instanceof HTMLInputElement ||
-    event.target instanceof HTMLTextAreaElement
-  ) {
+// Function to reset the stage position and update config if needed
+function resetStagePosition() {
+  if (konvaStage.value) {
+    // Reset stage position to 0,0
+    konvaStage.value.position({ x: 0, y: 0 });
+    konvaStage.value.batchDraw();
+  }
+}
+
+// Function to zoom to a specific annotation
+function scrollToAnnotation(detection: DetectionState) {
+  console.log('[Annotator] Scrolling to annotation:', detection.id);
+
+  if (!konvaStage.value || !konvaLayer.value) {
+    console.error('[Annotator] Cannot scroll: Stage or layer not available');
+    notificationStore.warning('Cannot zoom to annotation: view not ready');
     return;
   }
 
-  const key = event.key; // Use event.key for Spacebar check
-  const isCtrlPressed = event.ctrlKey || event.metaKey;
+  try {
+    // Find the annotation rect by id/name
+    const rect =
+      konvaStage.value.findOne(`#${detection.id}`) ||
+      konvaStage.value.findOne(`.annotation_${detection.id}`);
 
-  // Handle Spacebar for temporary drag mode
-  if (key === ' ' && !event.repeat) {
-    // Check for Spacebar, prevent repeat triggers
-    event.preventDefault(); // Prevent page scroll
-    navigationMode.startSpacebarPan();
-    return; // Don't process other shortcuts if space is pressed
-  }
-
-  // Prevent default browser behavior for other shortcuts we handle
-  if (isCtrlPressed && 'ZYS'.includes(key.toUpperCase())) {
-    event.preventDefault();
-  }
-  if (['W', 'E', 'Z', 'BACKSPACE', 'DELETE'].includes(key.toUpperCase())) {
-    event.preventDefault();
-  }
-
-  if (isCtrlPressed) {
-    switch (key.toUpperCase()) {
-      case 'Z':
-        if (event.shiftKey) {
-          annotations.redo();
-        } else {
-          annotations.undo();
-        }
-        return;
-      case 'Y':
-        annotations.redo();
-        return;
-      case 'S':
-        save();
-        return;
+    if (!rect) {
+      console.error(
+        `[Annotator] Cannot find annotation with ID: ${detection.id}`,
+      );
+      notificationStore.warning('Cannot find annotation to zoom to');
+      return;
     }
-  }
 
-  switch (key.toUpperCase()) {
-    case 'W':
-      navigationMode.setMode('add');
-      break;
-    case 'E':
-      navigationMode.setMode('drag');
-      break;
-    case 'Z':
-      imageCanvas.resetView();
-      break;
-    case 'BACKSPACE':
-    case 'DELETE':
-      annotations.deleteSelected();
-      break;
+    // Get center point of the annotation in image coordinates
+    const annotationCenter = {
+      x: detection.x + detection.width / 2,
+      y: detection.y + detection.height / 2,
+    };
+
+    console.log('[Annotator] Annotation center:', annotationCenter);
+
+    // Calculate a good zoom level that makes the annotation visible
+    // Use a slightly larger scale to show context around the annotation
+    const containerWidth = annotatorBox.value?.clientWidth || 800;
+    const containerHeight = annotatorBox.value?.clientHeight || 600;
+
+    // Determine optimal scale based on annotation size
+    // Want the annotation to take up about 1/3 of the view
+    const targetWidth = containerWidth / 3;
+    const targetHeight = containerHeight / 3;
+
+    // Calculate scales required to fit the annotation at desired size
+    const scaleX = targetWidth / detection.width;
+    const scaleY = targetHeight / detection.height;
+
+    // Use the smaller scale to ensure annotation fits
+    const newScale = Math.min(scaleX, scaleY);
+
+    // Limit scale to reasonable bounds
+    const finalScale = Math.min(Math.max(newScale, 0.5), 3);
+
+    console.log('[Annotator] Zooming to scale:', finalScale);
+
+    // Reset stage position first if it's been moved
+    resetStagePosition();
+
+    // Use imageCanvas to zoom to the specific point
+    imageCanvas.zoomToPoint(annotationCenter, finalScale, true);
+
+    // Make sure the layer reflects the changes
+    konvaLayer.value.batchDraw();
+
+    // Update transform handles if the annotation is selected
+    if (annotations.isSelected(detection.id)) {
+      updateTransformer();
+    }
+
+    notificationStore.info('Zoomed to annotation');
+  } catch (error) {
+    console.error('[Annotator] Error zooming to annotation:', error);
+    notificationStore.error('Failed to zoom to annotation');
   }
 }
 
-// Handle key up events (specifically for Spacebar)
-function handleKeyUp(event: KeyboardEvent) {
-  if (event.key === ' ') {
-    // Check for Spacebar release
-    event.preventDefault();
-    navigationMode.stopSpacebarPan();
-  }
-}
-
-// Expose the handlers for use in the template
+// Expose the method for use via synchronization
 defineExpose({
-  handleSelectAnnotation,
   scrollToAnnotation,
+  handleSelectAnnotation: annotations.selectAnnotation,
+  save,
 });
 
-function handleSelectAnnotation(id: string, shift = false) {
-  console.log(`ImageAnnotator: Selecting annotation ${id}, shift:`, shift);
+// Enhanced reset view function with proper layer refresh
+function resetViewWithRefresh() {
+  console.log('[Annotator] Resetting view with refresh...');
 
-  // Select in annotations
-  annotations.selectAnnotation(id, shift);
+  // Make sure we have the necessary objects
+  if (!konvaStage.value || !konvaLayer.value) {
+    console.error(
+      '[Annotator] Cannot reset view: Missing Konva stage or layer',
+    );
+    notificationStore.warning('Cannot reset view: stage not ready');
+    return;
+  }
 
-  // Sync with synchronization composable, which will update the store
-  // This helps prevent circular update loops
-  synchronization.syncSelectionFromAnnotator(id);
+  if (!imageCanvas.image.value) {
+    console.error('[Annotator] Cannot reset view: No image loaded');
+    notificationStore.warning('Cannot reset view: no image loaded');
+    return;
+  }
 
-  // Update transformer
-  nextTick(() => {
+  try {
+    // Reset stage position first
+    resetStagePosition();
+
+    // Call the improved reset view function
+    const resetResult = imageCanvas.resetView();
+
+    // Sync the Konva layer with the new position and scale
+    if (konvaLayer.value) {
+      konvaLayer.value.x(imageCanvas.position.x);
+      konvaLayer.value.y(imageCanvas.position.y);
+      konvaLayer.value.scale({
+        x: imageCanvas.scale.value,
+        y: imageCanvas.scale.value,
+      });
+
+      // Force a redraw of the layer
+      konvaLayer.value.batchDraw();
+    }
+
+    // Update the transformer to match the new view
     updateTransformer();
-  });
+
+    console.log('[Annotator] View reset complete with refresh:', resetResult);
+    notificationStore.info('View reset');
+  } catch (error) {
+    console.error('[Annotator] Error during view reset:', error);
+    notificationStore.error('Failed to reset view');
+  }
 }
 
-// Method to scroll/zoom to a specific annotation
-function scrollToAnnotation(detection: DetectionState) {
-  // First select the detection
-  handleSelectAnnotation(detection.id, false);
+// --- Konva Initialization --- //
+async function initializeKonvaObjects() {
+  debugState.value = 'initKonva';
+  console.log('[Annotator DEBUG] initializeKonvaObjects called');
 
-  // Find the annotation in our annotations list
-  const annotation = annotations.annotations.value.find(
-    (a) => a.id === detection.id,
+  if (!stage.value) {
+    console.error('[Annotator DEBUG] Stage ref not available');
+    loadingState.value = LoadingState.ERROR;
+    return;
+  }
+
+  if (!annotatorBox.value) {
+    console.error('[Annotator DEBUG] Container ref not available');
+    loadingState.value = LoadingState.ERROR;
+    return;
+  }
+
+  if (konvaStage.value) {
+    console.log('[Annotator DEBUG] Konva already initialized');
+    return;
+  }
+
+  try {
+    // IMPORTANT: Set the container FIRST before initializing Konva
+    // This ensures useImageCanvas doesn't attempt to create resize observers too early
+    console.log('[Annotator DEBUG] Setting container for imageCanvas');
+    imageCanvas.setContainer(annotatorBox.value);
+
+    console.log('[Annotator DEBUG] Getting Konva Stage from component ref');
+    konvaStage.value = stage.value.getStage();
+
+    if (!konvaStage.value) {
+      throw new Error('Failed to get Konva Stage object');
+    }
+
+    console.log('[Annotator DEBUG] Finding Konva Layer');
+    konvaLayer.value = konvaStage.value.findOne('Layer') as Layer | null;
+
+    if (!konvaLayer.value) {
+      throw new Error('Failed to find Layer in Stage');
+    }
+
+    debugState.value = 'konvaReady';
+    console.log('[Annotator DEBUG] Konva successfully initialized');
+
+    // If we have a current image ID, load it
+    if (currentImageId.value) {
+      console.log(
+        '[Annotator DEBUG] Loading initial image data after Konva init',
+      );
+      // Make sure the store has image data
+      if (
+        !imageStore.image.id ||
+        imageStore.image.id !== currentImageId.value
+      ) {
+        loadingState.value = LoadingState.LOADING_IMAGE;
+        try {
+          console.log(
+            '[Annotator DEBUG] Loading image from store:',
+            currentImageId.value,
+          );
+          await imageStore.loadImage(
+            currentImageId.value,
+            currentCollection.id,
+          );
+        } catch (error) {
+          console.error(
+            '[Annotator DEBUG] Error loading image from store:',
+            error,
+          );
+          loadingState.value = LoadingState.ERROR;
+          return;
+        }
+      }
+
+      // Now load the image into the canvas
+      await loadImageData();
+    } else {
+      console.log(
+        '[Annotator DEBUG] No current image ID, skipping data loading',
+      );
+      loadingState.value = LoadingState.IDLE;
+    }
+  } catch (error) {
+    console.error('[Annotator DEBUG] Konva initialization error:', error);
+    debugState.value = 'error';
+    notificationStore.error('Failed to initialize annotation canvas');
+    loadingState.value = LoadingState.ERROR;
+  }
+}
+
+// Create a manual method to reinitialize the image canvas if needed
+function reinitializeCanvas() {
+  console.log('[Annotator DEBUG] Reinitializing canvas manually');
+  if (annotatorBox.value && !konvaStage.value) {
+    imageCanvas.setContainer(annotatorBox.value);
+    if (stage.value) {
+      initializeKonvaObjects();
+    }
+  }
+}
+
+// ==========================================================================
+// Lifecycle Hooks & Watchers
+// ==========================================================================
+
+onMounted(() => {
+  console.log('[Annotator DEBUG] Component mounted');
+  debugState.value = 'mounted';
+  isMounted.value = true; // Allow conditional rendering
+
+  // Add a delayed initialization to ensure DOM is fully rendered
+  setTimeout(() => {
+    if (annotatorBox.value && !konvaStage.value) {
+      console.log('[Annotator DEBUG] Running delayed initialization');
+      imageCanvas.setContainer(annotatorBox.value);
+    }
+  }, 100);
+
+  // Start timer update interval
+  const timerInterval = setInterval(updateTime, 1000);
+
+  // Add a check for visible annotations to force-hide loading
+  const visibilityCheck = setInterval(() => {
+    // If we're still loading but annotations are present in the DOM, force hide
+    if (
+      loadingState.value !== LoadingState.READY &&
+      loadingState.value !== LoadingState.IDLE &&
+      annotations.annotations.value.length > 0 &&
+      konvaStage.value &&
+      elapsedTime.value > 2
+    ) {
+      console.log(
+        '[Annotator DEBUG] Annotations visible but loading still active - forcing hide',
+      );
+      forceHideLoadingOverlay();
+    }
+  }, 1000);
+
+  // Clean up intervals on unmount
+  onBeforeUnmount(() => {
+    clearInterval(timerInterval);
+    clearInterval(visibilityCheck);
+  });
+});
+
+onBeforeUnmount(() => {
+  // Cleanup if necessary (e.g., remove event listeners manually added)
+  console.log('[Annotator] Component unmounting.');
+});
+
+// --- Watchers --- //
+
+// Watch for the v-stage component ref to become available
+watch(stage, (newStage) => {
+  console.log('[Annotator DEBUG] Stage ref changed:', !!newStage);
+  if (newStage) {
+    // Use setTimeout for a slight delay, ensuring Vue DOM updates are complete
+    setTimeout(() => {
+      initializeKonvaObjects();
+    }, 50);
+  }
+});
+
+// Watch for metadata panel visibility to setup click outside handling
+watch(
+  () => annotations.pendingMetaAnnotationId.value,
+  (newValue) => {
+    console.log(
+      '[Annotator DEBUG] Metadata panel visibility changed:',
+      !!newValue,
+    );
+    if (newValue) {
+      // Panel is becoming visible - setup click outside after a small delay to ensure DOM updates
+      setTimeout(() => {
+        if (metaInputPanelRef.value) {
+          console.log(
+            '[Annotator DEBUG] Setting up click outside for metadata panel',
+          );
+          useClickOutside(
+            metaInputPanelRef,
+            (event) => {
+              // Check if the click was on a q-menu (dropdown) or other Quasar UI elements
+              const target = event.target as HTMLElement;
+
+              // Check for Quasar UI components that should be ignored
+              if (
+                document.querySelector('.q-menu') || // Any active dropdown
+                target.closest('.q-menu') ||
+                target.closest('.q-dialog') ||
+                target.closest('.q-select__dropdown') ||
+                target.closest('.q-popup-edit') ||
+                target.closest('.q-date') ||
+                target.closest('.q-time')
+              ) {
+                console.log(
+                  '[Annotator DEBUG] Click on or during active Quasar UI component, ignoring',
+                );
+                return; // Ignore clicks on Quasar UI components
+              }
+
+              // Check if the click target is a child of the metadata panel
+              if (metaInputPanelRef.value?.contains(target)) {
+                console.log(
+                  '[Annotator DEBUG] Click inside metadata panel, ignoring',
+                );
+                return; // Ignore clicks inside the panel
+              }
+
+              // If we got here, it's a genuine outside click
+              console.log(
+                '[Annotator DEBUG] Genuine outside click detected, handling...',
+              );
+              handleClickOutside();
+            },
+            {
+              capture: true, // Use capture phase to get the events first
+              detectIframe: false, // Don't handle iframe events
+            },
+          );
+        } else {
+          console.log(
+            '[Annotator DEBUG] Cannot setup click outside - metaInputPanelRef not available',
+          );
+        }
+      }, 200); // Longer delay to ensure full DOM updates
+    }
+  },
+);
+
+// Watch for changes in the selected image ID
+watch(
+  () => loadingState.value,
+  (newState) => {
+    // Auto-timeout if we stay in a loading state too long
+    if (
+      newState !== LoadingState.READY &&
+      newState !== LoadingState.ERROR &&
+      newState !== LoadingState.IDLE
+    ) {
+      const timeoutId = setTimeout(() => {
+        if (loadingState.value === newState) {
+          console.log(
+            `[Annotator DEBUG] Loading state ${newState} timed out after 10s`,
+          );
+          // Update with mutation instead of assignment
+          loadingState.value = LoadingState.ERROR;
+          notificationStore.warning('Loading timed out. Please try again.');
+        }
+      }, 10000);
+
+      // Cleanup timeout if state changes
+      const stopWatch = watch(
+        () => loadingState.value,
+        (innerState) => {
+          if (innerState !== newState) {
+            clearTimeout(timeoutId);
+            stopWatch(); // Remove this watcher when done
+          }
+        },
+        { immediate: true },
+      );
+    }
+  },
+  { immediate: true },
+);
+
+// Update watch for image ID changes to use state machine
+watch(currentImageId, async (newImageId, oldImageId) => {
+  debugState.value = 'watchImageId';
+  console.log(
+    '[Annotator DEBUG] currentImageId changed:',
+    oldImageId,
+    '->',
+    newImageId,
   );
-  if (!annotation) {
-    console.error(
-      `Cannot scroll to annotation ${detection.id}: not found in current annotations`,
+
+  if (!isMounted.value) {
+    console.log(
+      '[Annotator DEBUG] Component not mounted yet, deferring image load',
     );
     return;
   }
 
-  // Calculate center point of the annotation
-  const centerX = annotation.x + annotation.width / 2;
-  const centerY = annotation.y + annotation.height / 2;
+  if (!newImageId) {
+    console.log('[Annotator DEBUG] New image ID is empty, clearing state');
+    loadingState.value = LoadingState.IDLE;
+    annotations.loadAnnotations([]);
+    return;
+  }
 
-  // Calculate appropriate zoom level based on annotation size
-  // Use a multiplier to ensure annotation is visible but not too small
-  const minDimension = Math.min(
-    imageCanvas.dimensions.value?.originalWidth || 0,
-    imageCanvas.dimensions.value?.originalHeight || 0,
-  );
-  const annotationSize = Math.max(annotation.width, annotation.height);
-  const zoomFactor = minDimension / (annotationSize * 5); // 5x padding around annotation
+  if (newImageId === oldImageId) {
+    console.log('[Annotator DEBUG] Image ID unchanged, skipping load');
+    return;
+  }
 
-  // Clamp zoom to reasonable values
-  const normalizedZoom = Math.min(Math.max(zoomFactor, 0.5), 10);
+  loadingState.value = LoadingState.LOADING_IMAGE;
 
-  // Set new scale and position with smooth animation
-  imageCanvas.zoomToPoint({ x: centerX, y: centerY }, normalizedZoom, true);
+  try {
+    console.log('[Annotator DEBUG] Loading image from store:', newImageId);
+    await imageStore.loadImage(newImageId, currentCollection.id);
 
-  console.log(
-    `Scrolled to annotation ${detection.id} at (${centerX}, ${centerY}) with zoom ${normalizedZoom}`,
-  );
-
-  // Update transformer
-  nextTick(() => {
-    updateTransformer();
-  });
-}
-
-// New wrapper function for resetting view
-function handleResetView() {
-  imageCanvas.resetView();
-
-  nextTick(() => {
-    // Explicitly update the Konva layer with the values from imageCanvas
-    if (konvaLayer.value) {
-      konvaLayer.value.position({
-        x: imageCanvas.position.x,
-        y: imageCanvas.position.y,
-      });
-
-      konvaLayer.value.scale({
-        x: imageCanvas.scale.value || 1,
-        y: imageCanvas.scale.value || 1,
-      });
-
-      konvaLayer.value.batchDraw();
+    // Check if Konva is initialized
+    if (!konvaStage.value) {
+      console.warn(
+        '[Annotator DEBUG] Konva not initialized yet, waiting for stage initialization',
+      );
+      // Don't try to force initialization here - let the stage watcher handle it
+      loadingState.value = LoadingState.ERROR;
+      return;
     }
 
-    // Also update stage position
-    if (konvaStage.value) {
-      konvaStage.value.position({
-        x: 0,
-        y: 0,
-      });
-      konvaStage.value.batchDraw();
-    }
+    await loadImageData();
+  } catch (error) {
+    console.error('[Annotator DEBUG] Error in imageId watcher:', error);
+    notificationStore.error('Failed to load image');
+    loadingState.value = LoadingState.ERROR;
+  }
+});
 
-    // Update transformer after view reset
-    updateTransformer();
-  });
+// Watch for external selection changes to sync local state
+watch(
+  () => imageStore.selectedDetectionId,
+  (newId) => {
+    if (isMounted.value) {
+      annotations.syncSelectionWithStore(newId); // Let the composable handle sync
+    }
+  },
+);
+
+// Click outside metadata panel to cancel
+const handleClickOutside = () => {
+  if (annotations.pendingMetaAnnotationId.value) {
+    console.log(
+      '[Annotator] Clicked outside metadata panel, cancelling meta input.',
+    );
+    annotations.cancelAnnotationMeta();
+  }
+};
+
+// Update retryLoading function to use the new state machine
+async function retryLoading() {
+  console.log('[Annotator DEBUG] Manual retry triggered');
+  loadingStartTime.value = Date.now();
+  debugState.value = 'retry';
+
+  // Set loading state to initializing
+  loadingState.value = LoadingState.INITIALIZING;
+
+  // Clear any error state
+  imageCanvas.loadError.value = null;
+
+  // Wait for next tick to ensure Vue updates DOM
+  await nextTick();
+
+  // Attempt to get stage if not available
+  if (!konvaStage.value && stage.value) {
+    try {
+      console.log('[Annotator DEBUG] Getting stage in retry');
+      konvaStage.value = stage.value.getStage();
+      if (konvaStage.value) {
+        console.log('[Annotator DEBUG] Konva stage obtained in retry');
+        konvaLayer.value = konvaStage.value.findOne('Layer') as Layer | null;
+      }
+    } catch (e) {
+      console.error('[Annotator DEBUG] Error getting stage in retry:', e);
+    }
+  }
+
+  // If still no stage, try reinitializing
+  if (!konvaStage.value) {
+    reinitializeCanvas();
+  }
+
+  // If we have image data, try loading it
+  if (imageStore.image.id && konvaStage.value) {
+    try {
+      await loadImageData();
+    } catch (e) {
+      console.error('[Annotator DEBUG] Retry loading failed:', e);
+      loadingState.value = LoadingState.ERROR;
+      notificationStore.error('Retry failed. Please refresh the page.');
+    }
+  } else if (currentImageId.value) {
+    try {
+      await imageStore.loadImage(currentImageId.value, currentCollection.id);
+      if (konvaStage.value) {
+        await loadImageData();
+      }
+    } catch (e) {
+      console.error('[Annotator DEBUG] Retry image loading failed:', e);
+      loadingState.value = LoadingState.ERROR;
+      notificationStore.error('Retry failed. Please refresh the page.');
+    }
+  }
 }
+
+// Update forceHideLoadingOverlay function to use the new state
+function forceHideLoadingOverlay() {
+  console.log('[Annotator DEBUG] FORCE HIDING LOADING OVERLAY');
+  // Set state to ready
+  loadingState.value = LoadingState.READY;
+  debugState.value = 'ready';
+
+  // Try to access reactive property if it exists
+  if (imageCanvas.isLoading && typeof imageCanvas.isLoading === 'object') {
+    imageCanvas.isLoading.value = false;
+  }
+
+  // Force update the view if image is loaded
+  if (imageCanvas.image.value && konvaStage.value) {
+    try {
+      imageCanvas.resetView();
+      updateTransformer();
+    } catch (e) {
+      console.error(
+        '[Annotator DEBUG] Error updating view during force hide:',
+        e,
+      );
+    }
+  }
+
+  // Notify user the loading has been manually hidden
+  notificationStore.info('Loading overlay manually hidden');
+}
+
+// Add a watch for image loaded events to update loading state
+watch(
+  () => imageCanvas.image.value,
+  (newImage) => {
+    if (newImage && isLoading.value) {
+      console.log('[Annotator DEBUG] Image loaded in canvas, updating view...');
+      // Give a small delay to ensure the canvas has time to render
+      setTimeout(() => {
+        try {
+          if (konvaStage.value && konvaLayer.value) {
+            imageCanvas.resetView();
+            updateTransformer();
+            console.log('[Annotator DEBUG] View reset after image load');
+          }
+        } catch (e) {
+          console.error('[Annotator DEBUG] Error updating view:', e);
+        }
+
+        // If the image is loaded but we're still in loading state, force update
+        if (
+          debugState.value === 'loadingAnnotations' &&
+          elapsedTime.value > 5
+        ) {
+          console.log('[Annotator DEBUG] Force completing load sequence');
+          forceHideLoadingOverlay();
+        }
+      }, 200);
+    }
+  },
+);
 </script>
 
 <template>
-  <div class="full-width row wrap container">
-    <!-- Main annotator container -->
+  <div class="annotator-layout">
+    <!-- Main Annotator Area -->
     <div
-      class="annotator"
       ref="annotatorBox"
-      tabindex="1"
-      @mouseover="annotatorBox?.focus({ preventScroll: true })"
+      class="annotator-box"
+      :style="{ cursor: navigationMode.getCursorStyle.value }"
+      tabindex="0"
       @keydown="handleKeyDown"
       @keyup="handleKeyUp"
-      @wheel.prevent
-      :style="{
-        cursor: navigationMode.getCursorStyle.value,
-        height: '100%',
-        overflow: 'hidden',
-        position: 'relative',
-      }"
     >
-      <!-- Use the new Toolbar Component -->
+      <!-- Toolbar Moved Inside Canvas Area -->
       <AnnotatorToolbar
+        :mode="navigationMode.mode.value"
+        :can-undo="annotations.undoStack.value.length > 0"
+        :can-redo="annotations.redoStack.value.length > 0"
+        :zoom-percentage="imageCanvas.zoomPercentage.value"
         :save="save"
         :undo="annotations.undo"
         :redo="annotations.redo"
         :set-mode="navigationMode.setMode"
-        :reset-view="handleResetView"
+        :reset-view="resetViewWithRefresh"
         :current-mode="navigationMode.mode.value"
-        :undo-stack-length="annotations.undoStack.value?.length"
-        :redo-stack-length="annotations.redoStack.value?.length"
-        :zoom-percentage="imageCanvas.zoomPercentage.value"
+        :undo-stack-length="annotations.undoStack.value.length"
+        :redo-stack-length="annotations.redoStack.value.length"
+        :is-saving="isSaving"
+        @delete-selected="annotations.deleteSelected"
       />
 
-      <!-- Metadata Input Panel (conditionally displayed) -->
+      <!-- Loading/Error Overlay -->
+      <div
+        v-if="
+          loadingState !== LoadingState.READY &&
+          loadingState !== LoadingState.IDLE
+        "
+        class="loading-overlay"
+      >
+        <q-spinner color="primary" size="3em" />
+        <p>{{ loadingMessage }}</p>
+        <div class="overlay-buttons">
+          <q-btn
+            v-if="showRetryButton || !stage"
+            color="primary"
+            label="Retry"
+            @click="retryLoading"
+          />
+          <q-btn
+            color="warning"
+            label="Force Hide Loading"
+            @click="forceHideLoadingOverlay"
+          />
+        </div>
+        <p v-if="showRetryButton || !stage" class="help-text">
+          Loading is taking longer than expected
+        </p>
+
+        <!-- Debug info for developers -->
+        <div class="debug-info">
+          <p>Current state: {{ debugState }}</p>
+          <p>Stage ready: {{ stage !== null }}</p>
+          <p>Konva stage: {{ konvaStage !== null }}</p>
+          <p>Container: {{ annotatorBox !== null }}</p>
+          <p>Image loaded: {{ imageCanvas.image.value !== null }}</p>
+          <p>isLoading: {{ isLoading }}</p>
+          <p>imageCanvas loading: {{ imageCanvas.isLoading }}</p>
+          <p>Rendering blocked: {{ stageRenderingBlocked }}</p>
+          <p>Image error: {{ imageCanvas.loadError.value }}</p>
+          <p>Time since start: {{ elapsedTime }}s</p>
+          <p>Loading state: {{ loadingState }}</p>
+        </div>
+      </div>
+      <div
+        v-else-if="imageCanvas.loadError.value"
+        class="loading-overlay error"
+      >
+        <q-icon name="error" color="negative" size="3em" />
+        <p>Error loading image: {{ imageCanvas.loadError.value }}</p>
+        <p v-if="!currentImageId">Please select an image.</p>
+      </div>
+
+      <!-- Konva Canvas Stage -->
+      <v-stage
+        v-if="isMounted"
+        ref="stage"
+        :config="stageConfig"
+        @mousedown="konvaEventHandlers?.handleMouseDown"
+        @mousemove="konvaEventHandlers?.handleMouseMove"
+        @mouseup="konvaEventHandlers?.handleMouseUp"
+        @dragstart="konvaEventHandlers?.handleDragStart"
+        @dragmove="konvaEventHandlers?.handleDragMove"
+        @dragend="konvaEventHandlers?.handleDragEnd"
+        @wheel="konvaEventHandlers?.handleWheel"
+        class="prevent-propagation"
+      >
+        <v-layer :config="layerConfig">
+          <!-- Background Image -->
+          <v-image :config="imageConfig" />
+
+          <!-- Annotations -->
+          <v-rect
+            v-for="annotation in annotations.annotations.value"
+            :key="annotation.id"
+            :config="{
+              ...annotation, // Spread basic properties like x, y, width, height
+              id: annotation.id, // Ensure ID is passed for Konva node finding
+              name: `annotation_${annotation.id}`, // Unique name for targeting
+              fill: annotation.computed_color || '#00D2FF', // Use computed color or default
+              stroke: '#000000',
+              strokeWidth: annotations.isSelected(annotation.id) ? 2 : 1, // Highlight selected
+              opacity: 0.5, // Semi-transparent fill
+              draggable: navigationMode.mode.value === 'add', // Only draggable in 'add' mode
+              perfectDrawEnabled: false, // Optimize performance
+            }"
+            @transformend="konvaEventHandlers?.handleTransformEnd"
+            @dragend="konvaEventHandlers?.handleRectDragEnd"
+            @dragstart="konvaEventHandlers?.handleRectDragStart"
+            @click="konvaEventHandlers?.handleRectClick"
+          />
+
+          <!-- Transformer is managed internally by useTransformerManagement -->
+          <!-- No need for v-transformer here -->
+        </v-layer>
+      </v-stage>
+
+      <!-- Metadata Input Panel (absolutely positioned) -->
       <MetadataInputPanel
+        v-if="annotations.pendingMetaAnnotationId.value"
         ref="metaInputPanelRef"
-        :pending-annotation="pendingAnnotation"
-        :meta-roles="metaRoles"
         :position="metaInputPosition"
+        :metaRoles="metaRoles"
+        :pending-annotation="pendingAnnotation"
         :visible="!!annotations.pendingMetaAnnotationId.value"
         v-model="metaSelectedRole"
         v-model:valueText="metaInputValue"
         @confirm="handleConfirmMeta"
         @cancel="handleCancelMeta"
+        class="metadata-input-panel"
       />
 
-      <!-- Show skeleton while loading -->
-      <ImageSkeleton v-if="isLoading" :message="loadingMessage" />
-
-      <!-- Konva stage -->
-      <v-stage
-        :v-show="!isLoading && isMounted"
-        ref="stage"
-        :config="stageConfig"
-        @mousedown="konvaEventHandlers.handleMouseDown"
-        @mousemove="konvaEventHandlers.handleMouseMove"
-        @mouseup="konvaEventHandlers.handleMouseUp"
-        @dragstart="konvaEventHandlers.handleDragStart"
-        @dragmove="konvaEventHandlers.handleDragMove"
-        @dragend="konvaEventHandlers.handleDragEnd"
-        @wheel="konvaEventHandlers.handleWheel"
+      <!-- Move debug info outside the loading overlay so it's always visible -->
+      <div
+        v-if="
+          loadingState === LoadingState.READY ||
+          loadingState === LoadingState.IDLE
+        "
+        class="debug-info floating"
       >
-        <v-layer :config="layerConfig">
-          <v-image :config="imageConfig" />
-          <v-rect
-            v-for="annotation in annotations.annotations.value"
-            :key="annotation.id"
-            :config="{
-              id: annotation.id,
-              name: `annotation_${annotation.id}`,
-              x: annotation.x,
-              y: annotation.y,
-              width: annotation.width,
-              height: annotation.height,
-              stroke: annotation.computed_color || '#FF0000',
-              fill: addAlpha(
-                annotation.computed_color || '#FF0000',
-                annotations.selectedIds.value?.has(annotation.id) ? 0.5 : 0.3,
-              ),
-              strokeWidth: annotations.selectedIds.value?.has(annotation.id)
-                ? 3
-                : 2,
-              strokeScaleEnabled: false,
-              draggable: navigationMode.mode.value === 'add',
-              listening: true,
-            }"
-            @click="konvaEventHandlers.handleRectClick"
-            @mousedown="konvaEventHandlers.handleRectClick"
-            @dragstart="konvaEventHandlers.handleRectDragStart"
-            @dragend="konvaEventHandlers.handleRectDragEnd"
-            @transformend="konvaEventHandlers.handleTransformEnd"
+        <p>Current state: {{ debugState }}</p>
+        <p>Loading state: {{ loadingState }}</p>
+        <p>Stage ready: {{ stage !== null }}</p>
+        <p>Konva stage: {{ konvaStage !== null }}</p>
+        <p>Container: {{ annotatorBox !== null }}</p>
+        <p>Time: {{ elapsedTime }}s</p>
+        <div class="debug-buttons">
+          <q-btn color="primary" label="Force Retry" @click="retryLoading" />
+          <q-btn
+            color="warning"
+            label="Hide Loading"
+            @click="forceHideLoadingOverlay"
           />
-          <!-- Transformer added dynamically -->
-        </v-layer>
-      </v-stage>
+        </div>
+      </div>
+
+      <!-- Add a direct button to immediately hide the loading overlay in the main interface -->
+      <button
+        v-if="
+          loadingState !== LoadingState.READY &&
+          loadingState !== LoadingState.IDLE
+        "
+        class="emergency-hide-button"
+        @click="forceHideLoadingOverlay"
+      >
+        × FORCE HIDE LOADING
+      </button>
     </div>
   </div>
 </template>
 
-<style scoped>
-.container {
-  height: 100%;
-  background-color: #f0f0f0;
-}
-.annotator {
-  width: 100%;
-  position: relative;
-  background-color: #ffffff;
-  border: 1px solid #cccccc;
+<style scoped lang="scss">
+/* Add component-specific styles here */
+.annotator-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Make layout take full height */
+  background-color: #f0f0f0; /* Or your desired background */
+  overflow: hidden; /* Prevent scrollbars on the layout itself */
+  /* Ensure toolbar is visible */
+  > :first-child {
+    min-height: 48px; /* Minimum height for toolbar */
+    z-index: 100; /* Ensure it's above other elements */
+    background-color: white; /* Make it visible */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Add shadow for better visibility */
+    display: flex; /* Make sure it uses flexbox for layout */
+    align-items: center; /* Center items vertically */
+    padding: 0 8px; /* Add some padding */
+  }
 }
 
-/* Ensure Konva stage takes up available space */
-:deep(.konvajs-content) {
-  width: 100% !important;
-  height: 100% !important;
+.annotator-box {
+  flex-grow: 1; /* Allow box to fill available space */
+  position: relative; /* Needed for absolute positioning of overlays/panels */
+  overflow: hidden; /* Konva handles scrolling/panning */
+  background-color: #e0e0e0; /* Background for the canvas area */
+  outline: none; /* Remove focus outline */
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 10;
+  text-align: center;
+
+  &.error p {
+    color: var(--q-negative);
+    margin-top: 1em;
+  }
+}
+
+/* Style for the MetadataInputPanel (optional base styles) */
+:deep(.metadata-input-panel) {
+  /* Target inner component if needed */
+  background-color: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  border-radius: 4px;
+}
+
+/* Add style for the help text */
+.help-text {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.5em;
+}
+
+/* Add styles for debug info */
+.debug-info {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.75rem;
+  text-align: left;
+  max-width: 300px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.debug-info p {
+  margin: 2px 0;
+}
+
+/* Add style for floating debug info */
+.debug-info.floating {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 100;
+  padding: 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Add style for button container */
+.overlay-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.debug-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Add styling for the emergency button */
+.emergency-hide-button {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 10000;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 </style>

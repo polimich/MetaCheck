@@ -84,11 +84,6 @@ function updateValue(value: string | number | null) {
       hide-selected
       fill-input
       input-debounce="0"
-      @filter="
-        (val, update) => {
-          update(() => {});
-        }
-      "
       class="q-mb-sm"
     />
     <q-input
@@ -123,12 +118,25 @@ function updateValue(value: string | number | null) {
 <style lang="scss" scoped>
 .metadata-input-panel {
   position: absolute;
-  z-index: 11;
+  z-index: 1100;
   background-color: white;
-  padding: 12px;
+  padding: 16px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   min-width: 250px;
+  animation: fade-in 0.2s ease-out;
+  transform-origin: top center;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 </style>

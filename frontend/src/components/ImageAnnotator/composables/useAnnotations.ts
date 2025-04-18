@@ -1,17 +1,18 @@
-import { ref, computed, reactive, provide, inject } from 'vue';
+import { ref, computed, reactive, provide, inject, watch } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 import { useImageCanvas } from './useImageCanvas';
-import { useSelectionManagement } from './useSelectionManagement';
-import { useImageStore } from 'src/stores'; // Import image store
+import { useImageStore } from 'src/stores';
 
-// Separate history management concerns
+// --- History Management (Helper Composable) --- //
+/**
+ * Manages the undo/redo state for annotations and selections.
+ */
 function useHistoryManagement(
   annotations: ReturnType<typeof ref<DetectionState[]>>,
   selectedIds: ReturnType<typeof ref<Set<string>>>,
 ) {
-  // History state
   const undoStack = ref<
     { annotations: DetectionState[]; selectedIds: Set<string> }[]
   >([]);
@@ -19,447 +20,551 @@ function useHistoryManagement(
     { annotations: DetectionState[]; selectedIds: Set<string> }[]
   >([]);
 
-  // Save current state for undo/redo
+  /** Saves the current annotation and selection state to the undo stack. */
   function saveState() {
-    const cloneAnnotations = annotations.value?.map((a) => ({ ...a })) || [];
+    // Deep clone to prevent mutations affecting history
+    const currentAnnotations = annotations.value || []; // Handle potential undefined
+    const cloneAnnotations = currentAnnotations.map((a) => ({ ...a }));
     undoStack.value.push({
       annotations: cloneAnnotations,
-      selectedIds: new Set(selectedIds.value || new Set<string>()),
+      selectedIds: new Set(selectedIds.value),
     });
-    redoStack.value = []; // Clear redo stack when making a new change
+    redoStack.value = []; // Clear redo stack on new action
     console.log(
-      'Saved state to undo stack, stack size:',
+      '[History] State saved. Undo:',
       undoStack.value.length,
-      'Selected IDs:',
-      Array.from(selectedIds.value || new Set<string>()),
+      'Redo:',
+      redoStack.value.length,
     );
   }
 
-  // Undo last action
+  /** Restores the previous state from the undo stack. */
   function undo() {
     if (undoStack.value.length === 0) return;
-
-    // Get last state from stack
     const prevState = undoStack.value.pop();
     if (!prevState) return;
 
-    // Save current state to redo stack
+    // Save current state to redo stack before reverting
+    const currentAnnotations = annotations.value || []; // Handle potential undefined
     redoStack.value.push({
-      annotations: annotations.value?.map((a) => ({ ...a })) || [],
-      selectedIds: new Set(selectedIds.value || new Set<string>()),
+      annotations: currentAnnotations.map((a) => ({ ...a })), // Clone current state
+      selectedIds: new Set(selectedIds.value),
     });
+
+    // Check for newly created annotations that are being removed by this undo
+    // and remove them from the imageStore
+    const imageStore = useImageStore();
+    const currentIds = new Set(currentAnnotations.map((a) => a.id));
+    const prevIds = new Set(prevState.annotations.map((a) => a.id));
+
+    // Find IDs that exist in current but not in previous state (being removed by undo)
+    const removedIds = [...currentIds].filter((id) => !prevIds.has(id));
+
+    if (removedIds.length > 0) {
+      console.log(
+        '[History] Removing annotations from store on undo:',
+        removedIds,
+      );
+
+      // Remove from detectionsToAdd array (backend persistence queue)
+      imageStore.detectionsToAdd = imageStore.detectionsToAdd.filter(
+        (detection) => !removedIds.includes(detection.id),
+      );
+
+      // ALSO remove from the main detections array (UI state)
+      imageStore.detections = imageStore.detections.filter(
+        (detection) => !removedIds.includes(detection.id),
+      );
+
+      console.log(
+        '[History] Removed undone annotations from both store arrays',
+      );
+    }
 
     // Restore previous state
     annotations.value = prevState.annotations;
     selectedIds.value = prevState.selectedIds;
     console.log(
-      'Undo: restored state, undo stack size:',
+      '[History] Undo performed. Undo:',
       undoStack.value.length,
-      'redo stack size:',
+      'Redo:',
       redoStack.value.length,
     );
   }
 
-  // Redo previously undone action
+  /** Restores the next state from the redo stack. */
   function redo() {
     if (redoStack.value.length === 0) return;
-
-    // Get last state from redo stack
     const nextState = redoStack.value.pop();
     if (!nextState) return;
 
-    // Save current state to undo stack
+    // Save current state to undo stack before restoring
+    const currentAnnotations = annotations.value || []; // Handle potential undefined
     undoStack.value.push({
-      annotations: annotations.value?.map((a) => ({ ...a })) || [],
-      selectedIds: new Set(selectedIds.value || new Set<string>()),
+      annotations: currentAnnotations.map((a) => ({ ...a })), // Clone current state
+      selectedIds: new Set(selectedIds.value),
     });
+
+    // Check for annotations that will be added by this redo operation
+    const imageStore = useImageStore();
+    const currentIds = new Set(currentAnnotations.map((a) => a.id));
+    const nextIds = new Set(nextState.annotations.map((a) => a.id));
+
+    // Find IDs that exist in next state but not in current (being added by redo)
+    const addedIds = [...nextIds].filter((id) => !currentIds.has(id));
+
+    if (addedIds.length > 0) {
+      console.log(
+        '[History] Potentially adding annotations back on redo:',
+        addedIds,
+      );
+      // Find the annotations in the next state that need to be re-added to the store
+      const annotationsToAdd = nextState.annotations.filter((a) =>
+        addedIds.includes(a.id),
+      );
+
+      // Add these back to both store arrays if they're not already there
+      annotationsToAdd.forEach((annotation) => {
+        // Add to detectionsToAdd for backend persistence
+        if (!imageStore.detectionsToAdd.some((d) => d.id === annotation.id)) {
+          console.log(
+            '[History] Re-adding annotation to detectionsToAdd on redo:',
+            annotation.id,
+          );
+          imageStore.detectionsToAdd.push({
+            ...annotation,
+            image_id: annotation.image_id,
+          });
+        }
+
+        // Also add to main detections array for UI state
+        if (!imageStore.detections.some((d) => d.id === annotation.id)) {
+          console.log(
+            '[History] Re-adding annotation to detections on redo:',
+            annotation.id,
+          );
+          imageStore.detections.push({
+            ...annotation,
+            image_id: annotation.image_id,
+          });
+        }
+      });
+
+      console.log('[History] Re-added annotations to both store arrays');
+    }
 
     // Restore next state
     annotations.value = nextState.annotations;
     selectedIds.value = nextState.selectedIds;
     console.log(
-      'Redo: restored state, undo stack size:',
+      '[History] Redo performed. Undo:',
       undoStack.value.length,
-      'redo stack size:',
+      'Redo:',
       redoStack.value.length,
     );
   }
 
-  return {
-    undoStack,
-    redoStack,
-    saveState,
-    undo,
-    redo,
-  };
+  return { undoStack, redoStack, saveState, undo, redo };
 }
 
-// Separate annotation normalization concerns
+// --- Annotation Normalization (Helper Composable) --- //
+/**
+ * Provides utility to normalize annotation dimensions (e.g., handle negative width/height).
+ */
 function useAnnotationNormalization(
   imageCanvas: ReturnType<typeof useImageCanvas>,
 ) {
-  // Normalize annotation dimensions (handle negative w/h)
   function normalizeAnnotation(annotation: DetectionState): DetectionState {
     let { x, y, width, height } = annotation;
-
-    // Handle negative width/height (drag from bottom-right to top-left)
     if (width < 0) {
       x += width;
       width = Math.abs(width);
     }
-
     if (height < 0) {
       y += height;
       height = Math.abs(height);
     }
+    width = Math.max(width, 5); // Min width
+    height = Math.max(height, 5); // Min height
 
-    // Enforce minimum size (prevent zero-size annotations)
-    width = Math.max(width, 5);
-    height = Math.max(height, 5);
-
-    // Constrain to image bounds if we have image dimensions
+    // Constrain to image bounds
     if (imageCanvas.dimensions.value) {
-      const imgWidth = imageCanvas.dimensions.value.originalWidth;
-      const imgHeight = imageCanvas.dimensions.value.originalHeight;
-
-      x = Math.max(0, Math.min(x, imgWidth - width));
-      y = Math.max(0, Math.min(y, imgHeight - height));
+      const { originalWidth: imgW, originalHeight: imgH } =
+        imageCanvas.dimensions.value;
+      // Adjust position first if needed to keep it within bounds
+      x = Math.max(0, Math.min(x, imgW));
+      y = Math.max(0, Math.min(y, imgH));
+      // Adjust dimensions based on clamped position
+      width = Math.min(width, imgW - x);
+      height = Math.min(height, imgH - y);
     }
 
-    return {
-      ...annotation,
-      x,
-      y,
-      width,
-      height,
-    };
+    return { ...annotation, x, y, width, height };
   }
-
   return { normalizeAnnotation };
 }
 
+// --- Main Annotations Composable --- //
+
 /**
- * Composable for managing annotation state and operations
+ * @composable useAnnotations
+ * Manages the state and operations related to annotations within the ImageAnnotator,
+ * including creation, modification, deletion, selection, and undo/redo history.
+ * It interacts with the global imageStore for persistence and external state synchronization.
+ * @param {ReturnType<typeof useImageCanvas>} imageCanvas - Composable for canvas interactions.
  */
 export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
-  // Get the image store
+  // --- Dependencies --- //
   const imageStore = useImageStore();
+  const { normalizeAnnotation } = useAnnotationNormalization(imageCanvas);
 
-  // Core state
-  const annotations = ref<DetectionState[]>([]);
-  const isCreating = ref(false);
-  const creatingAnnotation = ref<DetectionState | null>(null);
-  const startPoint = reactive({ x: 0, y: 0 });
-  const pendingMetaAnnotationId = ref<string | null>(null);
+  // --- State --- //
+  const annotations = ref<DetectionState[]>([]); // Local list of annotations being edited
+  const isCreating = ref(false); // Flag for active annotation creation
+  const creatingAnnotation = ref<DetectionState | null>(null); // Temp annotation during creation
+  const startPoint = reactive({ x: 0, y: 0 }); // Start point for drag-creation
+  const pendingMetaAnnotationId = ref<string | null>(null); // ID of annotation awaiting metadata
+  const selectedIds = ref<Set<string>>(new Set()); // IDs of selected annotations (Integrated)
 
-  // Use the shared selection management composable
-  const {
-    selectedIds,
-    selectDetection,
-    deselectAll: deselectAllInternal,
-  } = useSelectionManagement();
-
+  // History State (Undo/Redo)
   const { undoStack, redoStack, saveState, undo, redo } = useHistoryManagement(
     annotations,
     selectedIds,
   );
-  const { normalizeAnnotation } = useAnnotationNormalization(imageCanvas);
 
-  // Computed
+  // --- Computed Properties --- //
   const hasSelection = computed(() => selectedIds.value.size > 0);
   const selectedAnnotations = computed(() =>
     annotations.value.filter((a) => selectedIds.value.has(a.id)),
   );
-
-  // Get annotations for saving - No longer needs deletedAnnotations
   const annotationsForSave = computed(() => {
-    return {
-      annotations: annotations.value,
-      // deletedAnnotations: deletedAnnotations.value,
-    };
+    // Store handles deletions, just return current local annotations
+    return { annotations: annotations.value };
   });
 
-  // Start creating a new annotation
-  function startCreate(startPos: Vector2d, imageId: string) {
-    if (isCreating.value) return;
-
-    console.log('Start creating annotation at:', startPos);
-    startPoint.x = startPos.x;
-    startPoint.y = startPos.y;
-
-    // Create a new annotation
-    const newAnnotation = newDetectionState();
-    newAnnotation.id = uuidv4(); // Temporary ID until saved
-    newAnnotation.image_id = imageId;
-    newAnnotation.x = startPos.x;
-    newAnnotation.y = startPos.y;
-    newAnnotation.width = 0;
-    newAnnotation.height = 0;
-    newAnnotation.created_date = new Date().toISOString();
-    newAnnotation.confidence = 1.0; // New annotations are fully confident
-    newAnnotation.edited = true; // Mark as edited since it's new
-    newAnnotation.annotated = true;
-
-    // Default meta values (will be overridden after creation)
-    // Use consistent, more descriptive default values
-    newAnnotation.computed_type = ''; // Will be set by selected role
-    newAnnotation.computed_color = '#ff0000'; // Red as default color
-    newAnnotation.computed_display_type = ''; // Will be set by selected role label
-
-    // Save state before adding the new annotation
-    saveState();
-
-    // Start tracking the new annotation
-    creatingAnnotation.value = newAnnotation;
-    isCreating.value = true;
-
-    annotations.value.push(newAnnotation);
-  }
-
-  // Update annotation being created
-  function updateCreating(currentPos: Vector2d) {
-    if (!isCreating.value || !creatingAnnotation.value) return;
-
-    // Update with current mouse position
-    const annotation = creatingAnnotation.value;
-    annotation.width = currentPos.x - startPoint.x;
-    annotation.height = currentPos.y - startPoint.y;
-  }
-
-  // Finish creating annotation
-  function finishCreate() {
-    if (!isCreating.value || !creatingAnnotation.value) return;
-
-    console.log('Finish creating annotation');
-
-    const annotation = creatingAnnotation.value;
-
-    // Normalize dimensions (handle negative width/height)
-    const normalized = normalizeAnnotation(annotation);
-    Object.assign(annotation, normalized);
-
-    // Set a real ID that will be used for server storage
-    annotation.id = uuidv4();
-
-    // Clear creation state
-    isCreating.value = false;
-    creatingAnnotation.value = null;
-
-    // Clear any current selection and select this new annotation
-    selectedIds.value.clear();
-    selectedIds.value.add(annotation.id);
-
-    console.log('Created annotation:', annotation);
-
-    // Set pending meta ID so user can input metadata
-    pendingMetaAnnotationId.value = annotation.id;
-    console.log('Awaiting metadata input for annotation:', annotation.id);
-  }
-
-  // Cancel annotation creation
-  function cancelCreate() {
-    if (!isCreating.value || !creatingAnnotation.value) return;
-
-    console.log('Cancelling annotation creation');
-
-    // Remove the annotation being created
-    const id = creatingAnnotation.value.id;
-    annotations.value = annotations.value.filter((a) => a.id !== id);
-
-    // Clear creation state
-    isCreating.value = false;
-    creatingAnnotation.value = null;
-  }
-
-  // Move an annotation
-  function moveAnnotation(id: string, delta: Vector2d) {
-    const annotation = annotations.value.find((a) => a.id === id);
-    if (!annotation) return;
-
-    annotation.x += delta.x;
-    annotation.y += delta.y;
-    annotation.edited = true;
-  }
-
-  // Update annotation dimensions (after transform or drag)
-  function updateAnnotationDimensions(
-    id: string,
-    newDimensions: { x: number; y: number; width: number; height: number },
-  ) {
-    const annotation = annotations.value.find((a) => a.id === id);
-    if (!annotation) return;
-
-    saveState();
-
-    Object.assign(annotation, newDimensions);
-    annotation.edited = true;
-
-    // Normalize to handle any negative dimensions
-    const normalized = normalizeAnnotation(annotation);
-    Object.assign(annotation, normalized);
-
-    console.log('Updated annotation dimensions:', annotation);
-  }
-
-  // Delete selected annotations
-  function deleteSelected() {
-    if (selectedIds.value.size === 0) return;
-    console.log(
-      '[useAnnotations] Deleting selected annotations:',
-      Array.from(selectedIds.value),
-    );
-
-    // Check if the pending annotation is among those selected
-    if (
-      pendingMetaAnnotationId.value &&
-      selectedIds.value.has(pendingMetaAnnotationId.value)
-    ) {
-      // If deleting the annotation pending meta, treat it as a cancel
-      cancelAnnotationMeta();
-      // If only the pending annotation was selected, we are done
-      if (selectedIds.value.size === 0) return;
-    }
-
-    saveState();
-
-    // Create a copy of the selected IDs before clearing
-    const idsToDelete = new Set(selectedIds.value);
-
-    // Remove from local annotations state
-    annotations.value = annotations.value.filter((a) => !idsToDelete.has(a.id));
-
-    // Remove from the store and queue for backend deletion
-    idsToDelete.forEach((id) => {
-      imageStore.deleteDetectionLocally(id);
-    });
-
-    // Clear selection in the local state
-    selectedIds.value.clear();
-  }
-
-  // Load annotations from external source
-  function loadAnnotations(loadedAnnotations: DetectionState[]) {
-    // Save current state if we have annotations to enable undo
-    if (annotations.value.length > 0) {
-      saveState();
-    }
-
-    // Clone annotations to avoid reference issues
-    annotations.value = loadedAnnotations;
-
-    // Clear selection
-    selectedIds.value.clear();
-
-    // Check for isSelected property in the loaded annotations and update selection
-    for (const ann of loadedAnnotations) {
-      if ('isSelected' in ann && ann.isSelected) {
-        selectedIds.value.add(ann.id);
-      }
-    }
-
-    // Reset creation state
-    isCreating.value = false;
-    creatingAnnotation.value = null;
-    pendingMetaAnnotationId.value = null;
-
-    console.log(`Loaded ${annotations.value.length} annotations`);
-  }
-
-  // Sync selections with the store
-  function syncSelectionWithStore(storeSelectedId: string | null) {
-    if (!storeSelectedId) {
-      selectedIds.value.clear();
-      return;
-    }
-
-    // Select only the annotation with this ID
-    if (annotations.value.some((ann) => ann.id === storeSelectedId)) {
-      selectedIds.value.clear();
-      selectedIds.value.add(storeSelectedId);
-    }
-  }
-
-  // Provide reactive state and methods - REMOVE deletedAnnotations
-  provide('annotations', annotations);
-  provide('selectedIds', selectedIds);
-  // provide('deletedAnnotations', deletedAnnotations);
+  // --- Selection Logic (Integrated) --- //
 
   function clearPendingMeta() {
     if (pendingMetaAnnotationId.value) {
       console.log(
-        '[useAnnotations] Clearing pending meta for ID:',
+        '[Annotations] Clearing pending meta for ID:',
         pendingMetaAnnotationId.value,
       );
       pendingMetaAnnotationId.value = null;
     }
   }
 
-  function deselectAll() {
-    clearPendingMeta();
-    deselectAllInternal();
-  }
-
   function selectAnnotation(id: string, addToSelection = false) {
     clearPendingMeta();
-    selectDetection(id, addToSelection);
+    if (!id) return;
+    const alreadySelected = selectedIds.value.has(id);
+
+    if (addToSelection) {
+      alreadySelected
+        ? selectedIds.value.delete(id)
+        : selectedIds.value.add(id);
+    } else {
+      if (selectedIds.value.size === 1 && alreadySelected) return; // No change needed
+      selectedIds.value.clear();
+      selectedIds.value.add(id);
+    }
+
+    const storeId = selectedIds.value.size === 1 ? id : null;
+    if (imageStore.selectedDetectionId !== storeId) {
+      imageStore.selectDetection(storeId);
+    }
+    console.log(
+      '[Annotations] Selection updated:',
+      Array.from(selectedIds.value),
+    );
   }
 
-  // Confirm Metadata for the pending annotation
-  function confirmAnnotationMeta(metaRole: string | null, value: string) {
-    if (!pendingMetaAnnotationId.value) return;
+  function deselectAll() {
+    clearPendingMeta();
+    if (selectedIds.value.size > 0) {
+      selectedIds.value.clear();
+      if (imageStore.selectedDetectionId !== null) {
+        imageStore.selectDetection(null);
+      }
+      console.log('[Annotations] All annotations deselected');
+    }
+  }
 
-    const annotation = annotations.value.find(
-      (a) => a.id === pendingMetaAnnotationId.value,
-    );
+  function isSelected(id: string): boolean {
+    return selectedIds.value.has(id);
+  }
 
-    if (annotation) {
-      console.log(
-        '[useAnnotations] Confirming meta for ID:',
-        annotation.id,
-        'Role:',
-        metaRole,
-        'Value:',
-        value,
-      );
-      // Set the value from user input
-      annotation.value = value;
-      // Note: computed_type and computed_display_type are set in ImageAnnotator.vue
-      // when metaRole object is looked up
-      annotation.edited = true; // Mark as edited
+  function syncSelectionWithStore(storeSelectedId: string | null) {
+    const localSelectionArray = Array.from(selectedIds.value);
+    if (!storeSelectedId) {
+      if (localSelectionArray.length === 1) {
+        selectedIds.value.clear();
+        console.log(
+          '[Annotations] Local selection cleared due to store (null).',
+        );
+      }
     } else {
-      console.error(
-        '[useAnnotations] Could not find annotation to confirm meta for ID:',
-        pendingMetaAnnotationId.value,
+      if (
+        localSelectionArray.length !== 1 ||
+        localSelectionArray[0] !== storeSelectedId
+      ) {
+        selectedIds.value.clear();
+        selectedIds.value.add(storeSelectedId);
+        console.log(
+          `[Annotations] Local selection synced to store: ${storeSelectedId}`,
+        );
+      }
+    }
+  }
+
+  watch(() => imageStore.selectedDetectionId, syncSelectionWithStore);
+
+  // --- Annotation CRUD & Actions --- //
+
+  function startCreate(startPos: Vector2d, imageId: string) {
+    if (isCreating.value) return;
+    console.log('[Annotations] Start creating annotation at:', startPos);
+    deselectAll(); // Deselect others when starting to draw a new one
+    startPoint.x = startPos.x;
+    startPoint.y = startPos.y;
+
+    const newAnnotation = newDetectionState();
+    newAnnotation.id = uuidv4();
+    newAnnotation.image_id = imageId;
+    newAnnotation.x = startPos.x;
+    newAnnotation.y = startPos.y;
+    newAnnotation.width = 0;
+    newAnnotation.height = 0;
+    newAnnotation.created_date = new Date().toISOString();
+    newAnnotation.confidence = 1.0;
+    newAnnotation.edited = true;
+    newAnnotation.annotated = true;
+    newAnnotation.computed_type = '';
+    newAnnotation.computed_color = '#ff0000';
+    newAnnotation.computed_display_type = '';
+
+    saveState(); // Save state *before* adding
+
+    creatingAnnotation.value = newAnnotation;
+    isCreating.value = true;
+    annotations.value.push(newAnnotation); // Add to local list immediately
+  }
+
+  function updateCreating(currentPos: Vector2d) {
+    if (!isCreating.value || !creatingAnnotation.value) return;
+    const annotation = creatingAnnotation.value;
+    annotation.width = currentPos.x - startPoint.x;
+    annotation.height = currentPos.y - startPoint.y;
+  }
+
+  function finishCreate() {
+    if (!isCreating.value || !creatingAnnotation.value) return;
+    console.log('[Annotations] Finish creating annotation');
+    const annotation = creatingAnnotation.value;
+    const normalized = normalizeAnnotation(annotation);
+    Object.assign(annotation, normalized);
+
+    isCreating.value = false;
+    creatingAnnotation.value = null;
+
+    selectAnnotation(annotation.id, false); // Select the new annotation
+
+    console.log('[Annotations] Created annotation:', annotation);
+    pendingMetaAnnotationId.value = annotation.id;
+    console.log('[Annotations] Awaiting metadata for:', annotation.id);
+  }
+
+  function cancelCreate() {
+    if (!isCreating.value || !creatingAnnotation.value) return;
+    console.log('[Annotations] Cancelling annotation creation');
+    const id = creatingAnnotation.value.id;
+
+    // Remove from local annotations
+    annotations.value = annotations.value.filter((a) => a.id !== id);
+
+    // Remove from both imageStore arrays if it exists there
+    const imageStore = useImageStore();
+
+    // Remove from detectionsToAdd (backend persistence queue)
+    const detectionInToAdd = imageStore.detectionsToAdd.find(
+      (d) => d.id === id,
+    );
+    if (detectionInToAdd) {
+      console.log(
+        '[Annotations] Removing cancelled annotation from detectionsToAdd:',
+        id,
+      );
+      imageStore.detectionsToAdd = imageStore.detectionsToAdd.filter(
+        (detection) => detection.id !== id,
       );
     }
 
-    pendingMetaAnnotationId.value = null; // Clear pending state
+    // Also remove from main detections array (UI state)
+    const detectionInMain = imageStore.detections.find((d) => d.id === id);
+    if (detectionInMain) {
+      console.log(
+        '[Annotations] Removing cancelled annotation from detections array:',
+        id,
+      );
+      imageStore.detections = imageStore.detections.filter(
+        (detection) => detection.id !== id,
+      );
+    }
+
+    isCreating.value = false;
+    creatingAnnotation.value = null;
+    // Revert the history state saved in startCreate
+    if (undoStack.value.length > 0) undo();
   }
 
-  // Cancel Metadata input and remove the annotation
+  function moveAnnotation(id: string, delta: Vector2d) {
+    const annotation = annotations.value.find((a) => a.id === id);
+    if (!annotation) return;
+    saveState(); // Save state before move for undo
+    annotation.x += delta.x;
+    annotation.y += delta.y;
+    annotation.edited = true;
+    console.log(`[Annotations] Moved annotation ${id}`);
+  }
+
+  function updateAnnotationDimensions(
+    id: string,
+    newDimensions: { x: number; y: number; width: number; height: number },
+  ) {
+    const annotation = annotations.value.find((a) => a.id === id);
+    if (!annotation) return;
+    saveState(); // Save state before resize for undo
+    Object.assign(annotation, newDimensions);
+    annotation.edited = true;
+    const normalized = normalizeAnnotation(annotation);
+    Object.assign(annotation, normalized);
+    console.log(`[Annotations] Updated dimensions for annotation ${id}`);
+  }
+
+  function deleteSelected() {
+    if (selectedIds.value.size === 0) return;
+    console.log(
+      '[Annotations] Deleting selected:',
+      Array.from(selectedIds.value),
+    );
+    if (
+      pendingMetaAnnotationId.value &&
+      selectedIds.value.has(pendingMetaAnnotationId.value)
+    ) {
+      cancelAnnotationMeta();
+      if (selectedIds.value.size === 0) return;
+    }
+    saveState(); // Save state before deletion for undo
+    const idsToDelete = new Set(selectedIds.value);
+    annotations.value = annotations.value.filter((a) => !idsToDelete.has(a.id));
+    idsToDelete.forEach((id) => {
+      imageStore.deleteDetectionLocally(id);
+    });
+    selectedIds.value.clear();
+    console.log('[Annotations] Deleted locally and queued in store.');
+  }
+
+  function loadAnnotations(loadedAnnotations: DetectionState[]) {
+    console.log(
+      `[Annotations] Loading ${loadedAnnotations.length} annotations...`,
+    );
+    if (
+      annotations.value.length > 0 ||
+      undoStack.value.length > 0 ||
+      redoStack.value.length > 0
+    ) {
+      // Only save state if there's something to save or history exists
+      saveState();
+    }
+    // Ensure deep clone to prevent reactivity issues across states/history
+    annotations.value = loadedAnnotations.map((a) => reactive({ ...a }));
+    selectedIds.value.clear(); // Clear local selection
+    isCreating.value = false;
+    creatingAnnotation.value = null;
+    pendingMetaAnnotationId.value = null;
+    // History might need reset depending on desired behavior when loading new image
+    // undoStack.value = [];
+    // redoStack.value = [];
+    console.log(
+      `[Annotations] Loaded ${annotations.value.length} annotations.`,
+    );
+  }
+
+  // --- Metadata Input Handling --- //
+
+  function confirmAnnotationMeta(metaRole: string | null, value: string) {
+    if (!pendingMetaAnnotationId.value) return;
+    const annotation = annotations.value.find(
+      (a) => a.id === pendingMetaAnnotationId.value,
+    );
+    if (annotation) {
+      console.log(
+        `[Annotations] Confirming meta for ${annotation.id}: Role=${metaRole}, Value=${value}`,
+      );
+      saveState(); // Save state before applying meta for undo
+      annotation.value = value;
+      annotation.edited = true;
+      // computed_type/display_type are set in ImageAnnotator
+    } else {
+      console.error(
+        '[Annotations] Could not find annotation to confirm meta for ID:',
+        pendingMetaAnnotationId.value,
+      );
+    }
+    pendingMetaAnnotationId.value = null;
+  }
+
   function cancelAnnotationMeta() {
     if (!pendingMetaAnnotationId.value) return;
-
     const idToRemove = pendingMetaAnnotationId.value;
-    console.log('[useAnnotations] Cancelling meta input for ID:', idToRemove);
+    console.log('[Annotations] Cancelling meta input for ID:', idToRemove);
 
-    // Remove the annotation
+    // Remove from local annotations
     annotations.value = annotations.value.filter((a) => a.id !== idToRemove);
 
-    // Pop the state saved when starting creation
-    // We assume the state *before* this annotation was started is what we want
-    undoStack.value.pop();
-    console.log(
-      'Annotation removed due to meta cancel, popped state from undo stack.',
-    );
+    // Remove from both imageStore arrays
 
-    pendingMetaAnnotationId.value = null; // Clear pending state
-    // Also clear selection if the cancelled annotation was selected
+    // Remove from detectionsToAdd array (backend persistence queue)
+    const detectionInToAdd = imageStore.detectionsToAdd.find(
+      (d) => d.id === idToRemove,
+    );
+    if (detectionInToAdd) {
+      console.log(
+        '[Annotations] Removing cancelled annotation from detectionsToAdd:',
+        idToRemove,
+      );
+      imageStore.detectionsToAdd = imageStore.detectionsToAdd.filter(
+        (detection) => detection.id !== idToRemove,
+      );
+    }
+
+    // Also remove from main detections array (UI state)
+    const detectionInMain = imageStore.detections.find(
+      (d) => d.id === idToRemove,
+    );
+    if (detectionInMain) {
+      console.log(
+        '[Annotations] Removing cancelled annotation from detections array:',
+        idToRemove,
+      );
+      imageStore.detections = imageStore.detections.filter(
+        (detection) => detection.id !== idToRemove,
+      );
+    }
+
+    // Revert the startCreate history entry
+    if (undoStack.value.length > 0) undo();
+    pendingMetaAnnotationId.value = null;
     if (selectedIds.value.has(idToRemove)) {
       selectedIds.value.delete(idToRemove);
     }
   }
 
+  // --- Provide / Inject --- //
+  provide('annotations', annotations);
+  provide('selectedIds', selectedIds);
+
+  // --- Returned State and Methods --- //
   return {
     // State
     annotations,
@@ -471,9 +576,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     selectedAnnotations,
     undoStack,
     redoStack,
-    // REMOVE: deletedAnnotations,
     annotationsForSave,
-
     // Methods
     startCreate,
     updateCreating,
@@ -481,35 +584,32 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     cancelCreate,
     selectAnnotation,
     deselectAll,
+    isSelected,
+    syncSelectionWithStore,
     moveAnnotation,
     updateAnnotationDimensions,
     deleteSelected,
-    saveState,
+    saveState, // Expose for Konva event handlers to save before move/transform
     undo,
     redo,
     loadAnnotations,
     confirmAnnotationMeta,
     cancelAnnotationMeta,
-    syncSelectionWithStore,
   };
 }
 
-// Injection functions for consuming components - REMOVE deletedAnnotations
-export function useAnnotationContext() {
-  const annotations = inject<typeof ref<DetectionState[]>>('annotations');
-  const selectedIds = inject<typeof ref<Set<string>>>('selectedIds');
-  // const deletedAnnotations =
-  //   inject<typeof ref<DetectionState[]>>('deletedAnnotations');
+// --- Context Injection Hook --- //
 
-  if (!annotations || !selectedIds /*|| !deletedAnnotations*/) {
+/** Provides access to the annotation context (local annotations and selected IDs). */
+export function useAnnotationContext() {
+  const annotations =
+    inject<ReturnType<typeof ref<DetectionState[]>>>('annotations');
+  const selectedIds =
+    inject<ReturnType<typeof ref<Set<string>>>>('selectedIds');
+  if (!annotations || !selectedIds) {
     throw new Error(
-      'useAnnotationContext must be used within an AnnotationProvider',
+      'useAnnotationContext must be used within an AnnotationProvider component context',
     );
   }
-
-  return {
-    annotations,
-    selectedIds,
-    // deletedAnnotations,
-  };
+  return { annotations, selectedIds };
 }

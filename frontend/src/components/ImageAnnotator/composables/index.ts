@@ -3,7 +3,6 @@ export { useAnnotations } from './useAnnotations';
 export { useImageCanvas } from './useImageCanvas';
 export { useKonvaEventHandlers } from './useKonvaEventHandlers';
 export { useNavigationMode } from './useNavigationMode';
-export { useSelectionManagement } from './useSelectionManagement';
 export { useSynchronization } from './useSynchronization';
 export { useTransformerManagement } from './useTransformerManagement';
 

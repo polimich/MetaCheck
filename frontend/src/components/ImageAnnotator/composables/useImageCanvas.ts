@@ -36,7 +36,11 @@ export interface ImageCanvasState {
 export interface ImageCanvasActions {
   loadImage: (url: string) => Promise<void>;
   setContainer: (el: HTMLElement) => void;
-  resetView: () => void;
+  resetView: () => {
+    scale: number;
+    position: { x: number; y: number };
+    dimensions: { width: number; height: number };
+  } | void;
   panImage: (delta: Vector2d) => void;
   zoomImage: (delta: number, pointer: Vector2d) => void;
   zoomToPoint: (
@@ -183,18 +187,33 @@ export function useImageCanvas() {
 
   // Calculate scale AND POSITION to fit image in container
   function updateScaleToFit(): void {
-    if (!container.value || !image.value) return;
+    if (!container.value || !image.value) {
+      console.warn(
+        '[useImageCanvas] Cannot update scale: container or image is null',
+      );
+      return;
+    }
 
     const containerWidth = container.value.clientWidth;
     const containerHeight = container.value.clientHeight;
 
     // Check for zero dimensions to prevent division by zero
-    if (containerWidth <= 0 || containerHeight <= 0) return;
+    if (containerWidth <= 0 || containerHeight <= 0) {
+      console.warn(
+        '[useImageCanvas] Cannot update scale: container has zero dimensions',
+      );
+      return;
+    }
 
     const imageWidth = dimensions.value.originalWidth;
     const imageHeight = dimensions.value.originalHeight;
 
-    if (imageWidth <= 0 || imageHeight <= 0) return; // Avoid division by zero
+    if (imageWidth <= 0 || imageHeight <= 0) {
+      console.warn(
+        '[useImageCanvas] Cannot update scale: image has zero dimensions',
+      );
+      return;
+    }
 
     // Calculate scale to fit both dimensions
     const scaleX = containerWidth / imageWidth;
@@ -202,29 +221,100 @@ export function useImageCanvas() {
 
     // Use the smaller scale to ensure image fits entirely, cap at 1:1
     const newScale = Math.min(scaleX, scaleY, 1);
-    scale.value = newScale;
-
-    // Update dimensions based on scale
-    dimensions.value.width = imageWidth * newScale;
-    dimensions.value.height = imageHeight * newScale;
 
     // Calculate position offset to center the scaled image
-    const offsetX = (containerWidth - dimensions.value.width) / 2;
-    const offsetY = (containerHeight - dimensions.value.height) / 2;
-
-    // Update position state
-    position.x = offsetX;
-    position.y = offsetY;
+    const scaledWidth = imageWidth * newScale;
+    const scaledHeight = imageHeight * newScale;
+    const offsetX = (containerWidth - scaledWidth) / 2;
+    const offsetY = (containerHeight - scaledHeight) / 2;
 
     console.log(
-      `Updated scale to ${newScale}, position to (${offsetX}, ${offsetY})`,
+      `[useImageCanvas] Updating: scale=${newScale}, position=(${offsetX}, ${offsetY}) from container(${containerWidth}, ${containerHeight}), image(${imageWidth}, ${imageHeight})`,
     );
+
+    // Update state
+    scale.value = newScale;
+    dimensions.value.width = scaledWidth;
+    dimensions.value.height = scaledHeight;
+    position.x = offsetX;
+    position.y = offsetY;
   }
 
   // Reset view to fit container (scale and position)
-  function resetView(): void {
-    console.log('Resetting view...');
-    updateScaleToFit(); // This handles both scale and position
+  function resetView(): {
+    scale: number;
+    position: { x: number; y: number };
+    dimensions: { width: number; height: number };
+  } | void {
+    console.log('[useImageCanvas] Reset view called. Current state:', {
+      containerExists: !!container.value,
+      imageExists: !!image.value,
+      currentScale: scale.value,
+      currentPosition: { ...position },
+      dimensions: { ...dimensions.value },
+    });
+
+    if (!container.value) {
+      console.error(
+        '[useImageCanvas] Cannot reset view: container reference is null',
+      );
+      return;
+    }
+
+    if (!image.value) {
+      console.error(
+        '[useImageCanvas] Cannot reset view: image reference is null',
+      );
+      return;
+    }
+
+    // Force update the image dimensions if not set
+    if (
+      dimensions.value.originalWidth <= 0 ||
+      dimensions.value.originalHeight <= 0
+    ) {
+      console.warn('[useImageCanvas] Fixing missing dimensions in resetView');
+      dimensions.value.originalWidth = image.value.width || 800;
+      dimensions.value.originalHeight = image.value.height || 600;
+    }
+
+    // Explicit calculation without using updateScaleToFit to bypass any potential issues
+    const containerWidth = container.value.clientWidth || 800;
+    const containerHeight = container.value.clientHeight || 600;
+    const imageWidth = dimensions.value.originalWidth;
+    const imageHeight = dimensions.value.originalHeight;
+
+    // Calculate new scale
+    const scaleX = containerWidth / imageWidth;
+    const scaleY = containerHeight / imageHeight;
+    const newScale = Math.min(scaleX, scaleY, 1);
+
+    // Calculate new position
+    const scaledWidth = imageWidth * newScale;
+    const scaledHeight = imageHeight * newScale;
+    const newX = (containerWidth - scaledWidth) / 2;
+    const newY = (containerHeight - scaledHeight) / 2;
+
+    // Directly update values
+    scale.value = newScale;
+    position.x = newX;
+    position.y = newY;
+    dimensions.value.width = scaledWidth;
+    dimensions.value.height = scaledHeight;
+
+    console.log('[useImageCanvas] View reset to:', {
+      newScale,
+      newPosition: { x: newX, y: newY },
+      containerSize: { width: containerWidth, height: containerHeight },
+      scaledSize: { width: scaledWidth, height: scaledHeight },
+    });
+
+    // Return values that can be used for debugging/confirmation
+    return {
+      scale: newScale,
+      position: { x: newX, y: newY },
+      dimensions: { width: scaledWidth, height: scaledHeight },
+    };
   }
 
   // Update canvas dimensions when container changes

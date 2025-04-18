@@ -268,6 +268,22 @@ export function useKonvaEventHandlers(
     node.scaleX(1);
     node.scaleY(1);
 
+    // Update the store's copy of the detection to ensure it's marked for saving
+    const annotation = annotations.annotations.value.find((a) => a.id === id);
+    if (annotation) {
+      const storeIndex = imageStore.detections.findIndex((d) => d.id === id);
+      if (storeIndex !== -1) {
+        // Update store copy with new dimensions and mark as edited
+        Object.assign(imageStore.detections[storeIndex], newAttrs, {
+          edited: true,
+          last_change: new Date().toISOString(),
+        });
+        console.log(
+          `[useKonvaEventHandlers] Updated detection ${id} in store after transform`,
+        );
+      }
+    }
+
     // Transformer update is handled by the watcher
   }
 
@@ -300,6 +316,22 @@ export function useKonvaEventHandlers(
 
     // Update annotation state and trigger saveState
     annotations.updateAnnotationDimensions(id, finalAttrs);
+
+    // Update the store's copy of the detection to ensure it's marked for saving
+    const annotation = annotations.annotations.value.find((a) => a.id === id);
+    if (annotation) {
+      const storeIndex = imageStore.detections.findIndex((d) => d.id === id);
+      if (storeIndex !== -1) {
+        // Update store copy with new position and mark as edited
+        Object.assign(imageStore.detections[storeIndex], finalAttrs, {
+          edited: true,
+          last_change: new Date().toISOString(),
+        });
+        console.log(
+          `[useKonvaEventHandlers] Updated detection ${id} in store after drag`,
+        );
+      }
+    }
 
     // Transformer update is handled by the watcher
   }

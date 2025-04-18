@@ -12,6 +12,7 @@ defineProps<{
   undoStackLength: number | undefined;
   redoStackLength: number | undefined;
   zoomPercentage: number | undefined;
+  isSaving?: boolean; // New prop to show saving indicator
 }>();
 </script>
 
@@ -26,6 +27,7 @@ defineProps<{
       size="md"
       class="toolbar-btn"
       title="Save (Ctrl+S)"
+      :loading="isSaving"
     />
     <q-btn
       @click="undo"
@@ -137,6 +139,12 @@ defineProps<{
           </q-item>
           <q-item>
             <q-item-section>
+              <q-item-label>Space</q-item-label>
+            </q-item-section>
+            <q-item-section>Temporary Pan Mode (while held)</q-item-section>
+          </q-item>
+          <q-item>
+            <q-item-section>
               <q-item-label>Delete/Backspace</q-item-label>
             </q-item-section>
             <q-item-section>Delete Selected</q-item-section>
@@ -160,7 +168,7 @@ defineProps<{
   right: 10px;
   bottom: auto;
   left: auto;
-  z-index: 10;
+  z-index: 1000;
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
