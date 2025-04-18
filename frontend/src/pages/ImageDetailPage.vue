@@ -10,6 +10,13 @@ import {
   useNotificationStore,
 } from 'src/stores';
 import { useCurrentCollectionState } from 'src/stores/frontend-state';
+import { DetectionState } from 'src/types';
+
+// Define the interface for the ImageAnnotator instance
+interface ImageAnnotatorInstance {
+  handleSelectAnnotation: (id: string, shift?: boolean) => void;
+  scrollToAnnotation: (detection: DetectionState) => void;
+}
 
 defineOptions({
   name: 'ImageDetailPage',
@@ -27,7 +34,7 @@ const notificationStore = useNotificationStore();
 const currentCollection = useCurrentCollectionState();
 
 // Computed properties
-const detections = computed(() => imageStore.detections);
+const detections = computed(() => imageStore.detectionsGetter);
 const loadingMessage = computed(() => loadingState.currentLoadingMessage);
 
 // Component ID for loading state
@@ -55,6 +62,9 @@ const imageId = computed({
     }
   },
 });
+
+// Refs for component instances - properly typed now
+const annotatorRef = ref<ImageAnnotatorInstance | null>(null);
 
 // Load image and detections when component mounts
 onMounted(async () => {
@@ -216,28 +226,36 @@ const loadImageData = async () => {
   }
 };
 
-// Handle loading meta roles for a specific detection
-const handleLoadMetaRoles = async (detectionId: string) => {
-  const componentId = `metaRoles_${detectionId}`;
-  loadingState.setComponentLoading(componentId, true);
-
-  try {
-    await imageStore.updateDetectionMetaRoles(detectionId);
-  } catch (error) {
-    console.error(
-      `Error loading meta roles for detection ${detectionId}:`,
-      error,
-    );
-    notificationStore.error('Error loading meta roles');
-  } finally {
-    loadingState.setComponentLoading(componentId, false);
-  }
-};
-
 // Handle image selection from PageList
 const handleSelectImage = async (selectedImageId: string) => {
   if (selectedImageId !== imageId.value) {
     imageId.value = selectedImageId;
+  }
+};
+
+// Handle selecting annotation (without zooming)
+const handleSelectAnnotation = (detection: DetectionState) => {
+  console.log('Handle select annotation:', detection.id);
+
+  // Update the store to reflect the selection
+  imageStore.selectDetection(detection.id);
+
+  // Call the imageAnnotator's selectAnnotation method to highlight the annotation
+  if (annotatorRef.value) {
+    annotatorRef.value.handleSelectAnnotation(detection.id, false);
+  }
+};
+
+// Handle scrolling to annotation in the image annotator (with zooming)
+const handleScrollToAnnotation = (detection: DetectionState) => {
+  console.log('Handle scroll to annotation in image annotator:', detection.id);
+
+  // First ensure the detection is selected in the store
+  imageStore.selectDetection(detection.id);
+
+  // Then call a method on the annotator component to scroll/zoom to this annotation
+  if (annotatorRef.value) {
+    annotatorRef.value.scrollToAnnotation(detection);
   }
 };
 </script>
@@ -264,41 +282,55 @@ const handleSelectImage = async (selectedImageId: string) => {
     </div>
 
     <div class="row items-stretch" style="min-height: inherit">
+      <!-- Page list column -->
       <div class="col-3 flex justify-center">
         <PageList
           :collection-id="collectionId"
           @select-image="handleSelectImage"
         />
       </div>
-      <div class="col-5 flex justify-center">
-        <div class="q-pa-md" style="width: 95%; border: 1px solid">
+
+      <!-- Image annotator column -->
+      <div class="col-6">
+        <div
+          v-if="currentCollection.selectedImageId"
+          class="fit position-relative"
+        >
           <ImageAnnotator
-            v-if="
-              currentCollection.selectedImageId &&
-              !loadingState.isComponentLoading(componentId)
-            "
             :image-id="currentCollection.selectedImageId"
             :collection-id="collectionId"
+            ref="annotatorRef"
           />
-          <div
-            v-else-if="currentCollection.selectedImageId"
-            class="flex flex-center full-height"
-          >
-            <q-spinner size="50px" color="secondary" />
+          <div v-show="loadingState.isLoading" class="loading-overlay">
+            <q-circular-progress indeterminate color="primary" size="50px" />
+            <div class="text-subtitle1 q-mt-sm">{{ loadingMessage }}</div>
           </div>
-          <div v-else class="flex flex-center full-height q-pa-md">
-            <div class="text-center">
-              <q-icon name="image" size="50px" color="grey-5" />
-              <div class="text-subtitle1 q-mt-sm">
-                Select an image from the list
-              </div>
+
+          <!-- Optional debugging info overlay -->
+          <div v-if="false" class="debug-info q-pa-sm bg-grey-1">
+            <div>Collection: {{ collectionId }}</div>
+            <div>Image: {{ currentCollection.selectedImageId }}</div>
+            <div>
+              Detections: {{ imageStore.detections?.length || 0 }} ({{
+                imageStore.isLoaded ? 'Loaded' : 'Not loaded'
+              }})
+            </div>
+          </div>
+        </div>
+        <div v-else class="flex flex-center full-height q-pa-md">
+          <div class="text-center">
+            <q-icon name="image" size="50px" color="grey-5" />
+            <div class="text-subtitle1 q-mt-sm">
+              Select an image from the list
             </div>
           </div>
         </div>
       </div>
-      <div class="col justify-center overflow-hidden-y">
+
+      <!-- Annotation list column -->
+      <div class="col-3 justify-center overflow-hidden">
         <div class="text-h6 q-pa-sm">Label Editor</div>
-        <q-scroll-area style="height: 100%; max-width: 100%">
+        <q-scroll-area style="height: calc(100vh - 150px); max-width: 100%">
           <AnnotationList
             :detections="detections"
             :loading="
@@ -306,7 +338,8 @@ const handleSelectImage = async (selectedImageId: string) => {
                 `annotationList_${currentCollection.selectedImageId}`,
               )
             "
-            @load-meta-roles="handleLoadMetaRoles"
+            @scroll-to-annotation="handleScrollToAnnotation"
+            @select-annotation="handleSelectAnnotation"
           />
         </q-scroll-area>
       </div>

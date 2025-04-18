@@ -5,13 +5,15 @@ import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useStateManager } from 'src/stores/app/stateManager';
 import { useCollectionDataAccess } from 'stores/data-access';
 import { useNotificationStore } from 'src/stores/app/notificationService';
+import { getImageById } from 'src/api/imageApiService';
+import { ImageDAtoState } from 'src/types/mapper';
 
 // Constants
 const STORAGE_KEY = 'image-store';
 
 export const useImageStore = defineStore('images', () => {
   // Dependencies
-  const currentCollectionState = useCurrentCollectionState();
+
   const stateManager = useStateManager();
   const collectionDA = useCollectionDataAccess();
   const notificationStore = useNotificationStore();
@@ -19,7 +21,6 @@ export const useImageStore = defineStore('images', () => {
   // State
   const image = ref<ImageState>(newImageState());
   const detections = ref<DetectionState[]>([]);
-  const detectionIdsBackup = ref<string[]>([]);
   const loading = ref(false);
   const error = ref('');
   const lastImageId = ref<string | null>(null);
@@ -28,18 +29,45 @@ export const useImageStore = defineStore('images', () => {
   const detectionsToDelete = ref<DetectionState[]>([]);
   const detectionsToAdd = ref<DetectionState[]>([]);
 
-  const availableMetaRolesOptions = ref<
-    {
-      label: string;
-      value: string;
-      color: string;
-      id: string;
-    }[]
-  >([]);
+  // Selected detection state
+  const selectedDetectionId = ref<string | null>(null);
 
   // Getters
   const isLoaded = computed(() => {
     return image.value.id !== '' && detections.value.length > 0;
+  });
+
+  const availableMetaRolesOptions = computed(() => {
+    try {
+      const currentCollectionState = useCurrentCollectionState();
+      if (currentCollectionState.availableMetaRoles.length > 0) {
+        return currentCollectionState.availableMetaRoles.map((role) => ({
+          id: role.id,
+          label: role.computed_display_name || role.id,
+          value: role.computed_name || role.id,
+          color: role.color || '#cccccc',
+        }));
+      }
+    } catch (e) {
+      console.error('Error getting meta roles from collection state:', e);
+    }
+    return []; // Default empty array return
+  });
+
+  // Get the currently selected detection
+  const selectedDetection = computed(() => {
+    if (!selectedDetectionId.value) return null;
+    return (
+      detections.value.find((d) => d.id === selectedDetectionId.value) || null
+    );
+  });
+
+  // Get all detections with isSelected flag
+  const detectionsGetter = computed(() => {
+    return detections.value.map((detection) => ({
+      ...detection,
+      isSelected: detection.id === selectedDetectionId.value,
+    }));
   });
 
   // Proper initialization
@@ -52,13 +80,10 @@ export const useImageStore = defineStore('images', () => {
         const parsed = JSON.parse(savedState);
         lastImageId.value = parsed.lastImageId || null;
         lastCollectionId.value = parsed.lastCollectionId || null;
-
+        selectedDetectionId.value = parsed.selectedDetectionId || null;
         console.log(
           `Restored image store state: lastImageId=${lastImageId.value}, lastCollectionId=${lastCollectionId.value}`,
         );
-
-        // We don't restore the full state to avoid stale data
-        // Just the references to know what we were working on
       } catch (e) {
         console.error('Error restoring image store state:', e);
         clearPersistedState();
@@ -67,6 +92,7 @@ export const useImageStore = defineStore('images', () => {
     return {
       lastImageId: lastImageId.value,
       lastCollectionId: lastCollectionId.value,
+      selectedDetectionId: selectedDetectionId.value,
     };
   };
 
@@ -75,6 +101,7 @@ export const useImageStore = defineStore('images', () => {
     const stateToSave = {
       lastImageId: image.value.id,
       lastCollectionId: image.value.id.split('_')[0], // Assuming format collectionId_imageId
+      selectedDetectionId: selectedDetectionId.value,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
     console.log('Persisted image store state');
@@ -89,17 +116,42 @@ export const useImageStore = defineStore('images', () => {
   const resetState = () => {
     image.value = newImageState();
     detections.value = [];
-    detectionIdsBackup.value = [];
     error.value = '';
     detectionsToDelete.value = [];
     detectionsToAdd.value = [];
+    selectedDetectionId.value = null;
     console.log('Reset image store state');
   };
 
-  // Load image from collection state
+  // Methods for managing selected detection
+  const selectDetection = (detectionId: string | null) => {
+    if (detectionId === null) {
+      selectedDetectionId.value = null;
+      console.log('Detection deselected');
+      persistState();
+      return;
+    }
+
+    // Verify the detection exists in our list
+    const detectionExists = detections.value.some((d) => d.id === detectionId);
+    if (!detectionExists) {
+      console.error(
+        `Cannot select detection ${detectionId}: Not found in current detections`,
+      );
+      return;
+    }
+
+    selectedDetectionId.value = detectionId;
+    console.log(`Selected detection: ${detectionId}`);
+    persistState();
+  };
+
+  // Load image directly from API
   const loadImage = async (imageId: string, collectionId: string) => {
     loading.value = true;
     error.value = '';
+    // Clear selected detection when loading a new image
+    selectedDetectionId.value = null;
 
     try {
       console.log(`Loading image ${imageId} from collection ${collectionId}`);
@@ -116,25 +168,18 @@ export const useImageStore = defineStore('images', () => {
         return;
       }
 
-      // First ensure the collection is loaded
-      if (!currentCollectionState.loaded && !currentCollectionState.loading) {
-        console.log('Collection not loaded, loading it first');
-        await currentCollectionState.loadCollection(collectionId);
-      } else if (currentCollectionState.loading) {
-        console.log(
-          'Collection is currently loading, waiting for it to complete',
-        );
-        // Wait for loading to complete but don't trigger another load
+      // Directly fetch the image from the API
+      const imageResponse = await getImageById(imageId);
+
+      if (imageResponse.error) {
+        error.value = `Failed to load image: ${imageResponse.error}`;
+        console.error(error.value);
+        return;
       }
 
-      // Get the image from collection state
-      const currentImage = currentCollectionState.getImageById(imageId);
-      availableMetaRolesOptions.value =
-        currentCollectionState.metaRolesOptionsGetter;
-
-      if (currentImage) {
-        // Set the image in our local state
-        image.value = currentImage;
+      if (imageResponse.data) {
+        // Convert from ImageDA to ImageState using the mapper
+        image.value = ImageDAtoState(imageResponse.data);
 
         // Update state manager
         stateManager.updateState(collectionId, imageId);
@@ -193,35 +238,7 @@ export const useImageStore = defineStore('images', () => {
         (detection) => detection.page_index_for === undefined,
       );
 
-      // Backup the IDs for later comparison
-      detectionIdsBackup.value = detections.value.map((d) => d.id);
-
-      // Load meta roles for all detections in parallel
-      await Promise.all(
-        detections.value.map(async (detection) => {
-          const result = await collectionDA.getMetaRolesForDetection(
-            detection.id,
-          );
-
-          if (result.error) {
-            console.error(
-              `Error loading meta roles for detection ${detection.id}:`,
-              result.error,
-            );
-            return;
-          }
-
-          // Find and update the detection in our array
-          const index = detections.value.findIndex(
-            (d) => d.id === detection.id,
-          );
-          if (index !== -1) {
-            detections.value[index].loadingMetaRoles = false;
-          }
-        }),
-      );
-
-      console.log('All detection meta roles loaded');
+      console.log('Detections loaded successfully');
     } catch (e) {
       error.value = 'Failed to load detections';
       console.error(e);
@@ -394,6 +411,12 @@ export const useImageStore = defineStore('images', () => {
         detections.value.splice(index, 1);
       }
 
+      // If this was the selected detection, deselect it
+      if (selectedDetectionId.value === detection.id) {
+        selectedDetectionId.value = null;
+        persistState();
+      }
+
       console.log(`Deleted detection: ${detection.id}`);
       return '';
     } catch (e) {
@@ -420,55 +443,15 @@ export const useImageStore = defineStore('images', () => {
     try {
       console.log(`Reloading image ${image.value.id}`);
 
-      // First reload the collection to get fresh data
-      await currentCollectionState.reloadCollection();
-
-      // Then reload the image from the updated collection
+      // Directly reload the image using the API
       await loadImage(currentImageId, lastCollectionId.value);
 
-      // Finally reload the detections for the image
+      // Then reload the detections for the image
       await loadDetections(currentImageId);
-
-      // Ensure the image remains selected after reload
-      if (currentImageId) {
-        currentCollectionState.selectImage(currentImageId);
-      }
 
       console.log('Image reloaded successfully');
     } catch (e) {
       error.value = 'Failed to reload image';
-      console.error(e);
-    } finally {
-      loading.value = false;
-    }
-  };
-
-  // Add a method to update a detection's meta roles
-  const updateDetectionMetaRoles = async (detectionId: string) => {
-    loading.value = true;
-    error.value = '';
-
-    try {
-      console.log(`Updating meta roles for detection ${detectionId}`);
-
-      const result = await collectionDA.getMetaRolesForDetection(detectionId);
-
-      if (result.error) {
-        error.value = result.error;
-        console.error(`Failed to load meta roles: ${result.error}`);
-        return;
-      }
-
-      // Find and update the detection in our array
-      const index = detections.value.findIndex((d) => d.id === detectionId);
-      if (index !== -1) {
-        detections.value[index].loadingMetaRoles = false;
-        console.log(`Updated meta roles for detection ${detectionId}`);
-      } else {
-        console.error(`Detection ${detectionId} not found in local state`);
-      }
-    } catch (e) {
-      error.value = 'Failed to update detection meta roles';
       console.error(e);
     } finally {
       loading.value = false;
@@ -481,9 +464,6 @@ export const useImageStore = defineStore('images', () => {
     error.value = '';
 
     try {
-      // Store current selected image ID to restore after reload
-      const currentSelectedImageId = currentCollectionState.selectedImageId;
-
       // Execute all operations in sequence
       const createResult = await createNewDetections();
       if (!createResult.success) {
@@ -503,11 +483,6 @@ export const useImageStore = defineStore('images', () => {
       // Reload image to refresh state after all changes
       await reloadImage();
 
-      // Restore the selected image after reload
-      if (currentSelectedImageId) {
-        currentCollectionState.selectImage(currentSelectedImageId);
-      }
-
       return { success: true };
     } catch (e) {
       error.value = 'Failed to save all changes';
@@ -516,6 +491,15 @@ export const useImageStore = defineStore('images', () => {
     } finally {
       loading.value = false;
     }
+  };
+
+  const ensureMetaRolesLoaded = async (collectionId: string) => {
+    const currentCollectionState = useCurrentCollectionState();
+    if (currentCollectionState.availableMetaRoles.length === 0) {
+      console.log('Meta roles not loaded, loading from collection state...');
+      await currentCollectionState.loadCollection(collectionId);
+    }
+    return availableMetaRolesOptions.value.length > 0;
   };
 
   return {
@@ -528,9 +512,13 @@ export const useImageStore = defineStore('images', () => {
     lastCollectionId,
     detectionsToAdd,
     detectionsToDelete,
+    selectedDetectionId,
 
     // Computed
     isLoaded,
+    availableMetaRolesOptions,
+    selectedDetection,
+    detectionsGetter,
 
     // Methods
     init,
@@ -542,11 +530,11 @@ export const useImageStore = defineStore('images', () => {
     deleteDetections,
     deleteDetection,
     reloadImage,
-    updateDetectionMetaRoles,
     saveAllChanges,
     resetState,
     persistState,
     clearPersistedState,
-    availableMetaRolesOptions,
+    ensureMetaRolesLoaded,
+    selectDetection,
   };
 });

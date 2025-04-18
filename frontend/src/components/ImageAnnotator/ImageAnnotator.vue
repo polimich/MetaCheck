@@ -202,6 +202,34 @@ watch(
   },
 );
 
+// Watch for changes in the store's selected detection
+watch(
+  () => imageStore.selectedDetectionId,
+  (newSelectedId) => {
+    if (newSelectedId) {
+      // Check if this detection exists in our annotations
+      const exists = annotations.annotations.value.some(
+        (ann) => ann.id === newSelectedId,
+      );
+      if (exists) {
+        // Sync with the annotations composable
+        annotations.syncSelectionWithStore(newSelectedId);
+        // Update transformer
+        nextTick(() => {
+          updateTransformer();
+        });
+      }
+    } else {
+      // Clear selection
+      annotations.deselectAll();
+      // Update transformer to remove it
+      nextTick(() => {
+        updateTransformer();
+      });
+    }
+  },
+);
+
 // Load image and annotation data
 async function loadImageData() {
   if (!currentImageId.value) {
@@ -235,27 +263,12 @@ async function loadImageData() {
     // Load annotations
     loadingMessage.value = 'Loading annotations...';
 
-    // Get annotations from current image in collection
-    if (currentCollectionId.value) {
-      const currentImage = currentCollection.getImageById(currentImageId.value);
+    // Load the image and detections directly from the store
+    await imageStore.loadImage(currentImageId.value, currentCollectionId.value);
+    await imageStore.loadDetections(currentImageId.value);
 
-      if (currentImage && currentImage.detections) {
-        // Use detections from the current image
-        annotations.loadAnnotations(currentImage.detections);
-      } else {
-        // Fall back to imageStore if needed
-        await imageStore.loadImage(
-          currentImageId.value,
-          currentCollectionId.value,
-        );
-        await imageStore.loadDetections(currentImageId.value);
-        annotations.loadAnnotations(imageStore.detections);
-      }
-    } else {
-      // No collection ID, fall back to imageStore only
-      await imageStore.loadDetections(currentImageId.value);
-      annotations.loadAnnotations(imageStore.detections);
-    }
+    // Use the enhanced detectionsGetter with isSelected property
+    annotations.loadAnnotations(imageStore.detectionsGetter);
 
     // Initialize Konva stage if needed
     await initKonva();
@@ -443,15 +456,72 @@ function handleKeyUp(event: KeyboardEvent) {
   }
 }
 
-// Expose the handler for use in the template
+// Expose the handlers for use in the template
 defineExpose({
   handleSelectAnnotation,
+  scrollToAnnotation,
 });
 
 function handleSelectAnnotation(id: string, shift = false) {
   console.log(`Selecting annotation ${id}, shift:`, shift);
+
+  // Select in annotations
   annotations.selectAnnotation(id, shift);
-  // Transformer update is handled by the watcher in useTransformerManagement
+
+  // Update the store's selected detection
+  if (!shift) {
+    // In single-select mode, set the selected detection
+    imageStore.selectDetection(id);
+  } else {
+    // In multi-select mode with shift, we need to be careful
+    // For now, just deselect in store when using shift
+    imageStore.selectDetection(null);
+  }
+}
+
+// Method to scroll/zoom to a specific annotation
+function scrollToAnnotation(detection: DetectionState) {
+  // First select the detection
+  handleSelectAnnotation(detection.id, false);
+
+  // Find the annotation in our annotations list
+  const annotation = annotations.annotations.value.find(
+    (a) => a.id === detection.id,
+  );
+  if (!annotation) {
+    console.error(
+      `Cannot scroll to annotation ${detection.id}: not found in current annotations`,
+    );
+    return;
+  }
+
+  // Calculate center point of the annotation
+  const centerX = annotation.x + annotation.width / 2;
+  const centerY = annotation.y + annotation.height / 2;
+
+  // Calculate appropriate zoom level based on annotation size
+  // Use a multiplier to ensure annotation is visible but not too small
+  const minDimension = Math.min(
+    imageCanvas.dimensions.value?.originalWidth || 0,
+    imageCanvas.dimensions.value?.originalHeight || 0,
+  );
+  const annotationSize = Math.max(annotation.width, annotation.height);
+  const zoomFactor = minDimension / (annotationSize * 5); // 5x padding around annotation
+
+  // Clamp zoom to reasonable values
+  const normalizedZoom = Math.min(Math.max(zoomFactor, 0.5), 10);
+
+  // Set new scale and position with smooth animation
+  imageCanvas.zoomToPoint({ x: centerX, y: centerY }, normalizedZoom, true);
+
+  console.log(
+    `Scrolled to annotation ${detection.id} at (${centerX}, ${centerY}) with zoom ${normalizedZoom}`,
+  );
+
+  // Update transformer
+  nextTick(() => {
+    updateTransformer();
+  });
 }
 
 // New wrapper function for resetting view

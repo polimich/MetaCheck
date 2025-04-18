@@ -4,47 +4,6 @@ import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 import { useImageCanvas } from './useImageCanvas';
 
-// Define interfaces for better dependency inversion
-export interface AnnotationState {
-  annotations: ReturnType<typeof ref<DetectionState[]>>;
-  selectedIds: ReturnType<typeof ref<Set<string>>>;
-  isCreating: ReturnType<typeof ref<boolean>>;
-  creatingAnnotation: ReturnType<typeof ref<DetectionState | null>>;
-  hasSelection: ReturnType<typeof computed<boolean>>;
-  selectedAnnotations: ReturnType<typeof computed<DetectionState[]>>;
-  undoStack: ReturnType<typeof ref<string[]>>;
-  redoStack: ReturnType<typeof ref<string[]>>;
-  deletedAnnotations: ReturnType<typeof ref<DetectionState[]>>;
-  annotationsForSave: ReturnType<
-    typeof computed<{
-      annotations: DetectionState[];
-      deletedAnnotations: DetectionState[];
-    }>
-  >;
-  pendingMetaAnnotationId: ReturnType<typeof ref<string | null>>;
-}
-
-export interface AnnotationActions {
-  startCreate: (point: Vector2d, imageId: string) => void;
-  updateCreating: (point: Vector2d) => void;
-  finishCreate: () => void;
-  cancelCreate: () => void;
-  selectAnnotation: (id: string, addToSelection?: boolean) => void;
-  deselectAll: () => void;
-  moveAnnotation: (id: string, delta: Vector2d) => void;
-  updateAnnotationDimensions: (
-    id: string,
-    newDimensions: { x: number; y: number; width: number; height: number },
-  ) => void;
-  deleteSelected: () => void;
-  saveState: () => void;
-  undo: () => void;
-  redo: () => void;
-  loadAnnotations: (loadedAnnotations: DetectionState[]) => void;
-  confirmAnnotationMeta: (metaRole: string | null, value: string) => void;
-  cancelAnnotationMeta: () => void;
-}
-
 // Separate selection management concerns
 function useSelectionManagement() {
   const selectedIds = ref<Set<string>>(new Set());
@@ -423,12 +382,44 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
 
   // Load annotations from external source
   function loadAnnotations(loadedAnnotations: DetectionState[]) {
-    annotations.value = JSON.parse(JSON.stringify(loadedAnnotations || [])); // Handle null/undefined
+    // Save current state if we have annotations to enable undo
+    if (annotations.value.length > 0) {
+      saveState();
+    }
+
+    // Clone annotations to avoid reference issues
+    annotations.value = loadedAnnotations;
+
+    // Clear selection
     selectedIds.value.clear();
-    undoStack.value = [];
-    redoStack.value = [];
-    deletedAnnotations.value = []; // Reset deleted on load
-    console.log('Loaded annotations:', annotations.value.length);
+
+    // Check for isSelected property in the loaded annotations and update selection
+    for (const ann of loadedAnnotations) {
+      if ('isSelected' in ann && ann.isSelected) {
+        selectedIds.value.add(ann.id);
+      }
+    }
+
+    // Reset creation state
+    isCreating.value = false;
+    creatingAnnotation.value = null;
+    pendingMetaAnnotationId.value = null;
+
+    console.log(`Loaded ${annotations.value.length} annotations`);
+  }
+
+  // Sync selections with the store
+  function syncSelectionWithStore(storeSelectedId: string | null) {
+    if (!storeSelectedId) {
+      selectedIds.value.clear();
+      return;
+    }
+
+    // Select only the annotation with this ID
+    if (annotations.value.some((ann) => ann.id === storeSelectedId)) {
+      selectedIds.value.clear();
+      selectedIds.value.add(storeSelectedId);
+    }
   }
 
   // Provide reactive state and methods
@@ -541,6 +532,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     loadAnnotations,
     confirmAnnotationMeta,
     cancelAnnotationMeta,
+    syncSelectionWithStore,
   };
 }
 

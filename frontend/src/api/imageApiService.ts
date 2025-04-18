@@ -5,6 +5,7 @@ import {
   DetectionStateToDa,
   MetaRoleDA,
   MetaRoleOption,
+  ImageDA,
 } from 'src/types';
 
 /**
@@ -113,5 +114,22 @@ export const deleteDetection = async (detectionId: string): Promise<string> => {
     return '';
   } catch (e) {
     return axiosErrorHandler(e);
+  }
+};
+
+/**
+ * Get a single image by ID
+ */
+export const getImageById = async (
+  imageId: string,
+): Promise<{ data: ImageDA | null; error: string }> => {
+  try {
+    const { data } = await axios.get<ImageDA>(`/image/${imageId}`);
+
+    return { data, error: '' };
+  } catch (e) {
+    const error = axiosErrorHandler(e);
+    console.error(`Error fetching image ${imageId}:`, e);
+    return { data: null, error };
   }
 };

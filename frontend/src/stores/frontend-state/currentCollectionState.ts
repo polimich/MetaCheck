@@ -9,6 +9,7 @@ import {
 } from 'src/types';
 import { ImageAddDto } from 'src/stores';
 import { MetaRoleState } from 'src/types/frontend-state/meta_role.state';
+import { getMetaRolesForCollection } from 'src/api/metaRoleApiService';
 
 export const useCurrentCollectionState = defineStore(
   'currentCollectionState',
@@ -160,7 +161,18 @@ export const useCurrentCollectionState = defineStore(
           // Clear selected image when loading a new collection
           selectedImageId.value = '';
 
-          availableMetaRoles.value = collectionDA.availableMetaRoles;
+          const metaRolesResponse =
+            await getMetaRolesForCollection(collectionId);
+          if (metaRolesResponse.data && metaRolesResponse.data.length > 0) {
+            availableMetaRoles.value = metaRolesResponse.data;
+            console.log(
+              `Loaded ${availableMetaRoles.value.length} meta roles for collection ${collectionId}`,
+            );
+          } else if (metaRolesResponse.error) {
+            console.error(
+              `Failed to load meta roles for collection: ${metaRolesResponse.error}`,
+            );
+          }
 
           loaded.value = true;
           console.log(

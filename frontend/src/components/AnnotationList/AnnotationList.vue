@@ -11,10 +11,23 @@ const props = defineProps<{
   loading?: boolean;
 }>();
 
-// Emit
-const emit = defineEmits<{
-  (event: 'load-meta-roles', detectionId: string): void;
-}>();
+// Define emits for parent component
+const emit = defineEmits(['scrollToAnnotation', 'selectAnnotation']);
+
+// Handle scroll to annotation event from list item
+const handleScrollToAnnotation = (detection: DetectionState) => {
+  console.log(
+    'Forwarding scrollToAnnotation event for detection:',
+    detection.id,
+  );
+  emit('scrollToAnnotation', detection);
+};
+
+// Handle select annotation event from list item
+const handleSelectAnnotation = (detection: DetectionState) => {
+  console.log('Forwarding selectAnnotation event for detection:', detection.id);
+  emit('selectAnnotation', detection);
+};
 
 // For debugging
 onMounted(() => {
@@ -315,17 +328,16 @@ watch(
         />
       </div>
 
-      <!-- List of annotation items -->
-      <div v-else class="annotation-items">
-        <AnnotationListItem
-          v-for="detection in filteredDetections"
-          :key="detection.id"
-          :detection="detection"
-          :loading="props.loading"
-          @load-meta-roles="
-            (detectionId) => emit('load-meta-roles', detectionId)
-          "
-        />
+      <!-- List of annotations with virtual scrolling -->
+      <div class="annotation-items q-px-md q-pt-sm q-pb-xl">
+        <div v-for="detection in filteredDetections" :key="detection.id">
+          <AnnotationListItem
+            :detection="detection"
+            :loading="props.loading"
+            @scrollToAnnotation="handleScrollToAnnotation"
+            @selectAnnotation="handleSelectAnnotation"
+          />
+        </div>
       </div>
     </template>
   </div>

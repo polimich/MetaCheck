@@ -5,6 +5,7 @@ import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { useNavigationMode } from './useNavigationMode';
 import { useAnnotations } from './useAnnotations';
 import { useImageCanvas } from './useImageCanvas';
+import { useImageStore } from 'src/stores/image/storeImages';
 
 /**
  * Composable for managing Konva event handlers for the annotator
@@ -16,6 +17,9 @@ export function useKonvaEventHandlers(
   annotations: ReturnType<typeof useAnnotations>,
   imageCanvas: ReturnType<typeof useImageCanvas>,
 ) {
+  // Get the image store for updating selected detection
+  const imageStore = useImageStore();
+
   // Handle annotations being created
   function handleMouseDown(event: KonvaPointerEvent) {
     if (navigationMode.mode.value !== 'add' || !konvaLayer.value) return;
@@ -54,7 +58,13 @@ export function useKonvaEventHandlers(
       console.log(
         '[useKonvaEventHandlers] Clicked on background, deselecting all annotations',
       );
+
+      // Deselect all annotations in the local state
       annotations.deselectAll();
+
+      // Also deselect in the store
+      imageStore.selectDetection(null);
+      console.log('[useKonvaEventHandlers] Deselected annotation in store');
 
       // Use layer.getRelativePointerPosition for accurate coords
       const layerPos = konvaLayer.value.getRelativePointerPosition();
@@ -164,8 +174,18 @@ export function useKonvaEventHandlers(
     // Check if we're holding shift for multi-select
     const shiftKey = (event.evt as MouseEvent).shiftKey;
 
-    // Select the annotation
+    // Select the annotation in our local state
     annotations.selectAnnotation(id, shiftKey);
+
+    // Update the store's selected detection ID for the AnnotationList synchronization
+    // Only update for single selection (not shift multi-select)
+    if (!shiftKey) {
+      imageStore.selectDetection(id);
+      console.log(
+        '[useKonvaEventHandlers] Updated store selectedDetectionId to:',
+        id,
+      );
+    }
 
     // Transformer update is handled by the watcher in useTransformerManagement
 

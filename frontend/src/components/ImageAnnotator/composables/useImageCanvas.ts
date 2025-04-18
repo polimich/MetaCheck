@@ -39,6 +39,11 @@ export interface ImageCanvasActions {
   resetView: () => void;
   panImage: (delta: Vector2d) => void;
   zoomImage: (delta: number, pointer: Vector2d) => void;
+  zoomToPoint: (
+    imagePoint: Vector2d,
+    newScale: number,
+    animate?: boolean,
+  ) => void;
   screenToImageCoords: (point: Vector2d) => Vector2d;
   imageToScreenCoords: (point: Vector2d) => Vector2d;
 }
@@ -312,6 +317,45 @@ export function useImageCanvas() {
   // Current zoom percentage for display
   const zoomPercentage = computed(() => Math.round(scale.value * 100));
 
+  // Zoom to a specific point in the image
+  function zoomToPoint(
+    imagePoint: Vector2d,
+    newScale: number,
+    animate = false,
+  ): void {
+    if (!container.value || !image.value) return;
+
+    // Constrain scale
+    const constrainedScale = Math.min(Math.max(newScale, 0.1), 10);
+
+    // Calculate where the point should be after zooming
+    const containerWidth = container.value.clientWidth;
+    const containerHeight = container.value.clientHeight;
+
+    // Center of container
+    const containerCenterX = containerWidth / 2;
+    const containerCenterY = containerHeight / 2;
+
+    // Calculate new position
+    const newX = containerCenterX - imagePoint.x * constrainedScale;
+    const newY = containerCenterY - imagePoint.y * constrainedScale;
+
+    if (animate) {
+      // Use transition for smooth animation
+      container.value.style.transition = 'transform 0.5s ease-out';
+      setTimeout(() => {
+        if (container.value) {
+          container.value.style.transition = '';
+        }
+      }, 500);
+    }
+
+    // Update state
+    scale.value = constrainedScale;
+    position.x = newX;
+    position.y = newY;
+  }
+
   return {
     // State
     image,
@@ -334,5 +378,6 @@ export function useImageCanvas() {
     zoomImage,
     screenToImageCoords,
     imageToScreenCoords,
+    zoomToPoint,
   };
 }

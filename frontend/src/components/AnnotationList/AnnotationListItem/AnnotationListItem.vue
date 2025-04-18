@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { DetectionState } from 'src/types/frontend-state';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useImageStore } from 'src/stores/image/storeImages';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { updateSingleDetection } from 'src/api/detectionApiService';
@@ -9,6 +9,9 @@ const props = defineProps<{
   detection: DetectionState;
   loading?: boolean;
 }>();
+
+// Define emits for parent component communication
+const emit = defineEmits(['scrollToAnnotation', 'selectAnnotation']);
 
 // Stores
 const imageStore = useImageStore();
@@ -22,6 +25,28 @@ const selectValue = ref({
   id: detection.value.computed_type,
   color: detection.value.computed_color,
 });
+
+// DOM ref for scrolling
+const itemRef = ref<HTMLElement | null>(null);
+
+// Check if this detection is selected
+const isSelected = computed(() => {
+  return imageStore.selectedDetectionId === detection.value.id;
+});
+
+// Watch for selection changes from store
+watch(
+  () => imageStore.selectedDetectionId,
+  (newSelectedId) => {
+    if (newSelectedId === detection.value.id && itemRef.value) {
+      // When our item gets selected, ensure it's visible
+      itemRef.value.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  },
+);
 
 // Get confidence value with a default of 0
 const getConfidence = computed(() => detection.value.confidence ?? 0);
@@ -62,6 +87,34 @@ const isLoading = computed(() => {
 
   return propsLoading || metaRolesLoading || metaRoleUpdateLoading;
 });
+
+// Handle clicking on the item to select it
+const handleSelectDetection = () => {
+  if (isSelected.value) {
+    // If already selected, deselect it
+    imageStore.selectDetection(null);
+  } else {
+    // Otherwise select this detection
+    imageStore.selectDetection(detection.value.id);
+
+    // Emit event to notify parent about selection (without zoom)
+    emit('selectAnnotation', detection.value);
+  }
+};
+
+// Handle the zoom action specifically
+const handleZoomToDetection = (event: Event) => {
+  // Stop event propagation to prevent triggering the parent div's click handler
+  event.stopPropagation();
+
+  // Select this detection if not already selected
+  if (!isSelected.value) {
+    imageStore.selectDetection(detection.value.id);
+  }
+
+  // Emit event for parent to handle zooming to this annotation
+  emit('scrollToAnnotation', detection.value);
+};
 
 const saveDetection = async () => {
   loadingState.startLoading(
@@ -121,7 +174,12 @@ const updateDetection = () => {
 </script>
 
 <template>
-  <div class="annotation-item q-mb-sm" :class="[attentionLevel]">
+  <div
+    ref="itemRef"
+    class="annotation-item q-mb-sm"
+    :class="[attentionLevel, { selected: isSelected }]"
+    @click="handleSelectDetection"
+  >
     <!-- Confidence indicator bar at the top -->
     <div class="confidence-bar">
       <div
@@ -149,6 +207,7 @@ const updateDetection = () => {
             @update:model-value="(value) => updateSelectValue(value)"
             hide-bottom-space
             options-dense
+            @click.stop
           >
             <template v-slot:selected>
               <div v-if="selectValue" class="row items-center no-wrap">
@@ -184,6 +243,7 @@ const updateDetection = () => {
             outlined
             @update:model-value="updateDetection"
             hide-bottom-space
+            @click.stop
           />
         </div>
 
@@ -197,7 +257,7 @@ const updateDetection = () => {
         </q-badge>
       </div>
 
-      <!-- Option 1: Bottom row with action buttons -->
+      <!-- Bottom row with action buttons -->
       <div class="row justify-between items-center q-mt-xs action-row">
         <div class="col-auto">
           <q-btn
@@ -206,12 +266,27 @@ const updateDetection = () => {
             dense
             color="primary"
             icon="save"
-            @click="saveDetection"
+            @click.stop="saveDetection"
             size="sm"
             :loading="
               loadingState.isSourceLoading(`saveDetection-${detection.id}`)
             "
-          />
+          >
+            <q-tooltip>Save changes</q-tooltip>
+          </q-btn>
+
+          <!-- New zoom button -->
+          <q-btn
+            flat
+            round
+            dense
+            color="secondary"
+            icon="zoom_in"
+            @click.stop="handleZoomToDetection"
+            size="sm"
+          >
+            <q-tooltip>Zoom to annotation</q-tooltip>
+          </q-btn>
         </div>
 
         <div class="col verified-container options-1">
@@ -221,7 +296,7 @@ const updateDetection = () => {
             dense
             outline
             clickable
-            @click="
+            @click.stop="
               detection.annotated = !detection.annotated;
               updateDetection();
             "
@@ -249,10 +324,20 @@ const updateDetection = () => {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   border-left: 3px solid $primary;
+  cursor: pointer;
 }
 
 .annotation-item:hover {
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+/* Selected state styling */
+.annotation-item.selected {
+  box-shadow:
+    0 0 0 2px $primary,
+    0 2px 5px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+  background-color: rgba($primary, 0.05);
 }
 
 .content-area {
@@ -309,6 +394,11 @@ const updateDetection = () => {
   border-left: 3px solid $green-8;
 }
 
+/* Adjust pulse animation for selected items */
+.selected.high-attention {
+  animation: pulse-red-selected 2s infinite;
+}
+
 @keyframes pulse-red {
   0% {
     box-shadow: 0 0 4px 1px rgba($red-8, 0.2);
@@ -318,6 +408,24 @@ const updateDetection = () => {
   }
   100% {
     box-shadow: 0 0 4px 1px rgba($red-8, 0.2);
+  }
+}
+
+@keyframes pulse-red-selected {
+  0% {
+    box-shadow:
+      0 0 4px 1px rgba($red-8, 0.2),
+      0 0 0 2px $primary;
+  }
+  50% {
+    box-shadow:
+      0 0 6px 2px rgba($red-8, 0.4),
+      0 0 0 2px $primary;
+  }
+  100% {
+    box-shadow:
+      0 0 4px 1px rgba($red-8, 0.2),
+      0 0 0 2px $primary;
   }
 }
 </style>
