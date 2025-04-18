@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, CSSProperties } from 'vue';
+import { CSSProperties } from 'vue';
 
 // Accept any detection type to avoid conflicts with the parent component
 interface DetectionBase {
@@ -11,7 +11,7 @@ interface DetectionBase {
   // No other required fields to make it more flexible
 }
 
-defineProps<{
+const props = defineProps<{
   pendingAnnotation: DetectionBase | null;
   metaRoles: Array<{
     value: string;
@@ -21,33 +21,47 @@ defineProps<{
   }>;
   position: CSSProperties;
   visible: boolean;
+  modelValue: string | null; // Add for v-model binding
+  valueText: string | null; // Fix to allow null values
 }>();
 
 const emit = defineEmits<{
   (e: 'confirm', metaRole: string | null, value: string): void;
   (e: 'cancel'): void;
+  (e: 'update:modelValue', value: string | null): void; // Add for v-model binding
+  (e: 'update:valueText', value: string | null): void; // Add for v-model binding
 }>();
-
-// Local state for the form inputs
-const selectedMetaRole = ref<string | null>(null);
-const annotationValue = ref<string>('');
 
 // Handle confirm button click
 function handleConfirm() {
-  emit('confirm', selectedMetaRole.value, annotationValue.value);
-  resetForm();
+  emit('confirm', props.modelValue, props.valueText || '');
 }
 
 // Handle cancel button click
 function handleCancel() {
   emit('cancel');
-  resetForm();
 }
 
-// Reset form state
-function resetForm() {
-  selectedMetaRole.value = null;
-  annotationValue.value = '';
+// Update handlers for v-model binding
+function updateMetaRole(
+  value: string | null | { value: string; label: string },
+) {
+  // Ensure we only emit a string or null
+  if (value === null) {
+    emit('update:modelValue', null);
+  } else if (typeof value === 'object' && 'value' in value) {
+    // If it's an object with a value property, extract just the value
+    emit('update:modelValue', value.value);
+  } else if (typeof value === 'string') {
+    emit('update:modelValue', value);
+  } else {
+    // Fallback
+    emit('update:modelValue', null);
+  }
+}
+
+function updateValue(value: string | number | null) {
+  emit('update:valueText', value as string | null);
 }
 </script>
 
@@ -56,9 +70,11 @@ function resetForm() {
     v-if="visible && pendingAnnotation"
     :style="position"
     class="metadata-input-panel"
+    @click.stop
   >
     <q-select
-      v-model="selectedMetaRole"
+      :model-value="modelValue"
+      @update:model-value="updateMetaRole"
       :options="metaRoles"
       label="Meta Role"
       dense
@@ -76,7 +92,8 @@ function resetForm() {
       class="q-mb-sm"
     />
     <q-input
-      v-model="annotationValue"
+      :model-value="valueText"
+      @update:model-value="updateValue"
       label="Value"
       dense
       outlined

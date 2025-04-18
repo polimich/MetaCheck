@@ -4,6 +4,7 @@ import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 import { useImageCanvas } from './useImageCanvas';
 import { useSelectionManagement } from './useSelectionManagement';
+import { useImageStore } from 'src/stores'; // Import image store
 
 // Separate history management concerns
 function useHistoryManagement(
@@ -141,6 +142,9 @@ function useAnnotationNormalization(
  * Composable for managing annotation state and operations
  */
 export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
+  // Get the image store
+  const imageStore = useImageStore();
+
   // Core state
   const annotations = ref<DetectionState[]>([]);
   const isCreating = ref(false);
@@ -161,20 +165,17 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
   );
   const { normalizeAnnotation } = useAnnotationNormalization(imageCanvas);
 
-  // Track deleted annotations for backend syncing
-  const deletedAnnotations = ref<DetectionState[]>([]);
-
   // Computed
   const hasSelection = computed(() => selectedIds.value.size > 0);
   const selectedAnnotations = computed(() =>
     annotations.value.filter((a) => selectedIds.value.has(a.id)),
   );
 
-  // Get annotations for saving
+  // Get annotations for saving - No longer needs deletedAnnotations
   const annotationsForSave = computed(() => {
     return {
       annotations: annotations.value,
-      deletedAnnotations: deletedAnnotations.value,
+      // deletedAnnotations: deletedAnnotations.value,
     };
   });
 
@@ -188,7 +189,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
 
     // Create a new annotation
     const newAnnotation = newDetectionState();
-    newAnnotation.id = `temp_${uuidv4()}`; // Temporary ID until saved
+    newAnnotation.id = uuidv4(); // Temporary ID until saved
     newAnnotation.image_id = imageId;
     newAnnotation.x = startPos.x;
     newAnnotation.y = startPos.y;
@@ -200,10 +201,10 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     newAnnotation.annotated = true;
 
     // Default meta values (will be overridden after creation)
-    // @TODO: Get defaults from app settings or previous selection
-    newAnnotation.computed_type = 'unknown';
-    newAnnotation.computed_color = '#ff0000'; // Red
-    newAnnotation.computed_display_type = 'Unknown';
+    // Use consistent, more descriptive default values
+    newAnnotation.computed_type = ''; // Will be set by selected role
+    newAnnotation.computed_color = '#ff0000'; // Red as default color
+    newAnnotation.computed_display_type = ''; // Will be set by selected role label
 
     // Save state before adding the new annotation
     saveState();
@@ -303,6 +304,10 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
   // Delete selected annotations
   function deleteSelected() {
     if (selectedIds.value.size === 0) return;
+    console.log(
+      '[useAnnotations] Deleting selected annotations:',
+      Array.from(selectedIds.value),
+    );
 
     // Check if the pending annotation is among those selected
     if (
@@ -317,16 +322,18 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
 
     saveState();
 
-    const toDelete = annotations.value.filter((a) =>
-      selectedIds.value.has(a.id),
-    );
-    toDelete.forEach((a) => (a.deleted = true));
-    deletedAnnotations.value = [...deletedAnnotations.value, ...toDelete];
+    // Create a copy of the selected IDs before clearing
+    const idsToDelete = new Set(selectedIds.value);
 
-    annotations.value = annotations.value.filter(
-      (a) => !selectedIds.value.has(a.id),
-    );
+    // Remove from local annotations state
+    annotations.value = annotations.value.filter((a) => !idsToDelete.has(a.id));
 
+    // Remove from the store and queue for backend deletion
+    idsToDelete.forEach((id) => {
+      imageStore.deleteDetectionLocally(id);
+    });
+
+    // Clear selection in the local state
     selectedIds.value.clear();
   }
 
@@ -372,10 +379,10 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     }
   }
 
-  // Provide reactive state and methods
+  // Provide reactive state and methods - REMOVE deletedAnnotations
   provide('annotations', annotations);
   provide('selectedIds', selectedIds);
-  provide('deletedAnnotations', deletedAnnotations);
+  // provide('deletedAnnotations', deletedAnnotations);
 
   function clearPendingMeta() {
     if (pendingMetaAnnotationId.value) {
@@ -414,10 +421,11 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
         'Value:',
         value,
       );
+      // Set the value from user input
       annotation.value = value;
-      annotation.edited = true; // Now mark as edited
-      // Optionally save state again after meta confirmation? Depends on desired undo granularity
-      // saveState();
+      // Note: computed_type and computed_display_type are set in ImageAnnotator.vue
+      // when metaRole object is looked up
+      annotation.edited = true; // Mark as edited
     } else {
       console.error(
         '[useAnnotations] Could not find annotation to confirm meta for ID:',
@@ -463,7 +471,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     selectedAnnotations,
     undoStack,
     redoStack,
-    deletedAnnotations,
+    // REMOVE: deletedAnnotations,
     annotationsForSave,
 
     // Methods
@@ -486,14 +494,14 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
   };
 }
 
-// Injection functions for consuming components
+// Injection functions for consuming components - REMOVE deletedAnnotations
 export function useAnnotationContext() {
   const annotations = inject<typeof ref<DetectionState[]>>('annotations');
   const selectedIds = inject<typeof ref<Set<string>>>('selectedIds');
-  const deletedAnnotations =
-    inject<typeof ref<DetectionState[]>>('deletedAnnotations');
+  // const deletedAnnotations =
+  //   inject<typeof ref<DetectionState[]>>('deletedAnnotations');
 
-  if (!annotations || !selectedIds || !deletedAnnotations) {
+  if (!annotations || !selectedIds /*|| !deletedAnnotations*/) {
     throw new Error(
       'useAnnotationContext must be used within an AnnotationProvider',
     );
@@ -502,6 +510,6 @@ export function useAnnotationContext() {
   return {
     annotations,
     selectedIds,
-    deletedAnnotations,
+    // deletedAnnotations,
   };
 }

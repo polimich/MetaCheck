@@ -104,6 +104,8 @@ function addAlpha(color: string, opacity: number) {
 // --- Metadata Input State ---
 const metaRoles = computed(() => metaRoleStore.getAllMetaRoleSelectOptions);
 const metaInputPanelRef = ref<HTMLDivElement | null>(null);
+const metaSelectedRole = ref<string | null>(null);
+const metaInputValue = ref<string>('');
 
 // --- Metadata Input Positioning Logic ---
 const pendingAnnotation = computed(() => {
@@ -141,11 +143,108 @@ const metaInputPosition = computed(() => {
 
 // --- Metadata Input Actions ---
 function handleConfirmMeta(metaRole: string | null, value: string) {
+  // Store the ID before it gets cleared
+  const confirmedAnnotationId = annotations.pendingMetaAnnotationId.value;
+  if (!confirmedAnnotationId) {
+    console.error('Cannot confirm meta: No pending annotation ID found.');
+    return;
+  }
+
+  // First confirm annotation using the annotations composable (this will clear pendingMetaAnnotationId)
   annotations.confirmAnnotationMeta(metaRole, value);
+
+  // Now find the annotation using the stored ID
+  const confirmedAnnotation = annotations.annotations.value.find(
+    (a) => a.id === confirmedAnnotationId,
+  );
+
+  if (confirmedAnnotation) {
+    // Look up the meta role object to get color and display type
+    let metaRoleObj = null;
+    if (metaRole) {
+      metaRoleObj = metaRoles.value.find((role) => role.value === metaRole) as
+        | {
+            value: string;
+            label: string;
+            color?: string;
+            id?: string;
+          }
+        | undefined;
+    }
+
+    // Set computed properties based on meta role if available
+    if (metaRoleObj) {
+      confirmedAnnotation.computed_color = metaRoleObj.color || '#ff0000';
+      // Use the label for the display type
+      confirmedAnnotation.computed_display_type = metaRoleObj.label;
+      // Use the value for the computed_type
+      confirmedAnnotation.computed_type = metaRoleObj.value;
+    } else if (metaRole) {
+      // If we have a metaRole string but couldn't find the object
+      confirmedAnnotation.computed_type = metaRole;
+      confirmedAnnotation.computed_display_type = metaRole;
+    }
+
+    // Ensure the annotation is in the store's detections
+    const existingIndex = imageStore.detections.findIndex(
+      (d) => d.id === confirmedAnnotation.id,
+    );
+
+    if (existingIndex === -1) {
+      // Add to the store's detections array
+      imageStore.detections.push({
+        ...confirmedAnnotation,
+        // Ensure these fields are properly set
+        created_date:
+          confirmedAnnotation.created_date || new Date().toISOString(),
+        last_change: new Date().toISOString(),
+        last_access: new Date().toISOString(),
+        edited: true,
+        loadingMetaRoles: false,
+      });
+
+      // Also add to the detectionsToAdd array for backend persistence
+      imageStore.detectionsToAdd.push({
+        ...confirmedAnnotation,
+        created_date:
+          confirmedAnnotation.created_date || new Date().toISOString(),
+        last_change: new Date().toISOString(),
+        last_access: new Date().toISOString(),
+        image_id: currentImageId.value,
+        loadingMetaRoles: false,
+      });
+
+      console.log(
+        `Added new annotation ${confirmedAnnotation.id} to image store`,
+      );
+    } else {
+      // Update the existing detection in the store
+      imageStore.detections[existingIndex] = {
+        ...confirmedAnnotation,
+        last_change: new Date().toISOString(),
+        edited: true,
+        loadingMetaRoles: false,
+      };
+      console.log(
+        `Updated existing annotation ${confirmedAnnotation.id} in image store`,
+      );
+    }
+  } else {
+    console.error(
+      `Could not find confirmed annotation with ID: ${confirmedAnnotationId}`,
+    );
+  }
+
+  // Reset our form values
+  metaSelectedRole.value = null;
+  metaInputValue.value = '';
 }
 
 function handleCancelMeta() {
   annotations.cancelAnnotationMeta();
+  // Reset our form values
+  metaSelectedRole.value = null;
+  metaInputValue.value = '';
 }
 
 // --- onClickOutside Logic for MetadataInputPanel ---
@@ -153,9 +252,23 @@ onClickOutside(metaInputPanelRef, (event) => {
   // Check if the click target is part of the Konva canvas/stage
   // This prevents immediate cancellation when clicking to draw a new box
   const targetElement = event.target as HTMLElement;
+
+  // Check if click is on Konva canvas
   if (targetElement.closest('.konvajs-content')) {
     console.log(
       'onClickOutside: Click inside Konva canvas detected, ignoring.',
+    );
+    return;
+  }
+
+  // Check if click is on any q-menu (dropdowns)
+  if (
+    targetElement.closest('.q-menu') ||
+    targetElement.closest('.q-dialog') ||
+    document.querySelector('.q-menu')?.contains(targetElement)
+  ) {
+    console.log(
+      'onClickOutside: Click on dropdown or dialog detected, ignoring.',
     );
     return;
   }
@@ -383,67 +496,26 @@ async function initKonva() {
 // Save annotations to the store/backend
 async function save() {
   try {
-    // Get the current image
-    const currentImage = currentCollection.getImageById(currentImageId.value);
+    // Get the current image from the store - it should be up-to-date
+    const currentImage = imageStore.image;
 
-    if (currentImage) {
-      // Get latest data from composable
-      const { annotations: currentAnns, deletedAnnotations: deletedAnns } =
-        annotations.annotationsForSave.value;
+    if (currentImage && currentImage.id === currentImageId.value) {
+      // The store now handles the lists of detections to add/update/delete
+      // We only need to tell the store to save changes.
 
-      // Reset store's arrays for tracking changes
-      imageStore.detectionsToAdd.length = 0;
-      imageStore.detectionsToDelete.length = 0;
-
-      // Process updates and new annotations
-      currentAnns.forEach((ann) => {
-        const existingIndex = currentImage.detections.findIndex(
-          (d) => d.id === ann.id,
-        );
-        if (existingIndex !== -1) {
-          // Update existing detection - only assign properties managed by this component
-          currentImage.detections[existingIndex] = {
-            ...currentImage.detections[existingIndex], // Keep existing properties
-            x: ann.x,
-            y: ann.y,
-            width: ann.width,
-            height: ann.height,
-            value: ann.value,
-            computed_type: ann.computed_type,
-            computed_color: ann.computed_color,
-            computed_display_type: ann.computed_display_type,
-            confidence: ann.confidence,
-            annotated: ann.annotated,
-            edited: true, // Mark as edited
-          } as DetectionState;
-        } else {
-          // Add new detection to the store's array for adding
-          imageStore.detectionsToAdd.push({
-            ...ann,
-            created_date: new Date().toISOString(),
-            image_id: currentImageId.value,
-            collection_id: currentCollectionId.value,
-          } as DetectionState);
-        }
-      });
-
-      // Process deleted annotations
-      deletedAnns.forEach((ann) => {
-        // Add to store's array for deletion
-        imageStore.detectionsToDelete.push(ann);
-      });
-
-      // Mark image as edited if there were changes
+      // Mark image as edited if there were pending changes
       if (
-        currentAnns.some((a) => a.edited) ||
-        deletedAnns.length > 0 ||
-        imageStore.detectionsToAdd.length > 0
+        imageStore.detectionsToAdd.length > 0 ||
+        imageStore.detectionsToDelete.length > 0 ||
+        imageStore.detections.some((d) => d.edited)
       ) {
-        currentImage.edited = true;
+        // We might need a way to mark the image itself as edited in the store
+        // For now, we rely on the detection flags.
+        console.log('Save initiated with pending changes.');
+      } else {
+        notificationStore.info('No changes to save.');
+        return; // Nothing to save
       }
-
-      // Update imageStore detections for consistency
-      imageStore.detections = [...currentAnns];
 
       // Save all changes (create new, update existing, delete marked)
       const saveResult = await imageStore.saveAllChanges();
@@ -455,12 +527,14 @@ async function save() {
         console.error('Error saving changes:', saveResult?.error);
       } else {
         notificationStore.success('Annotations saved successfully');
-        // Clear deleted annotations after successful save
-        annotations.deletedAnnotations.value = [];
+        // No need to clear local deleted annotations list anymore
+        // The store handles clearing its detectionsToDelete list after successful save
       }
     } else {
-      notificationStore.error('Cannot save: Image not found');
-      console.error('Cannot save: Current image not found');
+      notificationStore.error('Cannot save: Image not found or ID mismatch');
+      console.error(
+        `Cannot save: Current image not found or ID mismatch. Store: ${imageStore.image?.id}, Expected: ${currentImageId.value}`,
+      );
     }
   } catch (error) {
     notificationStore.error(
@@ -683,6 +757,8 @@ function handleResetView() {
         :meta-roles="metaRoles"
         :position="metaInputPosition"
         :visible="!!annotations.pendingMetaAnnotationId.value"
+        v-model="metaSelectedRole"
+        v-model:valueText="metaInputValue"
         @confirm="handleConfirmMeta"
         @cancel="handleCancelMeta"
       />

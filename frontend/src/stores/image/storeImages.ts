@@ -428,6 +428,32 @@ export const useImageStore = defineStore('images', () => {
     }
   };
 
+  // New method to handle immediate local deletion
+  const deleteDetectionLocally = (detectionId: string) => {
+    const index = detections.value.findIndex((d) => d.id === detectionId);
+    if (index !== -1) {
+      const deletedDetection = detections.value[index];
+      // Add to the deletion queue for backend
+      if (!detectionsToDelete.value.some((d) => d.id === detectionId)) {
+        detectionsToDelete.value.push(deletedDetection);
+      }
+      // Remove from the main detections list
+      detections.value.splice(index, 1);
+      console.log(
+        `Locally deleted detection ${detectionId} and queued for backend deletion.`,
+      );
+
+      // Deselect if it was the selected one
+      if (selectedDetectionId.value === detectionId) {
+        selectDetection(null); // This already persists
+      }
+    } else {
+      console.warn(
+        `Could not find detection ${detectionId} to delete locally.`,
+      );
+    }
+  };
+
   const reloadImage = async () => {
     if (!image.value?.id || !lastCollectionId.value) {
       console.error('Cannot reload image: no image or collection ID');
@@ -536,5 +562,6 @@ export const useImageStore = defineStore('images', () => {
     clearPersistedState,
     ensureMetaRolesLoaded,
     selectDetection,
+    deleteDetectionLocally,
   };
 });

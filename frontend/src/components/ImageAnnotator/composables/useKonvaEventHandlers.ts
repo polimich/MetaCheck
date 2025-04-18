@@ -20,7 +20,13 @@ export function useKonvaEventHandlers(
   // Get the image store for updating selected detection
   const imageStore = useImageStore();
 
-  // Handle annotations being created
+  // Track mouse state for drag detection
+  const isDragging = { value: false };
+  const mouseIsDown = { value: false };
+  const dragStartPos = { x: 0, y: 0 };
+  const dragThreshold = 5; // Minimum pixels to move before considering it a drag
+
+  // Handle mouse down event
   function handleMouseDown(event: KonvaPointerEvent) {
     if (navigationMode.mode.value !== 'add' || !konvaLayer.value) return;
 
@@ -66,7 +72,7 @@ export function useKonvaEventHandlers(
       imageStore.selectDetection(null);
       console.log('[useKonvaEventHandlers] Deselected annotation in store');
 
-      // Use layer.getRelativePointerPosition for accurate coords
+      // Store the starting position for potential drag creation
       const layerPos = konvaLayer.value.getRelativePointerPosition();
       if (!layerPos) {
         console.error(
@@ -74,35 +80,73 @@ export function useKonvaEventHandlers(
         );
         return;
       }
-      const currentImageIdFromCanvas = imageCanvas.imageUrl.value
-        .split('/')
-        .pop()
-        ?.split('?')[0];
-      if (currentImageIdFromCanvas) {
-        annotations.startCreate(layerPos, currentImageIdFromCanvas);
-      } else {
-        console.error(
-          '[useKonvaEventHandlers] Could not determine image ID for annotation creation',
-        );
-      }
+
+      // Save start position for later drag detection
+      dragStartPos.x = layerPos.x;
+      dragStartPos.y = layerPos.y;
+      isDragging.value = false;
+      mouseIsDown.value = true; // Track that mouse is now down
     }
   }
 
   // Update annotation being created
   function handleMouseMove() {
-    if (!annotations.isCreating.value || !konvaLayer.value) return;
+    if (
+      !konvaLayer.value ||
+      navigationMode.mode.value !== 'add' ||
+      !mouseIsDown.value
+    )
+      return;
 
+    // Get current mouse position
     const layerPos = konvaLayer.value.getRelativePointerPosition();
     if (!layerPos) return;
 
-    annotations.updateCreating(layerPos);
+    // If already creating an annotation, update it
+    if (annotations.isCreating.value) {
+      annotations.updateCreating(layerPos);
+      return;
+    }
+
+    // Check if we should start a drag operation
+    if (!isDragging.value) {
+      // Calculate distance moved
+      const dx = layerPos.x - dragStartPos.x;
+      const dy = layerPos.y - dragStartPos.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // If moved past threshold, start creating
+      if (distance > dragThreshold) {
+        isDragging.value = true;
+
+        // Start creation process
+        const currentImageIdFromCanvas = imageCanvas.imageUrl.value
+          .split('/')
+          .pop()
+          ?.split('?')[0];
+
+        if (currentImageIdFromCanvas) {
+          annotations.startCreate(dragStartPos, currentImageIdFromCanvas);
+          // Immediately update to current position
+          annotations.updateCreating(layerPos);
+        } else {
+          console.error(
+            '[useKonvaEventHandlers] Could not determine image ID for annotation creation',
+          );
+        }
+      }
+    }
   }
 
   // Finish creating annotation
   function handleMouseUp() {
-    if (annotations.isCreating.value) {
+    if (annotations.isCreating.value && isDragging.value) {
       annotations.finishCreate();
     }
+
+    // Reset state
+    isDragging.value = false;
+    mouseIsDown.value = false;
   }
 
   // Update drag handlers for STAGE dragging
