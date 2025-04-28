@@ -26,3 +26,8 @@ crud_router = CRUDRouter(
 @detection_route.post("/change_meta_role/{detection_id}/{meta_role_id}", response_model=bool, tags=["Detection"])
 async def change_meta_role(detection_id: UUID, meta_role_id: UUID, session: AsyncSession = Depends(get_async_session)):
     return await crud_detection.change_detection_meta_role(detection_id, meta_role_id, session)
+
+
+@detection_route.post("/update_detection_meta_role/{detection_id}/{meta_role_id}/{value}", response_model=bool, tags=["Detection"])
+async def update_detection_meta_role(detection_id: UUID, meta_role_id: UUID, value: str, session: AsyncSession = Depends(get_async_session)):
+    return await crud_detection.update_detection_meta_role(detection_id, meta_role_id, value, session)
