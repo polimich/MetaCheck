@@ -59,12 +59,15 @@ const props = defineProps({
 
 const emit = defineEmits(['click', 'select']);
 
-function handleClick() {
-  emit('click', props.image.id);
+function handleClick(event: MouseEvent) {
+  // Pass the event's shift key state to the parent
+  emit('click', props.image.id, event.shiftKey);
 }
 
-function handleSelect() {
-  emit('select', props.image.id);
+function handleSelect(event: MouseEvent | null = null) {
+  // Also pass shift key if available
+  const shiftKey = event ? event.shiftKey : false;
+  emit('select', props.image.id, shiftKey);
 }
 
 // Calculate image dimensions based on view mode
@@ -124,7 +127,7 @@ const hasPageInfo = computed(() => {
     <div
       v-if="selectMode"
       class="selection-indicator"
-      @click.stop="handleSelect"
+      @click.stop="handleSelect($event)"
     >
       <q-checkbox :modelValue="isSelected" @update:modelValue="handleSelect" />
     </div>

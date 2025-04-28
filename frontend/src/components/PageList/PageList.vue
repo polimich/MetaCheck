@@ -256,9 +256,9 @@ async function loadCollection() {
 }
 
 // Optimized image navigation with proper type checking
-function navigateToImage(imageId: string) {
+function navigateToImage(imageId: string, shiftKey = false) {
   if (selectMode.value) {
-    toggleImageSelection(imageId);
+    toggleImageSelection(imageId, shiftKey);
   } else {
     // Update selected image in the collection state
     currentCollection.value.selectImage(imageId);
@@ -395,7 +395,7 @@ onMounted(() => {
             :LOW_CONFIDENCE_THRESHOLD="LOW_CONFIDENCE_THRESHOLD"
             :MEDIUM_CONFIDENCE_THRESHOLD="MEDIUM_CONFIDENCE_THRESHOLD"
             @click="navigateToImage"
-            @select="toggleImageSelection"
+            @select="(id, shiftKey) => toggleImageSelection(id, shiftKey)"
           />
         </div>
 
