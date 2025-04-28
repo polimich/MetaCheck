@@ -57,3 +57,31 @@ export const getDetectionById = async (
     return { data: null, error: errorMessage };
   }
 };
+
+export const updateDetectionWithMetaRole = async (
+  detectionId: string,
+  metaRoleId: string,
+  value: string,
+): Promise<{ error: string; success: boolean }> => {
+  try {
+    console.log(
+      `API: Updating detection ${detectionId} with meta role ${metaRoleId}`,
+    );
+
+    await axios.post(
+      `/detection/update_detection_meta_role/${detectionId}/${metaRoleId}/${value}`,
+    );
+
+    console.log(
+      `API: Successfully updated detection ${detectionId} with meta role`,
+    );
+    return { error: '', success: true };
+  } catch (error) {
+    const errorMessage = axiosErrorHandler(error);
+    console.error(
+      `API Error in updateDetectionWithMetaRole for detection ${detectionId}, meta role ${metaRoleId}:`,
+      errorMessage,
+    );
+    return { error: errorMessage, success: false };
+  }
+};

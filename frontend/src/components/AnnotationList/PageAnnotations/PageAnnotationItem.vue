@@ -3,7 +3,8 @@ import { DetectionState } from 'src/types/frontend-state';
 import { ref, computed, watch } from 'vue';
 import { useImageStore } from 'src/stores/image/storeImages';
 import { useLoadingState } from 'src/stores/app/loadingState';
-import { updateSingleDetection } from 'src/api/detectionApiService';
+import { useNotificationStore } from 'src/stores/app/notificationService';
+import { updateDetectionWithMetaRole } from 'src/api/detectionApiService';
 import { ANNOTATION_EVENTS } from 'src/constants/events';
 
 const props = defineProps<{
@@ -20,6 +21,7 @@ const emit = defineEmits([
 // Stores
 const imageStore = useImageStore();
 const loadingState = useLoadingState();
+const notificationStore = useNotificationStore();
 
 // Local state
 const detection = ref<DetectionState>(props.detection);
@@ -128,15 +130,23 @@ const saveDetection = async () => {
   try {
     console.log(`Saving changes for detection ${detection.value.id}`);
 
-    // Use the new single detection update API instead of saving all changes
-    const { success, error } = await updateSingleDetection(detection.value);
+    // Call the API to update the detection's meta role and value
+    const { success, error } = await updateDetectionWithMetaRole(
+      detection.value.id,
+      selectValue.value.id, // meta role ID
+      detection.value.value, // current value
+    );
 
     if (success) {
       console.log(`Detection ${detection.value.id} saved successfully`);
       // Mark as no longer edited after save
       detection.value.edited = false;
+      // Show success notification
+      notificationStore.success('Annotation saved successfully');
     } else {
       console.error(`Error saving detection ${detection.value.id}: ${error}`);
+      // Show error notification
+      notificationStore.error(`Failed to save annotation: ${error}`);
       throw new Error(error);
     }
   } catch (error) {
@@ -144,6 +154,10 @@ const saveDetection = async () => {
       `Error saving changes for detection ${detection.value.id}:`,
       error,
     );
+    // Show error notification
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    notificationStore.error(`Error saving annotation: ${errorMessage}`);
   } finally {
     loadingState.stopLoading(`saveDetection-${detection.value.id}`);
   }
@@ -155,6 +169,7 @@ const updateSelectValue = (value: {
   id: string;
   color: string;
 }) => {
+  // Update local state immediately for responsive UI
   detection.value.computed_type = value.value;
   detection.value.edited = true;
   detection.value.computed_color = value.color;
@@ -167,13 +182,16 @@ const updateSelectValue = (value: {
 };
 
 const updateDetection = () => {
+  // Update local state immediately for responsive UI
   detection.value.edited = true;
 
   // When the user makes any change, set confidence to 1 (100%) and mark as annotated
   detection.value.confidence = 1;
   detection.value.annotated = true;
 
-  console.log(`Marked detection ${detection.value.id} as edited`);
+  console.log(
+    `Marked detection ${detection.value.id} as edited with value: ${detection.value.value}`,
+  );
 };
 </script>
 
