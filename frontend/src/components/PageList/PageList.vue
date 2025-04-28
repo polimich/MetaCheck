@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import {
+  ref,
+  computed,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+  shallowRef,
+  withDefaults,
+} from 'vue';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import {
   useImageConfidence,
@@ -14,26 +23,74 @@ import PageStatistics from './PageStatistics.vue';
 import ImageThumbnail from './ImageThumbnail.vue';
 import BulkActions from './BulkActions.vue';
 
-const props = defineProps<{
+interface PageListProps {
   collectionId: string;
-  layout?: 'fullscreen' | 'sidebar';
-}>();
+  showHeader?: boolean;
+  showStatistics?: boolean;
+  showViewModeSelector?: boolean;
+  enableBulkActions?: boolean;
+  layout?: 'full-width' | 'sidebar';
+  initialViewMode?: 'list-small' | 'list-large' | 'grid';
+  gridColumns?: number;
+}
+
+// Define props with defaults
+const props = withDefaults(defineProps<PageListProps>(), {
+  showHeader: false,
+  showStatistics: false,
+  showViewModeSelector: false,
+  enableBulkActions: false,
+  layout: 'sidebar',
+});
 
 const emit = defineEmits<{
   (e: 'select-image', imageId: string): void;
+  (e: 'layout-change', layout: string): void;
+  (e: 'view-mode-change', viewMode: string): void;
 }>();
 
-const currentCollection = useCurrentCollectionState();
+// Use shallowRef for complex objects that don't need deep reactivity
+const currentCollection = shallowRef(useCurrentCollectionState());
 
-// View mode options
-const viewModeOptions = [
-  { value: 'list-small', icon: 'view_list' },
-  { value: 'list-large', icon: 'view_headline' },
-  { value: 'grid', icon: 'grid_view' },
-];
+// Default values for optional props
+const showHeader = computed(() => props.showHeader !== false);
+const showStatistics = computed(() => props.showStatistics !== false);
+const enableBulkActions = computed(() => props.enableBulkActions !== false);
 
-// View mode control
-const viewMode = ref('list-large'); // Default view mode
+// Current active image
+const activeImageId = computed(() => currentCollection.value.selectedImageId);
+
+// View mode options - with and without labels
+const viewModeOptions = computed(() => {
+  const options = [
+    { value: 'list-small', icon: 'view_list', label: 'Compact' },
+    { value: 'list-large', icon: 'view_headline', label: 'Details' },
+    { value: 'grid', icon: 'grid_view', label: 'Grid' },
+  ];
+
+  // If in sidebar mode, remove labels
+  if (props.layout === 'sidebar') {
+    return options.map((option) => ({
+      value: option.value,
+      icon: option.icon,
+    }));
+  }
+
+  return options;
+});
+
+// View mode control - use initialViewMode prop if provided
+const viewMode = ref(props.initialViewMode || 'list-large');
+
+// Watch for changes to initialViewMode prop
+watch(
+  () => props.initialViewMode,
+  (newMode) => {
+    if (newMode && newMode !== viewMode.value) {
+      viewMode.value = newMode;
+    }
+  },
+);
 
 // Use composables
 const verification = useImageVerification();
@@ -79,44 +136,60 @@ const {
   downloadSelected,
 } = selection;
 
-// Current active image
-const activeImageId = computed(() => currentCollection.selectedImageId);
-
 // Ref for the scroll area
 const scrollAreaRef = ref<QScrollArea | null>(null);
 
-// Function to scroll to active image
+// Response to view mode changes
+watch(viewMode, (newMode) => {
+  localStorage.setItem(
+    `pagelist-viewmode-${props.layout || 'default'}`,
+    newMode,
+  );
+  emit('view-mode-change', newMode);
+});
+
+// Optimize the activeImageId watcher to avoid unnecessary scrolling
+watch(
+  activeImageId,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      // Small delay to ensure DOM is updated
+      setTimeout(scrollToActiveImage, 100);
+    }
+  },
+  { immediate: false },
+);
+
+// Clean up event listeners
+onBeforeUnmount(() => {
+  if (resizeTimeout) {
+    window.clearTimeout(resizeTimeout);
+  }
+});
+
+// Function to scroll to active image with requestAnimationFrame
 const scrollToActiveImage = async () => {
   if (!activeImageId.value || !scrollAreaRef.value) return;
 
   // Wait for DOM updates
   await nextTick();
 
-  // Find the active thumbnail element
-  const activeThumbnail = document.querySelector(
-    '.image-thumbnail.thumbnail-active',
-  ) as HTMLElement;
+  // Use requestAnimationFrame for smoother scrolling
+  requestAnimationFrame(() => {
+    const activeThumbnail = document.querySelector(
+      '.image-thumbnail.thumbnail-active',
+    ) as HTMLElement;
 
-  if (activeThumbnail) {
-    // Scroll the element into view with smooth behavior
-    scrollAreaRef.value.setScrollPosition(
-      'vertical',
-      activeThumbnail.offsetTop - 100, // Offset for better visibility
-      300, // Duration in ms
-    );
-    console.log('Scrolled to active image:', activeImageId.value);
-  }
+    if (activeThumbnail && scrollAreaRef.value) {
+      // Scroll the element into view with smooth behavior
+      scrollAreaRef.value.setScrollPosition(
+        'vertical',
+        activeThumbnail.offsetTop - 100,
+        300,
+      );
+    }
+  });
 };
-
-// Watch for changes in activeImageId to maintain position if it changes
-watch(
-  activeImageId,
-  () => {
-    // Small delay to ensure DOM is updated
-    setTimeout(scrollToActiveImage, 100);
-  },
-  { immediate: false },
-);
 
 // Load collection data when component mounts or collectionId changes
 watch(() => props.collectionId, loadCollection, { immediate: true });
@@ -124,107 +197,167 @@ watch(() => props.collectionId, loadCollection, { immediate: true });
 // Use the filtered images from the filtering composable
 const filteredImages = computed(() => filtering.filteredImages.value);
 
+// Determine if the collection is empty
+const isCollectionEmpty = computed(() => {
+  if (!currentCollection.value.collection?.images) return true;
+  return currentCollection.value.collection.images.length === 0;
+});
+
+// Add userGridColumns ref to track user's column preference
+const userGridColumns = ref(
+  props.gridColumns || (props.layout === 'sidebar' ? 1 : 4),
+);
+
+// Update gridColumns computed property to use the user's preference
+const effectiveGridColumns = computed(() => {
+  // If view mode is not grid, always use 1 column
+  if (viewMode.value !== 'grid') {
+    return 1;
+  }
+
+  // Otherwise use the user's column preference
+  return userGridColumns.value;
+});
+
+// Debounce variable for resize
+let resizeTimeout: number | null = null;
+
+// Optimized loadCollection with better caching and error handling
 async function loadCollection() {
-  if (props.collectionId) {
-    // Check if the collection is already loaded or currently being loaded
-    if (
-      (currentCollection.loaded &&
-        currentCollection.id === props.collectionId) ||
-      currentCollection.loading
-    ) {
-      console.log(
-        `PageList: Collection ${props.collectionId} already loaded or loading, skipping loadCollection call.`,
-      );
-      return;
-    }
-    console.log(`PageList: Loading collection ${props.collectionId}`);
-    await currentCollection.loadCollection(props.collectionId);
+  if (!props.collectionId) return;
+
+  // More comprehensive cache check with logging
+  if (
+    currentCollection.value.loaded &&
+    currentCollection.value.id === props.collectionId
+  ) {
+    console.log(
+      `PageList: Collection ${props.collectionId} already loaded, using cached data.`,
+    );
+    return;
+  }
+
+  if (currentCollection.value.loading) {
+    console.log(
+      `PageList: Collection ${props.collectionId} is currently loading, waiting...`,
+    );
+    return;
+  }
+
+  console.log(`PageList: Loading collection ${props.collectionId}`);
+  try {
+    await currentCollection.value.loadCollection(props.collectionId);
+  } catch (error) {
+    console.error(
+      `PageList: Error loading collection ${props.collectionId}:`,
+      error,
+    );
   }
 }
 
+// Optimized image navigation with proper type checking
 function navigateToImage(imageId: string) {
   if (selectMode.value) {
     toggleImageSelection(imageId);
   } else {
     // Update selected image in the collection state
-    currentCollection.selectImage(imageId);
+    currentCollection.value.selectImage(imageId);
 
     // Emit the selected image ID to parent component
     emit('select-image', imageId);
   }
 }
+
+// Load saved preferences from localStorage
+onMounted(() => {
+  const savedViewMode = localStorage.getItem(
+    `pagelist-viewmode-${props.layout || 'default'}`,
+  );
+  if (
+    savedViewMode &&
+    viewModeOptions.value.some((option) => option.value === savedViewMode)
+  ) {
+    viewMode.value = savedViewMode as 'list-small' | 'list-large' | 'grid';
+  }
+
+  // Load saved grid columns preference
+  const savedColumns = localStorage.getItem(
+    `pagelist-grid-columns-${props.layout || 'default'}`,
+  );
+  if (savedColumns && !isNaN(parseInt(savedColumns))) {
+    userGridColumns.value = parseInt(savedColumns);
+  }
+});
 </script>
 
 <template>
-  <div class="page-list" :class="[`layout-${props.layout || 'sidebar'}`]">
-    <!-- Header with filters and controls -->
+  <div class="page-list q-pa-md" :class="[`layout-${props.layout}`]">
+    <!-- Header with filters and controls - more compact in fullscreen mode -->
     <PageHeader
+      v-if="showHeader"
       v-model:searchQuery="searchQuery"
       v-model:sortBy="sortBy"
       v-model:filterVerified="filterVerified"
       v-model:confidenceFilters="confidenceFilters"
-      :class="{ 'header-fullscreen': props.layout === 'fullscreen' }"
+      v-model:viewMode="viewMode"
+      v-model:userGridColumns="userGridColumns"
+      :class="{ 'header-fullscreen': props.layout === 'full-width' }"
+      :layoutMode="props.layout"
+      :compact="props.layout === 'full-width'"
+      @locate-active-image="scrollToActiveImage"
     />
 
-    <!-- Statistics and progress indicators -->
+    <!-- Statistics and progress indicators - more compact in fullscreen -->
     <PageStatistics
+      v-if="showStatistics"
       :statistics="statistics"
       :filterVerified="filterVerified"
       :searchQuery="searchQuery"
       :filteredImagesCount="filteredImages.length"
       :totalImagesCount="currentCollection.collection?.images?.length || 0"
       @resetFilters="resetFilters"
-      :class="{ 'stats-fullscreen': props.layout === 'fullscreen' }"
+      :class="{ 'stats-fullscreen': props.layout === 'full-width' }"
+      :layoutMode="props.layout"
+      :compact="props.layout === 'full-width'"
     />
 
-    <!-- View mode selector -->
-    <div class="view-mode-selector">
-      <div class="view-mode-container q-px-md q-py-sm">
-        <div class="row items-center">
-          <div class="col-auto text-body2 text-weight-medium q-mr-sm">
-            View:
-          </div>
-          <div class="col">
-            <q-btn-toggle
-              v-model="viewMode"
-              :options="viewModeOptions"
-              spread
-              elevated
-              dense
-              class="view-toggle"
-            />
-          </div>
-          <div class="col-auto q-ml-md" v-if="activeImageId">
-            <q-btn
-              icon="my_location"
-              color="primary"
-              flat
-              round
-              dense
-              @click="scrollToActiveImage"
-              :disable="!activeImageId"
-            >
-              <q-tooltip>Scroll to active image</q-tooltip>
-            </q-btn>
-          </div>
-        </div>
+    <!-- Empty Collection State -->
+    <div
+      v-if="isCollectionEmpty && !currentCollection.loading"
+      class="empty-collection q-pa-xl flex flex-center column"
+    >
+      <q-icon name="image_not_supported" size="64px" color="grey-6" />
+      <div class="text-h6 q-mt-md">No Images in Collection</div>
+      <div class="text-body1 text-grey-7 q-mt-sm">
+        This collection doesn't contain any images yet.
       </div>
+      <q-btn
+        color="primary"
+        class="q-mt-lg"
+        label="Upload Images"
+        icon="upload"
+      />
     </div>
 
     <!-- Image list with status indicators -->
-    <div class="page-list-content">
+    <div v-else class="page-list-content">
       <q-scroll-area class="page-list-scroll" ref="scrollAreaRef">
         <div v-if="currentCollection.loading" class="flex flex-center q-pa-md">
-          <q-spinner color="primary" size="40px" />
+          <div class="column items-center">
+            <q-spinner color="primary" size="40px" />
+            <div class="text-subtitle1 q-mt-md">Loading images...</div>
+          </div>
         </div>
 
         <div
           v-else-if="!filteredImages.length"
-          class="empty-state q-pa-md text-center"
+          class="empty-state q-pa-xl text-center"
         >
-          <q-icon name="image_not_supported" size="48px" color="grey-6" />
-          <div class="text-subtitle1 q-mt-sm">No pages found</div>
-          <div class="text-caption text-grey-7">Try adjusting your filters</div>
+          <q-icon name="filter_alt_off" size="48px" color="grey-6" />
+          <div class="text-subtitle1 q-mt-sm">No pages match your filters</div>
+          <div class="text-caption text-grey-7">
+            Try adjusting your search or filter criteria
+          </div>
           <q-btn
             flat
             color="primary"
@@ -234,7 +367,15 @@ function navigateToImage(imageId: string) {
           />
         </div>
 
-        <div v-else :class="['image-container', `view-${viewMode}`]">
+        <div
+          v-else
+          :class="[
+            'image-container',
+            `view-${viewMode}`,
+            `grid-cols-${effectiveGridColumns}`,
+          ]"
+        >
+          <!-- Use optimized rendering for thumbnails -->
           <ImageThumbnail
             v-for="image in filteredImages"
             :key="image.id"
@@ -265,6 +406,7 @@ function navigateToImage(imageId: string) {
 
     <!-- Bulk action toolbar at the bottom -->
     <BulkActions
+      v-if="enableBulkActions"
       :selectMode="selectMode"
       :selectedImages="selectedImages"
       @toggleSelectMode="toggleSelectMode"
@@ -272,7 +414,8 @@ function navigateToImage(imageId: string) {
       @deselectAll="deselectAll"
       @markSelectedAsVerified="markSelectedAsVerified"
       @downloadSelected="downloadSelected"
-      :class="{ 'actions-fullscreen': props.layout === 'fullscreen' }"
+      :class="{ 'actions-fullscreen': props.layout === 'full-width' }"
+      :layoutMode="props.layout"
     >
       <template v-slot:page-count>
         {{ filteredImages.length }} of
@@ -284,72 +427,66 @@ function navigateToImage(imageId: string) {
 </template>
 
 <style lang="scss" scoped>
+// Define CSS variables for easy theming
+:root {
+  --page-list-border-color: rgba(0, 0, 0, 0.12);
+  --page-list-shadow-color: rgba(0, 0, 0, 0.05);
+  --page-list-bg-light: #f8f8f8;
+  --page-list-bg-white: white;
+  --page-list-spacing-sm: 8px;
+  --page-list-spacing-md: 16px;
+  --page-list-spacing-lg: 24px;
+}
+
 .page-list {
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
+  // Use CSS containment for better performance
+  contain: layout style;
 
   &.layout-sidebar {
-    border-right: 1px solid rgba(0, 0, 0, 0.12);
-    width: 400px;
-    min-width: 400px;
+    border-right: 1px solid var(--page-list-border-color);
+    width: 100%;
   }
 
-  &.layout-fullscreen {
+  &.layout-full-width {
     max-width: 100%;
     padding: 0;
     border: none;
+    background-color: var(--page-list-bg-light);
 
     .header-fullscreen {
-      padding: 16px 24px;
-      background: white;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      padding: 8px var(--page-list-spacing-md);
+      background: var(--page-list-bg-white);
+      border-bottom: 1px solid var(--page-list-border-color);
+      box-shadow: 0 2px 4px var(--page-list-shadow-color);
     }
 
     .stats-fullscreen {
-      padding: 12px 24px;
-      background: #f5f5f5;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      padding: 6px var(--page-list-spacing-md);
+      background: var(--page-list-bg-light);
+      border-bottom: 1px solid var(--page-list-border-color);
     }
 
     .actions-fullscreen {
-      padding: 8px 24px;
-      background: white;
-      border-top: 1px solid rgba(0, 0, 0, 0.12);
+      padding: 6px var(--page-list-spacing-md);
+      background: var(--page-list-bg-white);
+      border-top: 1px solid var(--page-list-border-color);
+      box-shadow: 0 -2px 4px var(--page-list-shadow-color);
     }
 
     .image-container {
       &.view-grid {
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        padding: 24px;
-        gap: 24px;
+        padding: var(--page-list-spacing-md);
+        gap: var(--page-list-spacing-md);
       }
 
       &.view-list-small,
       &.view-list-large {
-        padding: 16px 24px;
+        padding: var(--page-list-spacing-md);
       }
-    }
-  }
-}
-
-.view-mode-selector {
-  flex-shrink: 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.view-toggle {
-  width: 100%;
-  max-width: 300px;
-
-  :deep(.q-btn__content) {
-    flex-direction: column;
-
-    i {
-      margin-bottom: 2px;
-      font-size: 18px;
     }
   }
 }
@@ -358,27 +495,40 @@ function navigateToImage(imageId: string) {
   flex-grow: 1;
   position: relative;
   overflow: hidden;
+  // Use contain to optimize performance
+  contain: content;
 }
 
 .page-list-scroll {
   height: 100%;
   width: 100%;
+  // Optimize scroll performance
+  will-change: scroll-position;
+  overscroll-behavior: contain;
 }
 
 .image-container {
-  padding: 8px;
+  padding: var(--page-list-spacing-sm);
+  // Use CSS containment for better performance
+  contain: layout style;
 
   &.view-list-small,
   &.view-list-large {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--page-list-spacing-sm);
   }
 
   &.view-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 8px;
+    gap: 16px;
+
+    // Dynamic grid columns based on the gridColumns prop
+    @for $i from 1 through 12 {
+      &.grid-cols-#{$i} {
+        grid-template-columns: repeat($i, 1fr);
+      }
+    }
   }
 }
 
@@ -390,5 +540,11 @@ function navigateToImage(imageId: string) {
   height: 200px;
   background-color: rgba(0, 0, 0, 0.02);
   border-radius: 4px;
+  margin: 16px;
+}
+
+.empty-collection {
+  flex-grow: 1;
+  text-align: center;
 }
 </style>

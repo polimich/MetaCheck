@@ -315,6 +315,11 @@ const handleSelectImage = async (selectedImageId: string) => {
       <div class="col-3 flex justify-center">
         <PageList
           :collection-id="collectionId"
+          layout="sidebar"
+          show-header
+          show-statistics
+          show-view-mode-selector
+          enable-bulk-actions
           @[IMAGE_EVENTS.SELECT]="handleSelectImage"
         />
       </div>

@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import {
+  useViewMode,
+  useGridColumns,
+  useSearch,
+  useFilters,
+} from './composables';
+import { watch } from 'vue';
+
 const props = defineProps({
   searchQuery: {
     type: String,
@@ -16,147 +24,426 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  viewMode: {
+    type: String,
+    required: true,
+  },
+  userGridColumns: {
+    type: Number,
+    required: true,
+  },
+  layoutMode: {
+    type: String,
+    default: 'sidebar',
+  },
+  compact: {
+    type: Boolean,
+    default: false,
+  },
 });
-
-// Using props directly to avoid linter error
-console.log('Current sort criteria:', props.sortBy);
 
 const emit = defineEmits([
   'update:searchQuery',
   'update:sortBy',
   'update:filterVerified',
   'update:confidenceFilters',
+  'update:viewMode',
+  'update:userGridColumns',
+  'locate-active-image',
 ]);
 
-const confidenceOptions = [
-  { label: 'Low', value: 'low', color: 'red' },
-  { label: 'Medium', value: 'medium', color: 'orange' },
-  { label: 'High', value: 'high', color: 'green' },
-];
+// Use view mode composable
+const { currentViewMode, isGridView } = useViewMode(
+  props.viewMode as 'list-small' | 'list-large' | 'grid',
+  (mode) => emit('update:viewMode', mode),
+);
 
-function toggleConfidenceFilter(level: string) {
-  const newFilters = { ...props.confidenceFilters };
-  newFilters[level] = !newFilters[level];
-  emit('update:confidenceFilters', newFilters);
-}
+// Watch for changes to viewMode prop to ensure reactivity
+watch(
+  () => props.viewMode,
+  (newMode) => {
+    if (newMode !== currentViewMode.value) {
+      currentViewMode.value = newMode as 'list-small' | 'list-large' | 'grid';
+    }
+  },
+);
 
-function getColorValue(colorName: string): string {
-  // Map Quasar color names to hex values
-  const colorMap: Record<string, string> = {
-    red: '#F44336',
-    orange: '#FF9800',
-    green: '#4CAF50',
-    'grey-5': '#9E9E9E',
-  };
+// Use grid columns composable
+const { currentGridColumns, gridColumnOptions } = useGridColumns(
+  props.userGridColumns,
+  (cols) => emit('update:userGridColumns', cols),
+);
 
-  return colorMap[colorName] || '#9E9E9E';
-}
+// Watch for changes to userGridColumns prop to ensure reactivity
+watch(
+  () => props.userGridColumns,
+  (newValue) => {
+    if (newValue !== currentGridColumns.value) {
+      // This will update the dropdown label
+      emit('update:userGridColumns', newValue);
+    }
+  },
+);
+
+// Use search composable
+const { searchQuery } = useSearch(props.searchQuery, (query) =>
+  emit('update:searchQuery', query),
+);
+
+// Use filters composable
+const { confidenceOptions, toggleConfidenceFilter, getColorValue } = useFilters(
+  props.sortBy,
+  props.filterVerified,
+  props.confidenceFilters as Record<string, boolean>,
+  (sort) => emit('update:sortBy', sort),
+  (filter) => emit('update:filterVerified', filter),
+  (filters) => emit('update:confidenceFilters', filters),
+);
+
+// Get prop references for template
+const { sortBy, filterVerified, confidenceFilters } = props;
+
+const updateGridColumns = (cols: number) => {
+  currentGridColumns.value = cols;
+  emit('update:userGridColumns', cols);
+};
 </script>
 
 <template>
-  <div class="page-header">
-    <!-- Row 1: Heading -->
-    <div class="header-row heading-row q-px-md q-py-sm">
-      <div class="text-h6">Pages</div>
-    </div>
-
-    <!-- Row 2: Search Bar -->
-    <div class="header-row search-row q-px-md q-py-sm">
-      <q-input
-        :modelValue="searchQuery"
-        dense
-        outlined
-        placeholder="Search images..."
-        class="full-width"
-        @update:modelValue="emit('update:searchQuery', $event)"
-      >
-        <template v-slot:prepend>
-          <q-icon name="search" size="xs" />
-        </template>
-        <template v-slot:append v-if="searchQuery">
-          <q-icon
-            name="close"
-            class="cursor-pointer"
-            @click="emit('update:searchQuery', '')"
-          />
-        </template>
-      </q-input>
-    </div>
-
-    <!-- Row 3: Sort and Verification Dropdowns -->
-    <div class="header-row filter-row q-px-md q-py-sm">
-      <!-- Sort dropdown -->
-      <q-select
-        :modelValue="sortBy"
-        dense
-        outlined
-        :options="[
-          { label: 'Order', value: 'order' },
-          { label: 'Name (A-Z)', value: 'name_asc' },
-          { label: 'Name (Z-A)', value: 'name_desc' },
-          { label: 'Newest first', value: 'date_desc' },
-          { label: 'Oldest first', value: 'date_asc' },
-          { label: 'Confidence (Low to High)', value: 'confidence_asc' },
-          { label: 'Confidence (High to Low)', value: 'confidence_desc' },
-        ]"
-        option-label="label"
-        option-value="value"
-        map-options
-        emit-value
-        label="Sort By"
-        class="sort-select"
-        @update:modelValue="emit('update:sortBy', $event)"
-      />
-
-      <!-- Filter verified dropdown -->
-      <q-select
-        :modelValue="filterVerified"
-        dense
-        outlined
-        :options="[
-          { label: 'All verification', value: 'all' },
-          { label: 'Verified only', value: 'verified' },
-          { label: 'Unverified only', value: 'unverified' },
-        ]"
-        option-label="label"
-        option-value="value"
-        map-options
-        emit-value
-        label="Verification"
-        class="verification-select"
-        @update:modelValue="emit('update:filterVerified', $event)"
-      />
-    </div>
-
-    <!-- Row 4: Confidence Level Filters -->
-    <div class="header-row confidence-row q-px-md q-py-sm">
-      <div class="row items-center">
-        <div class="col-auto text-body2 text-weight-medium q-mr-md">
-          Page Confidence:
-        </div>
-        <div class="col">
-          <div class="confidence-buttons">
-            <div
-              v-for="option in confidenceOptions"
-              :key="option.value"
-              class="confidence-filter-btn"
-              :style="{
-                backgroundColor: confidenceFilters[option.value]
-                  ? getColorValue(option.color)
-                  : 'transparent',
-                color: confidenceFilters[option.value] ? 'white' : '#555',
-                borderColor: confidenceFilters[option.value]
-                  ? getColorValue(option.color)
-                  : '#ddd',
-              }"
-              @click="toggleConfidenceFilter(option.value)"
+  <div
+    class="page-header"
+    :class="{ 'header-fullwidth': layoutMode === 'full-width' }"
+  >
+    <!-- Optimized single-row layout for full-width mode -->
+    <div
+      v-if="layoutMode === 'full-width'"
+      class="header-row super-compact-row q-pa-sm"
+    >
+      <div class="row items-center q-col-gutter-sm no-wrap">
+        <!-- View Mode Controls - fixed width -->
+        <div class="col-auto view-selector-wrapper" style="width: 200px">
+          <div class="row items-center justify-between no-wrap">
+            <!-- List Small Button -->
+            <q-btn
+              flat
+              :color="currentViewMode === 'list-small' ? 'primary' : 'grey-7'"
+              icon="view_list"
+              dense
+              @click="currentViewMode = 'list-small'"
             >
-              {{ option.label }}
+              <q-tooltip>Compact List View</q-tooltip>
+            </q-btn>
+
+            <!-- List Large Button -->
+            <q-btn
+              flat
+              :color="currentViewMode === 'list-large' ? 'primary' : 'grey-7'"
+              icon="view_headline"
+              dense
+              @click="currentViewMode = 'list-large'"
+            >
+              <q-tooltip>Detailed List View</q-tooltip>
+            </q-btn>
+
+            <!-- Grid Button with Column Dropdown -->
+            <q-btn
+              flat
+              :color="currentViewMode === 'grid' ? 'primary' : 'grey-7'"
+              icon="grid_view"
+              dense
+              @click="currentViewMode = 'grid'"
+            >
+              <q-tooltip>Grid View</q-tooltip>
+            </q-btn>
+
+            <!-- Grid Column Dropdown -->
+            <q-btn-dropdown
+              v-if="isGridView"
+              flat
+              dense
+              :label="currentGridColumns.toString()"
+              class="q-ml-xs grid-columns-dropdown"
+            >
+              <q-list>
+                <q-item
+                  v-for="cols in gridColumnOptions"
+                  :key="cols"
+                  clickable
+                  v-close-popup
+                  @click="updateGridColumns(cols)"
+                  :active="currentGridColumns === cols"
+                >
+                  <q-item-section>
+                    <q-item-label>{{ cols }} columns</q-item-label>
+                  </q-item-section>
+                  <q-item-section avatar v-if="currentGridColumns === cols">
+                    <q-icon name="check" color="primary" />
+                  </q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+          </div>
+        </div>
+
+        <!-- Search Box - fixed width -->
+        <div class="col-auto search-box-container" style="width: 500px">
+          <q-input
+            v-model="searchQuery"
+            dense
+            outlined
+            placeholder="Search images..."
+            class="full-width"
+          >
+            <template v-slot:prepend>
+              <q-icon name="search" size="xs" />
+            </template>
+            <template v-slot:append v-if="searchQuery">
+              <q-icon
+                name="close"
+                class="cursor-pointer"
+                @click="emit('update:searchQuery', '')"
+              />
+            </template>
+          </q-input>
+        </div>
+
+        <!-- Expanded Filters Container -->
+        <div class="col-12 col-sm-8 filters-container" style="min-width: 600px">
+          <div class="row items-center justify-start q-gutter-md">
+            <!-- Sort dropdown -->
+            <div class="col-auto">
+              <q-select
+                :modelValue="sortBy"
+                dense
+                outlined
+                :options="[
+                  { label: 'Order', value: 'order' },
+                  { label: 'Name (A-Z)', value: 'name_asc' },
+                  { label: 'Name (Z-A)', value: 'name_desc' },
+                  { label: 'Newest first', value: 'date_desc' },
+                  { label: 'Oldest first', value: 'date_asc' },
+                  {
+                    label: 'Confidence (Low to High)',
+                    value: 'confidence_asc',
+                  },
+                  {
+                    label: 'Confidence (High to Low)',
+                    value: 'confidence_desc',
+                  },
+                ]"
+                option-label="label"
+                option-value="value"
+                map-options
+                emit-value
+                label="Sort By"
+                class="sort-select"
+                @update:modelValue="emit('update:sortBy', $event)"
+              />
+            </div>
+
+            <!-- Filter verified dropdown -->
+            <div class="col-auto">
+              <q-select
+                :modelValue="filterVerified"
+                dense
+                outlined
+                :options="[
+                  { label: 'All verification', value: 'all' },
+                  { label: 'Verified only', value: 'verified' },
+                  { label: 'Unverified only', value: 'unverified' },
+                ]"
+                option-label="label"
+                option-value="value"
+                map-options
+                emit-value
+                label="Verification"
+                class="verification-select"
+                @update:modelValue="emit('update:filterVerified', $event)"
+              />
+            </div>
+
+            <!-- Confidence Filters -->
+            <div class="col-auto confidence-filters">
+              <div class="confidence-buttons">
+                <div
+                  v-for="option in confidenceOptions"
+                  :key="option.value"
+                  class="confidence-filter-btn"
+                  :style="{
+                    backgroundColor: confidenceFilters[option.value]
+                      ? getColorValue(option.color)
+                      : 'transparent',
+                    color: confidenceFilters[option.value] ? 'white' : '#555',
+                    borderColor: confidenceFilters[option.value]
+                      ? getColorValue(option.color)
+                      : '#ddd',
+                  }"
+                  @click="toggleConfidenceFilter(option.value)"
+                >
+                  {{ option.label }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Standard sidebar layout -->
+    <template v-else>
+      <!-- Row 1: View Mode Selection & Grid Controls -->
+      <div class="header-row view-controls-row q-px-md q-py-sm">
+        <div class="row items-center justify-between">
+          <div class="col-auto">
+            <div class="view-selector-wrapper">
+              <div class="view-mode-label text-subtitle2 q-mr-sm">View as:</div>
+              <div class="view-mode-buttons">
+                <q-btn-toggle
+                  v-model="currentViewMode"
+                  :options="[
+                    {
+                      value: 'list-small',
+                      icon: 'view_list',
+                      label: 'Compact',
+                    },
+                    {
+                      value: 'list-large',
+                      icon: 'view_headline',
+                      label: 'Details',
+                    },
+                    { value: 'grid', icon: 'grid_view', label: 'Grid' },
+                  ]"
+                  spread
+                  unelevated
+                  rounded
+                  dense
+                  class="view-toggle-modern"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="col-auto" v-if="isGridView">
+            <div class="grid-columns-control row items-center">
+              <div class="text-subtitle2 q-mr-sm">Columns:</div>
+              <div class="column-buttons">
+                <q-btn-group flat>
+                  <q-btn
+                    v-for="cols in gridColumnOptions"
+                    :key="cols"
+                    :label="cols.toString()"
+                    size="sm"
+                    dense
+                    flat
+                    :color="currentGridColumns === cols ? 'primary' : 'grey-7'"
+                    :text-color="currentGridColumns === cols ? 'white' : ''"
+                    :class="{ 'active-column': currentGridColumns === cols }"
+                    @click="updateGridColumns(cols)"
+                  />
+                </q-btn-group>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Search Bar -->
+      <div class="header-row search-row q-px-md q-py-sm">
+        <q-input
+          v-model="searchQuery"
+          dense
+          outlined
+          placeholder="Search images..."
+          class="full-width"
+        >
+          <template v-slot:prepend>
+            <q-icon name="search" size="xs" />
+          </template>
+          <template v-slot:append v-if="searchQuery">
+            <q-icon
+              name="close"
+              class="cursor-pointer"
+              @click="emit('update:searchQuery', '')"
+            />
+          </template>
+        </q-input>
+      </div>
+
+      <!-- Row 3: Sort and Verification Dropdowns -->
+      <div class="header-row filter-row q-px-md q-py-sm">
+        <!-- Sort dropdown -->
+        <q-select
+          :modelValue="sortBy"
+          dense
+          outlined
+          :options="[
+            { label: 'Order', value: 'order' },
+            { label: 'Name (A-Z)', value: 'name_asc' },
+            { label: 'Name (Z-A)', value: 'name_desc' },
+            { label: 'Newest first', value: 'date_desc' },
+            { label: 'Oldest first', value: 'date_asc' },
+            { label: 'Confidence (Low to High)', value: 'confidence_asc' },
+            { label: 'Confidence (High to Low)', value: 'confidence_desc' },
+          ]"
+          option-label="label"
+          option-value="value"
+          map-options
+          emit-value
+          label="Sort By"
+          class="sort-select"
+          @update:modelValue="emit('update:sortBy', $event)"
+        />
+
+        <!-- Filter verified dropdown -->
+        <q-select
+          :modelValue="filterVerified"
+          dense
+          outlined
+          :options="[
+            { label: 'All verification', value: 'all' },
+            { label: 'Verified only', value: 'verified' },
+            { label: 'Unverified only', value: 'unverified' },
+          ]"
+          option-label="label"
+          option-value="value"
+          map-options
+          emit-value
+          label="Verification"
+          class="verification-select"
+          @update:modelValue="emit('update:filterVerified', $event)"
+        />
+      </div>
+
+      <!-- Row 4: Confidence Level Filters -->
+      <div class="header-row confidence-row q-px-md q-py-sm">
+        <div class="row items-center">
+          <div class="col-auto text-body2 text-weight-medium q-mr-md">
+            Page Confidence:
+          </div>
+          <div class="col">
+            <div class="confidence-buttons">
+              <div
+                v-for="option in confidenceOptions"
+                :key="option.value"
+                class="confidence-filter-btn"
+                :style="{
+                  backgroundColor: confidenceFilters[option.value]
+                    ? getColorValue(option.color)
+                    : 'transparent',
+                  color: confidenceFilters[option.value] ? 'white' : '#555',
+                  borderColor: confidenceFilters[option.value]
+                    ? getColorValue(option.color)
+                    : '#ddd',
+                }"
+                @click="toggleConfidenceFilter(option.value)"
+              >
+                {{ option.label }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -166,6 +453,10 @@ function getColorValue(colorName: string): string {
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
   background-color: white;
   z-index: 10;
+
+  &.header-fullwidth {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
 }
 
 .header-row {
@@ -174,30 +465,53 @@ function getColorValue(colorName: string): string {
   &:last-child {
     border-bottom: none;
   }
+
+  &.super-compact-row {
+    padding: 8px;
+    background-color: #f8f8f8;
+  }
 }
 
-.heading-row {
-  background-color: #f5f5f5;
+.search-box-container {
+  @media (max-width: 767px) {
+    order: -1; // Move search to top on mobile
+  }
+}
+
+.grid-columns-dropdown {
+  min-width: 40px;
+
+  :deep(.q-btn__content) {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
 }
 
 .filter-row {
   display: flex;
   gap: 12px;
+  flex: 1;
+
+  @media (max-width: 1100px) {
+    flex-direction: column;
+    gap: 8px;
+  }
 
   .sort-select,
   .verification-select {
-    flex: 1;
+    min-width: 160px;
+    max-width: 220px;
   }
-}
-
-.confidence-row {
-  background-color: rgba(0, 0, 0, 0.02);
 }
 
 .confidence-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+
+  @media (max-width: 991px) {
+    gap: 4px;
+  }
 }
 
 .confidence-filter-btn {
@@ -217,5 +531,35 @@ function getColorValue(colorName: string): string {
   &:hover {
     opacity: 0.9;
   }
+
+  @media (max-width: 991px) {
+    min-width: 60px;
+    height: 28px;
+    font-size: 11px;
+    padding: 0 8px;
+  }
+}
+
+.filters-container {
+  @media (max-width: 767px) {
+    order: 0;
+  }
+}
+
+// Original sidebar styles
+.heading-row {
+  background-color: #f5f5f5;
+}
+
+.search-row {
+  background-color: #f9f9f9;
+}
+
+.confidence-row {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.full-width {
+  width: 100%;
 }
 </style>

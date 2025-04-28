@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
-import { Image, ImageAddDto } from 'src/stores';
-import { getPreviewImage } from 'utils';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useLoadingState } from 'src/stores/app/loadingState';
+import { PageList } from 'components';
+
+// Define view mode type to match what PageList expects
+type ViewMode = 'grid' | 'list-small' | 'list-large';
 
 defineOptions({
   name: 'CollectionDetailPage',
@@ -15,18 +17,20 @@ const router = useRouter();
 const currentCollection = useCurrentCollectionState();
 const loadingState = useLoadingState();
 const collectionId = ref(route.params.collectionId as string);
-const grid = ref(true);
-const fileTypes = 'image/*';
 
 // Register this component with the loading state
 const componentId = 'collectionDetail_' + collectionId.value;
 
-const isAddOpen = ref(false);
-const imageToAdd = ref<ImageAddDto>({
-  collection_id: collectionId.value,
-  order: 0,
-  file: undefined,
-});
+// View mode management - ensure it's properly typed
+const savedMode = localStorage.getItem('collection-view-mode');
+const defaultMode: ViewMode = 'grid';
+const viewMode = ref<ViewMode>(
+  savedMode === 'grid' ||
+    savedMode === 'list-small' ||
+    savedMode === 'list-large'
+    ? (savedMode as ViewMode)
+    : defaultMode,
+);
 
 // Load the collection when component is mounted
 onMounted(async () => {
@@ -39,7 +43,6 @@ watch(
   async (newCollectionId) => {
     if (newCollectionId && newCollectionId !== collectionId.value) {
       collectionId.value = newCollectionId as string;
-      imageToAdd.value.collection_id = collectionId.value;
       await loadCurrentCollection();
     }
   },
@@ -58,177 +61,100 @@ const loadCurrentCollection = async () => {
   }
 };
 
-const onRowClick = (_evt: Event, row: Image) => {
+// Handle image selection
+const handleSelectImage = (imageId: string) => {
   router.push({
     name: 'image',
     params: {
-      imageId: row.id,
-    },
-  });
-};
-
-const openComparisonPage = (evt: Event, row: Image) => {
-  evt.stopPropagation();
-  router.push({
-    name: 'imageCompare',
-    params: {
-      imageId: row.id,
+      imageId,
       collectionId: collectionId.value,
     },
   });
 };
 
-const handleUpload = async () => {
-  console.log('handleUpload');
-  await currentCollection.uploadImageToCollection(imageToAdd.value);
-};
-const onReset = () => {
-  imageToAdd.value.order = 0;
-  imageToAdd.value.file = undefined;
+// Handle view mode changes with string parameter type to match PageList emit type
+// We'll validate and cast the string to our ViewMode type internally
+const handleViewModeChange = (newMode: string) => {
+  // Only update if it's a valid view mode
+  if (
+    newMode === 'grid' ||
+    newMode === 'list-small' ||
+    newMode === 'list-large'
+  ) {
+    viewMode.value = newMode as ViewMode;
+    localStorage.setItem('collection-view-mode', newMode);
+  }
 };
 </script>
 
 <template>
-  <q-page>
-    <div class="q-pa-md">
-      <!-- Show skeleton when loading -->
-      <div v-if="loadingState.isComponentLoading(componentId)">
-        <div class="text-h6 q-mb-md">Loading Collection...</div>
-        <div class="row q-col-gutter-md">
-          <div v-for="n in 8" :key="n" class="col-xs-12 col-sm-6 col-md-3">
-            <q-card bordered>
-              <q-skeleton height="200px" square />
-              <q-card-section>
-                <q-skeleton type="text" />
-              </q-card-section>
-            </q-card>
+  <q-page class="collection-page">
+    <!-- Collection Header -->
+    <div class="collection-header q-pa-md">
+      <div class="row items-center justify-between">
+        <div class="col-auto">
+          <div class="text-h5">
+            {{ currentCollection.collection?.name || 'Collection' }}
+          </div>
+          <div class="text-caption text-grey-7">
+            {{ currentCollection.collection?.images?.length || 0 }} images
           </div>
         </div>
+        <div class="col-auto">
+          <q-btn color="primary" icon="add" label="Add Images" />
+        </div>
       </div>
-
-      <!-- Show content when loaded -->
-      <q-table
-        v-else
-        title="Images"
-        :grid="grid"
-        :rows="currentCollection.collection?.images || []"
-        row-key="name"
-        @row-click="onRowClick"
-      >
-        <template v-slot:top-right>
-          <q-btn-toggle
-            class="q-mr-md"
-            v-model="grid"
-            toggle-color="primary"
-            :options="[
-              { icon: 'apps', value: true },
-              { icon: 'list', value: false },
-            ]"
-          />
-          <q-btn
-            round
-            color="primary"
-            icon="add"
-            :disable="currentCollection.loading"
-            @click="isAddOpen = true"
-          />
-          <q-dialog v-model="isAddOpen" @hide="onReset">
-            <q-card style="min-width: 400px">
-              <q-form @submit="handleUpload" @reset="onReset">
-                <q-card-section>
-                  <div class="text-h6">Upload image to collection</div>
-                </q-card-section>
-                <q-card-section class="q-gutter-md">
-                  <q-input
-                    autofocus
-                    filled
-                    v-model="imageToAdd.order"
-                    label="Collection description"
-                    lazy-rules
-                    type="number"
-                  />
-
-                  <q-file
-                    filled
-                    bottom-slots
-                    v-model="imageToAdd.file"
-                    label="Image"
-                    counter
-                    :accept="fileTypes"
-                  >
-                    <template v-slot:prepend>
-                      <q-icon name="cloud_upload" @click.stop.prevent />
-                    </template>
-                    <template v-slot:append>
-                      <q-icon
-                        name="close"
-                        @click.stop.prevent="imageToAdd.file = undefined"
-                        class="cursor-pointer"
-                      />
-                    </template>
-                    <template v-slot:hint> Upload image </template>
-                  </q-file>
-                </q-card-section>
-
-                <q-card-actions align="right">
-                  <q-btn
-                    flat
-                    label="Add"
-                    color="primary"
-                    v-close-popup
-                    @click="handleUpload"
-                  />
-                  <q-btn
-                    flat
-                    label="Cancel"
-                    type="reset"
-                    color="negative"
-                    v-close-popup
-                  />
-                </q-card-actions>
-              </q-form>
-            </q-card>
-          </q-dialog>
-        </template>
-
-        <template v-slot:item="props">
-          <div
-            class="q-pa-xs col-xs-12 col-sm-6 col-md-4 col-lg-2 grid-style-transition"
-            :style="props.selected ? 'transform: scale(0.95);' : ''"
-            @click="(e) => onRowClick(e, props.row)"
-          >
-            <q-card
-              bordered
-              flat
-              :class="
-                props.selected
-                  ? $q.dark.isActive
-                    ? 'bg-grey-9'
-                    : 'bg-grey-2'
-                  : ''
-              "
-            >
-              <q-card-section> {{ props.row.name }} </q-card-section>
-              <q-img :src="getPreviewImage(props.row.id)" style="height: 200px">
-                <div class="absolute-bottom text-subtitle2 text-center">
-                  {{ props.row.name }}
-                </div>
-              </q-img>
-              <q-card-actions align="right">
-                <q-btn
-                  flat
-                  color="secondary"
-                  icon="compare"
-                  label="Compare"
-                  @click="(e) => openComparisonPage(e, props.row)"
-                />
-              </q-card-actions>
-            </q-card>
-          </div>
-        </template>
-      </q-table>
     </div>
+
+    <!-- Loading State -->
+    <div
+      v-if="loadingState.isComponentLoading(componentId)"
+      class="loading-state q-pa-md"
+    >
+      <div class="text-h6 q-mb-md">Loading Collection...</div>
+      <div class="row q-col-gutter-md">
+        <div v-for="n in 8" :key="n" class="col-xs-12 col-sm-6 col-md-3">
+          <q-card bordered>
+            <q-skeleton height="200px" square />
+            <q-card-section>
+              <q-skeleton type="text" />
+            </q-card-section>
+          </q-card>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page List Component -->
+    <PageList
+      v-else
+      :collectionId="collectionId"
+      layout="full-width"
+      :initialViewMode="viewMode"
+      :showHeader="true"
+      :showStatistics="true"
+      :enableBulkActions="true"
+      @select-image="handleSelectImage"
+      @view-mode-change="handleViewModeChange"
+    />
   </q-page>
 </template>
 
-<style scoped></style>
+<style lang="scss" scoped>
+.collection-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.collection-header {
+  background-color: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  z-index: 10;
+}
+
+.loading-state {
+  flex: 1;
+  overflow: auto;
+}
+</style>
