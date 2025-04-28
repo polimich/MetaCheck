@@ -16,6 +16,7 @@ import BulkActions from './BulkActions.vue';
 
 const props = defineProps<{
   collectionId: string;
+  layout?: 'fullscreen' | 'sidebar';
 }>();
 
 const emit = defineEmits<{
@@ -155,13 +156,14 @@ function navigateToImage(imageId: string) {
 </script>
 
 <template>
-  <div class="page-list">
+  <div class="page-list" :class="[`layout-${props.layout || 'sidebar'}`]">
     <!-- Header with filters and controls -->
     <PageHeader
       v-model:searchQuery="searchQuery"
       v-model:sortBy="sortBy"
       v-model:filterVerified="filterVerified"
       v-model:confidenceFilters="confidenceFilters"
+      :class="{ 'header-fullscreen': props.layout === 'fullscreen' }"
     />
 
     <!-- Statistics and progress indicators -->
@@ -172,6 +174,7 @@ function navigateToImage(imageId: string) {
       :filteredImagesCount="filteredImages.length"
       :totalImagesCount="currentCollection.collection?.images?.length || 0"
       @resetFilters="resetFilters"
+      :class="{ 'stats-fullscreen': props.layout === 'fullscreen' }"
     />
 
     <!-- View mode selector -->
@@ -269,6 +272,7 @@ function navigateToImage(imageId: string) {
       @deselectAll="deselectAll"
       @markSelectedAsVerified="markSelectedAsVerified"
       @downloadSelected="downloadSelected"
+      :class="{ 'actions-fullscreen': props.layout === 'fullscreen' }"
     >
       <template v-slot:page-count>
         {{ filteredImages.length }} of
@@ -285,7 +289,49 @@ function navigateToImage(imageId: string) {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
+
+  &.layout-sidebar {
+    border-right: 1px solid rgba(0, 0, 0, 0.12);
+    width: 400px;
+    min-width: 400px;
+  }
+
+  &.layout-fullscreen {
+    max-width: 100%;
+    padding: 0;
+    border: none;
+
+    .header-fullscreen {
+      padding: 16px 24px;
+      background: white;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .stats-fullscreen {
+      padding: 12px 24px;
+      background: #f5f5f5;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .actions-fullscreen {
+      padding: 8px 24px;
+      background: white;
+      border-top: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .image-container {
+      &.view-grid {
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        padding: 24px;
+        gap: 24px;
+      }
+
+      &.view-list-small,
+      &.view-list-large {
+        padding: 16px 24px;
+      }
+    }
+  }
 }
 
 .view-mode-selector {
@@ -326,11 +372,12 @@ function navigateToImage(imageId: string) {
   &.view-list-large {
     display: flex;
     flex-direction: column;
+    gap: 8px;
   }
 
   &.view-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(45%, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 8px;
   }
 }

@@ -180,7 +180,7 @@ const updateDetection = () => {
 <template>
   <div
     ref="itemRef"
-    class="annotation-item q-mb-sm"
+    class="annotation-item q-mb-md"
     :class="[attentionLevel, { selected: isSelected }]"
     @click="handleSelectDetection"
   >
@@ -196,16 +196,15 @@ const updateDetection = () => {
     </div>
 
     <!-- Main content area with white background -->
-    <div class="content-area q-px-md q-py-sm">
-      <!-- Main row: Type selector and Value on same line -->
+    <div class="content-area q-px-sm q-py-sm">
+      <!-- Main row: All content in one line -->
       <div class="row items-center q-col-gutter-sm no-wrap">
         <!-- Type selector -->
-        <div class="col-6">
+        <div class="col-5">
           <q-select
             v-model="selectValue"
             :options="optionsValue"
             label="Type"
-            dense
             outlined
             :loading="isLoading"
             @update:model-value="(value) => updateSelectValue(value)"
@@ -239,11 +238,10 @@ const updateDetection = () => {
         </div>
 
         <!-- Value input -->
-        <div class="col-6">
+        <div class="col-5">
           <q-input
             v-model="detection.value"
             label="Value"
-            dense
             outlined
             @update:model-value="updateDetection"
             hide-bottom-space
@@ -251,69 +249,40 @@ const updateDetection = () => {
           />
         </div>
 
-        <!-- Confidence badge -->
-        <q-badge
-          floating
-          :color="confidenceColorClass"
-          class="confidence-badge"
-        >
-          {{ confidencePercent }}%
-        </q-badge>
-      </div>
-
-      <!-- Bottom row with action buttons -->
-      <div class="row justify-between items-center q-mt-xs action-row">
-        <div class="col-auto">
-          <q-btn
-            flat
-            round
-            dense
-            color="primary"
-            icon="save"
-            @click.stop="saveDetection"
-            size="sm"
-            :loading="
-              loadingState.isSourceLoading(`saveDetection-${detection.id}`)
-            "
-          >
-            <q-tooltip>Save changes</q-tooltip>
-          </q-btn>
-
-          <!-- New zoom button -->
-          <q-btn
-            flat
-            round
-            dense
-            color="secondary"
-            icon="zoom_in"
-            @click.stop="handleZoomToDetection"
-            size="sm"
-          >
-            <q-tooltip>Zoom to annotation</q-tooltip>
-          </q-btn>
-        </div>
-
-        <div class="col verified-container options-1">
-          <q-chip
-            :color="detection.annotated ? 'green' : 'grey-4'"
-            :text-color="detection.annotated ? 'white' : 'grey-8'"
-            dense
-            outline
-            clickable
-            @click.stop="
-              detection.annotated = !detection.annotated;
-              updateDetection();
-            "
-            class="verified-chip"
-            size="sm"
-          >
-            <q-icon
-              :name="detection.annotated ? 'check_circle' : 'circle'"
-              left
-              size="xs"
-            />
-            <span class="text-caption">Verified</span>
-          </q-chip>
+        <!-- Save button -->
+        <div class="col-2">
+          <div class="row justify-center">
+            <q-badge :color="confidenceColorClass">
+              {{ confidencePercent }}%
+            </q-badge>
+          </div>
+          <div class="row justify-center">
+            <q-btn
+              flat
+              round
+              dense
+              color="secondary"
+              icon="zoom_in"
+              @click.stop="handleZoomToDetection"
+              size="md"
+            >
+              <q-tooltip>Zoom to annotation</q-tooltip>
+            </q-btn>
+            <q-btn
+              flat
+              round
+              dense
+              color="primary"
+              icon="save"
+              @click.stop="saveDetection"
+              size="sm"
+              :loading="
+                loadingState.isSourceLoading(`saveDetection-${detection.id}`)
+              "
+            >
+              <q-tooltip>Save changes</q-tooltip>
+            </q-btn>
+          </div>
         </div>
       </div>
     </div>
@@ -364,24 +333,10 @@ const updateDetection = () => {
 
 .confidence-badge {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: 2px;
+  right: 2px;
   padding: 1px 4px;
   font-size: 10px;
-}
-
-.action-row {
-  min-height: 32px;
-}
-
-.verified-container {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.verified-chip {
-  border-radius: 16px;
-  height: 24px;
 }
 
 /* Attention levels */

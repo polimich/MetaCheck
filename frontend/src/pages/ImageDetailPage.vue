@@ -358,7 +358,6 @@ const handleSelectImage = async (selectedImageId: string) => {
 
       <!-- Annotation list column -->
       <div class="col-3 justify-center overflow-hidden">
-        <div class="text-h6 q-pa-sm">Label Editor</div>
         <q-scroll-area style="height: calc(100vh - 180px); max-width: 100%">
           <AnnotationList
             :detections="detections"
@@ -367,6 +366,7 @@ const handleSelectImage = async (selectedImageId: string) => {
                 `annotationList_${currentCollection.selectedImageId}`,
               )
             "
+            :image="imageStore.image"
             @[ANNOTATION_EVENTS.SCROLL_TO]="
               synchronization.handleScrollToAnnotation
             "

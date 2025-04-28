@@ -91,6 +91,31 @@ const thumbnailClass = computed(() => {
     'thumbnail-needs-attention': props.needsAttention,
   };
 });
+
+// Helper functions for page information
+const formatConfidence = (confidence: number) => {
+  return confidence ? `${Math.round(confidence * 100)}%` : '';
+};
+
+const pageIndexConfidenceLevel = computed(() => {
+  const confidence = props.image.page_index_confidence;
+  if (!confidence) return '';
+  if (confidence >= 0.8) return 'text-green';
+  if (confidence >= 0.5) return 'text-orange';
+  return 'text-red';
+});
+
+const pageTypeConfidenceLevel = computed(() => {
+  const confidence = props.image.page_type_confidence;
+  if (!confidence) return '';
+  if (confidence >= 0.8) return 'text-green';
+  if (confidence >= 0.5) return 'text-orange';
+  return 'text-red';
+});
+
+const hasPageInfo = computed(() => {
+  return props.image.page_index || props.image.page_type;
+});
 </script>
 
 <template>
@@ -146,11 +171,15 @@ const thumbnailClass = computed(() => {
 
       <!-- Image metadata -->
       <div class="image-metadata">
+        <q-icon name="drive_file_rename_outline" size="xs" class="q-mr-xs" />
+        <span class="text-weight-medium">Name: </span>
         <div class="image-name text-weight-medium">
           {{ image.name }}
         </div>
 
         <div class="image-details text-caption">
+          <q-icon name="equalizer" size="xs" class="q-mr-xs" />
+          <span class="text-weight-medium">Overall confidence: </span>
           <span v-if="hasLowConfidence" class="text-red">
             Low confidence ({{ LOW_CONFIDENCE_THRESHOLD }}%)
           </span>
@@ -161,6 +190,34 @@ const thumbnailClass = computed(() => {
           <template v-if="hasUnverifiedDetections">
             • <span class="text-grey-7">Unverified</span>
           </template>
+        </div>
+
+        <!-- Page info section -->
+        <div v-if="hasPageInfo" class="page-info text-caption q-mt-xs">
+          <div v-if="image.page_index" class="q-mb-xs">
+            <q-icon name="format_list_numbered" size="xs" class="q-mr-xs" />
+            <span class="text-weight-medium">Page: </span>
+            <span>{{ image.page_index }}</span>
+            <span
+              v-if="image.page_index_confidence"
+              class="q-ml-xs"
+              :class="pageIndexConfidenceLevel"
+            >
+              ({{ formatConfidence(image.page_index_confidence) }})
+            </span>
+          </div>
+          <div v-if="image.page_type">
+            <q-icon name="category" size="xs" class="q-mr-xs" />
+            <span class="text-weight-medium">Type: </span>
+            <span>{{ image.page_type }}</span>
+            <span
+              v-if="image.page_type_confidence"
+              class="q-ml-xs"
+              :class="pageTypeConfidenceLevel"
+            >
+              ({{ formatConfidence(image.page_type_confidence) }})
+            </span>
+          </div>
         </div>
       </div>
     </div>
@@ -370,5 +427,11 @@ const thumbnailClass = computed(() => {
     color: var(--q-primary) !important;
     font-weight: 700;
   }
+}
+
+.page-info {
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+  padding-top: 4px;
+  margin-top: 4px;
 }
 </style>
