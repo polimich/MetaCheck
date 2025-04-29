@@ -1,5 +1,8 @@
 import { computed, ref, watch } from 'vue';
 
+/**
+ * Composable for grid columns functionality with two-way binding
+ */
 export function useGridColumns(
   initialColumns: number | undefined,
   updateColumns: (columns: number) => void,

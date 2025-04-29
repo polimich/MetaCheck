@@ -15,7 +15,7 @@ import {
   useImageVerification,
   useImageStatusDisplay,
   useImageSelection,
-  useImageFiltering,
+  useFilteringFunctions,
 } from 'src/composables';
 import { QScrollArea } from 'quasar';
 import PageHeader from './PageHeader.vue';
@@ -103,15 +103,15 @@ const statusDisplay = useImageStatusDisplay(
   confidence.hasMediumConfidenceDetections,
   verification.hasUnverifiedDetections,
 );
-const filtering = useImageFiltering(
-  verification.getImageVerificationStatus,
-  (id: string) =>
+const filtering = useFilteringFunctions({
+  getVerificationStatus: verification.getImageVerificationStatus,
+  getAttentionLevel: (id: string) =>
     confidence.getAttentionLevel(id, verification.hasUnverifiedDetections),
-  (id: string) =>
+  needsAttention: (id: string) =>
     confidence.needsAttention(id, verification.hasUnverifiedDetections),
-  confidence.hasLowConfidenceDetections,
-  confidence.hasMediumConfidenceDetections,
-);
+  hasLowConfidence: confidence.hasLowConfidenceDetections,
+  hasMediumConfidence: confidence.hasMediumConfidenceDetections,
+});
 
 // Convenience aliases
 const {

@@ -1,5 +1,8 @@
 import { computed } from 'vue';
 
+/**
+ * Composable for search functionality with two-way binding
+ */
 export function useSearch(
   initialQuery: string,
   updateQuery: (query: string) => void,

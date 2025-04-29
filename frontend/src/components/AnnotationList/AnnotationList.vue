@@ -40,32 +40,35 @@ const emit = defineEmits([
   <div class="annotation-list">
     <!--   Tab navigation -->
     <div class="tab-navigation q-mb-md">
-      <q-tabs
-        v-model="activeTab"
-        dense
-        indicator-color="primary"
-        active-color="primary"
-        align="justify"
-        narrow-indicator
-      >
-        <q-tab
-          name="annotations"
-          icon="article"
-          label="Annotations"
-          :alert="!hasAnnotations"
-          alert-icon="cancel"
-          :disable="!hasAnnotations"
-        />
-        <q-tab
-          name="pageInfo"
-          icon="info"
-          label="Page Info"
-          :alert="!hasPageInfo"
-          alert-icon="cancel"
-          :disable="!hasPageInfo"
-        />
-      </q-tabs>
-
+      <div class="row items-center">
+        <div class="col">
+          <q-tabs
+            v-model="activeTab"
+            dense
+            indicator-color="primary"
+            active-color="primary"
+            align="justify"
+            narrow-indicator
+          >
+            <q-tab
+              name="annotations"
+              icon="article"
+              label="Annotations"
+              :alert="!hasAnnotations"
+              alert-icon="cancel"
+              :disable="!hasAnnotations"
+            />
+            <q-tab
+              name="pageInfo"
+              icon="info"
+              label="Page Info"
+              :alert="!hasPageInfo"
+              alert-icon="cancel"
+              :disable="!hasPageInfo"
+            />
+          </q-tabs>
+        </div>
+      </div>
       <q-separator />
     </div>
 

@@ -363,7 +363,7 @@ const handleSelectImage = async (selectedImageId: string) => {
 
       <!-- Annotation list column -->
       <div class="col-3 justify-center overflow-hidden">
-        <q-scroll-area style="height: calc(100vh - 180px); max-width: 100%">
+        <q-scroll-area style="height: 100%; max-width: 100%">
           <AnnotationList
             :detections="detections"
             :loading="

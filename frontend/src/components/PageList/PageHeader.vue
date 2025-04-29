@@ -1,11 +1,7 @@
 <script setup lang="ts">
-import {
-  useViewMode,
-  useGridColumns,
-  useSearch,
-  useFilters,
-} from './composables';
-import { watch } from 'vue';
+import { useViewMode, useGridColumns } from 'src/composables/ui';
+import { useFilters } from 'src/composables';
+import { computed, watch } from 'vue';
 
 const props = defineProps({
   searchQuery: {
@@ -55,7 +51,7 @@ const emit = defineEmits([
 // Use view mode composable
 const { currentViewMode, isGridView } = useViewMode(
   props.viewMode as 'list-small' | 'list-large' | 'grid',
-  (mode) => emit('update:viewMode', mode),
+  (mode: string) => emit('update:viewMode', mode),
 );
 
 // Watch for changes to viewMode prop to ensure reactivity
@@ -71,7 +67,7 @@ watch(
 // Use grid columns composable
 const { currentGridColumns, gridColumnOptions } = useGridColumns(
   props.userGridColumns,
-  (cols) => emit('update:userGridColumns', cols),
+  (cols: number) => emit('update:userGridColumns', cols),
 );
 
 // Watch for changes to userGridColumns prop to ensure reactivity
@@ -79,19 +75,13 @@ watch(
   () => props.userGridColumns,
   (newValue) => {
     if (newValue !== currentGridColumns.value) {
-      // This will update the dropdown label
-      emit('update:userGridColumns', newValue);
+      currentGridColumns.value = newValue;
     }
   },
 );
 
-// Use search composable
-const { searchQuery } = useSearch(props.searchQuery, (query) =>
-  emit('update:searchQuery', query),
-);
-
 // Use filters composable
-const { confidenceOptions, toggleConfidenceFilter, getColorValue } = useFilters(
+const { confidenceOptions, getColorValue } = useFilters(
   props.sortBy,
   props.filterVerified,
   props.confidenceFilters as Record<string, boolean>,
@@ -100,13 +90,71 @@ const { confidenceOptions, toggleConfidenceFilter, getColorValue } = useFilters(
   (filters) => emit('update:confidenceFilters', filters),
 );
 
-// Get prop references for template
-const { sortBy, filterVerified, confidenceFilters } = props;
-
 const updateGridColumns = (cols: number) => {
   currentGridColumns.value = cols;
   emit('update:userGridColumns', cols);
 };
+
+// Create computed properties with two-way binding for the template
+const sortByComputed = computed({
+  get: () => props.sortBy,
+  set: (value: string) => emit('update:sortBy', value),
+});
+
+const filterVerifiedComputed = computed({
+  get: () => props.filterVerified,
+  set: (value: string) => emit('update:filterVerified', value),
+});
+
+// Create computed for confidence filters
+const confidenceFiltersComputed = computed({
+  get: () => props.confidenceFilters as Record<string, boolean>,
+  set: (value: Record<string, boolean>) =>
+    emit('update:confidenceFilters', value),
+});
+
+// Create a wrapper for toggleConfidenceFilter
+const handleToggleConfidence = (level: string) => {
+  const newFilters = { ...confidenceFiltersComputed.value };
+  newFilters[level] = !newFilters[level];
+  emit('update:confidenceFilters', newFilters);
+};
+
+// Create a searchQuery computed property with two-way binding
+const searchQueryComputed = computed({
+  get: () => props.searchQuery,
+  set: (value: string) => emit('update:searchQuery', value),
+});
+
+// Watch for sortBy prop changes
+watch(
+  () => props.sortBy,
+  (newValue) => {
+    if (sortByComputed.value !== newValue) {
+      sortByComputed.value = newValue;
+    }
+  },
+);
+
+// Watch for filterVerified prop changes
+watch(
+  () => props.filterVerified,
+  (newValue) => {
+    if (filterVerifiedComputed.value !== newValue) {
+      filterVerifiedComputed.value = newValue;
+    }
+  },
+);
+
+// Watch for confidenceFilters prop changes
+watch(
+  () => props.confidenceFilters,
+  (newValue) => {
+    const typedValue = newValue as Record<string, boolean>;
+    confidenceFiltersComputed.value = { ...typedValue };
+  },
+  { deep: true },
+);
 </script>
 
 <template>
@@ -188,7 +236,7 @@ const updateGridColumns = (cols: number) => {
         <!-- Search Box - fixed width -->
         <div class="col-auto search-box-container" style="width: 500px">
           <q-input
-            v-model="searchQuery"
+            v-model="searchQueryComputed"
             dense
             outlined
             placeholder="Search images..."
@@ -197,11 +245,11 @@ const updateGridColumns = (cols: number) => {
             <template v-slot:prepend>
               <q-icon name="search" size="xs" />
             </template>
-            <template v-slot:append v-if="searchQuery">
+            <template v-slot:append v-if="searchQueryComputed">
               <q-icon
                 name="close"
                 class="cursor-pointer"
-                @click="emit('update:searchQuery', '')"
+                @click="searchQueryComputed = ''"
               />
             </template>
           </q-input>
@@ -213,7 +261,7 @@ const updateGridColumns = (cols: number) => {
             <!-- Sort dropdown -->
             <div class="col-auto">
               <q-select
-                :modelValue="sortBy"
+                v-model="sortByComputed"
                 dense
                 outlined
                 :options="[
@@ -237,14 +285,13 @@ const updateGridColumns = (cols: number) => {
                 emit-value
                 label="Sort By"
                 class="sort-select"
-                @update:modelValue="emit('update:sortBy', $event)"
               />
             </div>
 
             <!-- Filter verified dropdown -->
             <div class="col-auto">
               <q-select
-                :modelValue="filterVerified"
+                v-model="filterVerifiedComputed"
                 dense
                 outlined
                 :options="[
@@ -258,7 +305,6 @@ const updateGridColumns = (cols: number) => {
                 emit-value
                 label="Verification"
                 class="verification-select"
-                @update:modelValue="emit('update:filterVerified', $event)"
               />
             </div>
 
@@ -270,15 +316,17 @@ const updateGridColumns = (cols: number) => {
                   :key="option.value"
                   class="confidence-filter-btn"
                   :style="{
-                    backgroundColor: confidenceFilters[option.value]
+                    backgroundColor: confidenceFiltersComputed[option.value]
                       ? getColorValue(option.color)
                       : 'transparent',
-                    color: confidenceFilters[option.value] ? 'white' : '#555',
-                    borderColor: confidenceFilters[option.value]
+                    color: confidenceFiltersComputed[option.value]
+                      ? 'white'
+                      : '#555',
+                    borderColor: confidenceFiltersComputed[option.value]
                       ? getColorValue(option.color)
                       : '#ddd',
                   }"
-                  @click="toggleConfidenceFilter(option.value)"
+                  @click="handleToggleConfidence(option.value)"
                 >
                   {{ option.label }}
                 </div>
@@ -292,65 +340,11 @@ const updateGridColumns = (cols: number) => {
     <!-- Standard sidebar layout -->
     <template v-else>
       <!-- Row 1: View Mode Selection & Grid Controls -->
-      <div class="header-row view-controls-row q-px-md q-py-sm">
-        <div class="row items-center justify-between">
-          <div class="col-auto">
-            <div class="view-selector-wrapper">
-              <div class="view-mode-label text-subtitle2 q-mr-sm">View as:</div>
-              <div class="view-mode-buttons">
-                <q-btn-toggle
-                  v-model="currentViewMode"
-                  :options="[
-                    {
-                      value: 'list-small',
-                      icon: 'view_list',
-                      label: 'Compact',
-                    },
-                    {
-                      value: 'list-large',
-                      icon: 'view_headline',
-                      label: 'Details',
-                    },
-                    { value: 'grid', icon: 'grid_view', label: 'Grid' },
-                  ]"
-                  spread
-                  unelevated
-                  rounded
-                  dense
-                  class="view-toggle-modern"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="col-auto" v-if="isGridView">
-            <div class="grid-columns-control row items-center">
-              <div class="text-subtitle2 q-mr-sm">Columns:</div>
-              <div class="column-buttons">
-                <q-btn-group flat>
-                  <q-btn
-                    v-for="cols in gridColumnOptions"
-                    :key="cols"
-                    :label="cols.toString()"
-                    size="sm"
-                    dense
-                    flat
-                    :color="currentGridColumns === cols ? 'primary' : 'grey-7'"
-                    :text-color="currentGridColumns === cols ? 'white' : ''"
-                    :class="{ 'active-column': currentGridColumns === cols }"
-                    @click="updateGridColumns(cols)"
-                  />
-                </q-btn-group>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Row 2: Search Bar -->
       <div class="header-row search-row q-px-md q-py-sm">
         <q-input
-          v-model="searchQuery"
+          v-model="searchQueryComputed"
           dense
           outlined
           placeholder="Search images..."
@@ -359,11 +353,11 @@ const updateGridColumns = (cols: number) => {
           <template v-slot:prepend>
             <q-icon name="search" size="xs" />
           </template>
-          <template v-slot:append v-if="searchQuery">
+          <template v-slot:append v-if="searchQueryComputed">
             <q-icon
               name="close"
               class="cursor-pointer"
-              @click="emit('update:searchQuery', '')"
+              @click="searchQueryComputed = ''"
             />
           </template>
         </q-input>
@@ -373,7 +367,7 @@ const updateGridColumns = (cols: number) => {
       <div class="header-row filter-row q-px-md q-py-sm">
         <!-- Sort dropdown -->
         <q-select
-          :modelValue="sortBy"
+          v-model="sortByComputed"
           dense
           outlined
           :options="[
@@ -391,12 +385,11 @@ const updateGridColumns = (cols: number) => {
           emit-value
           label="Sort By"
           class="sort-select"
-          @update:modelValue="emit('update:sortBy', $event)"
         />
 
         <!-- Filter verified dropdown -->
         <q-select
-          :modelValue="filterVerified"
+          v-model="filterVerifiedComputed"
           dense
           outlined
           :options="[
@@ -410,7 +403,6 @@ const updateGridColumns = (cols: number) => {
           emit-value
           label="Verification"
           class="verification-select"
-          @update:modelValue="emit('update:filterVerified', $event)"
         />
       </div>
 
@@ -427,20 +419,100 @@ const updateGridColumns = (cols: number) => {
                 :key="option.value"
                 class="confidence-filter-btn"
                 :style="{
-                  backgroundColor: confidenceFilters[option.value]
+                  backgroundColor: confidenceFiltersComputed[option.value]
                     ? getColorValue(option.color)
                     : 'transparent',
-                  color: confidenceFilters[option.value] ? 'white' : '#555',
-                  borderColor: confidenceFilters[option.value]
+                  color: confidenceFiltersComputed[option.value]
+                    ? 'white'
+                    : '#555',
+                  borderColor: confidenceFiltersComputed[option.value]
                     ? getColorValue(option.color)
                     : '#ddd',
                 }"
-                @click="toggleConfidenceFilter(option.value)"
+                @click="handleToggleConfidence(option.value)"
               >
                 {{ option.label }}
               </div>
             </div>
           </div>
+        </div>
+      </div>
+      <div class="col-auto view-selector-wrapper q-px-md q-py-sm">
+        <div class="row items-center no-wrap full-width">
+          <div class="col-auto text-body2 text-weight-medium q-mr-md">
+            View Mode:
+          </div>
+          <!-- List Small Button -->
+          <q-btn
+            flat
+            :color="currentViewMode === 'list-small' ? 'primary' : 'grey-7'"
+            icon="view_list"
+            dense
+            @click="currentViewMode = 'list-small'"
+          >
+            <q-tooltip>Compact List View</q-tooltip>
+          </q-btn>
+
+          <!-- List Large Button -->
+          <q-btn
+            flat
+            :color="currentViewMode === 'list-large' ? 'primary' : 'grey-7'"
+            icon="view_headline"
+            dense
+            @click="currentViewMode = 'list-large'"
+          >
+            <q-tooltip>Detailed List View</q-tooltip>
+          </q-btn>
+
+          <!-- Grid Button with Column Dropdown -->
+          <q-btn
+            flat
+            :color="currentViewMode === 'grid' ? 'primary' : 'grey-7'"
+            icon="grid_view"
+            dense
+            @click="currentViewMode = 'grid'"
+          >
+            <q-tooltip>Grid View</q-tooltip>
+          </q-btn>
+
+          <!-- Grid Column Dropdown -->
+          <q-btn-dropdown
+            v-if="isGridView"
+            flat
+            dense
+            :label="currentGridColumns.toString()"
+            class="q-ml-xs grid-columns-dropdown"
+          >
+            <q-list>
+              <q-item
+                v-for="cols in gridColumnOptions"
+                :key="cols"
+                clickable
+                v-close-popup
+                @click="updateGridColumns(cols)"
+                :active="currentGridColumns === cols"
+              >
+                <q-item-section>
+                  <q-item-label>{{ cols }} columns</q-item-label>
+                </q-item-section>
+                <q-item-section avatar v-if="currentGridColumns === cols">
+                  <q-icon name="check" color="primary" />
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-btn-dropdown>
+
+          <div class="col"></div>
+
+          <q-btn
+            flat
+            dense
+            icon="my_location"
+            class="locate-btn"
+            @click="emit('locate-active-image')"
+          >
+            <q-tooltip>Locate active image</q-tooltip>
+          </q-btn>
         </div>
       </div>
     </template>
@@ -499,8 +571,7 @@ const updateGridColumns = (cols: number) => {
 
   .sort-select,
   .verification-select {
-    min-width: 160px;
-    max-width: 220px;
+    flex: 1;
   }
 }
 
@@ -538,25 +609,6 @@ const updateGridColumns = (cols: number) => {
     font-size: 11px;
     padding: 0 8px;
   }
-}
-
-.filters-container {
-  @media (max-width: 767px) {
-    order: 0;
-  }
-}
-
-// Original sidebar styles
-.heading-row {
-  background-color: #f5f5f5;
-}
-
-.search-row {
-  background-color: #f9f9f9;
-}
-
-.confidence-row {
-  background-color: rgba(0, 0, 0, 0.02);
 }
 
 .full-width {

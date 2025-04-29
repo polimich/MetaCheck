@@ -2,6 +2,9 @@ import { computed, ref, watch } from 'vue';
 
 type ViewMode = 'list-small' | 'list-large' | 'grid';
 
+/**
+ * Composable for view mode functionality with two-way binding
+ */
 export function useViewMode(
   initialViewMode: ViewMode | undefined,
   updateViewMode: (mode: string) => void,

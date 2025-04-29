@@ -17,15 +17,14 @@ export function useImageConfidence() {
     );
     if (!image) return false;
 
-    // Only consider images with detections as potentially low confidence
-    if (!image.detection_count || image.detection_count === 0) {
-      return false; // No detections means it's fine
-    }
-
-    // Check if confidence is below the low threshold
+    // Check if any confidence value is below the low threshold
     return (
-      image.confidence !== undefined &&
-      image.confidence < LOW_CONFIDENCE_THRESHOLD
+      (image.confidence !== undefined &&
+        image.confidence < LOW_CONFIDENCE_THRESHOLD) ||
+      (image.page_index_confidence !== undefined &&
+        image.page_index_confidence < LOW_CONFIDENCE_THRESHOLD) ||
+      (image.page_type_confidence !== undefined &&
+        image.page_type_confidence < LOW_CONFIDENCE_THRESHOLD)
     );
   }
 
@@ -38,16 +37,29 @@ export function useImageConfidence() {
     );
     if (!image) return false;
 
-    // Only consider images with detections
-    if (!image.detection_count || image.detection_count === 0) {
+    // If any confidence is low, we don't consider it medium
+    if (
+      (image.confidence !== undefined &&
+        image.confidence < LOW_CONFIDENCE_THRESHOLD) ||
+      (image.page_index_confidence !== undefined &&
+        image.page_index_confidence < LOW_CONFIDENCE_THRESHOLD) ||
+      (image.page_type_confidence !== undefined &&
+        image.page_type_confidence < LOW_CONFIDENCE_THRESHOLD)
+    ) {
       return false;
     }
 
-    // Check if confidence is between low and medium thresholds
+    // Check if any confidence is between low and medium thresholds
     return (
-      image.confidence !== undefined &&
-      image.confidence >= LOW_CONFIDENCE_THRESHOLD &&
-      image.confidence < MEDIUM_CONFIDENCE_THRESHOLD
+      (image.confidence !== undefined &&
+        image.confidence >= LOW_CONFIDENCE_THRESHOLD &&
+        image.confidence < MEDIUM_CONFIDENCE_THRESHOLD) ||
+      (image.page_index_confidence !== undefined &&
+        image.page_index_confidence >= LOW_CONFIDENCE_THRESHOLD &&
+        image.page_index_confidence < MEDIUM_CONFIDENCE_THRESHOLD) ||
+      (image.page_type_confidence !== undefined &&
+        image.page_type_confidence >= LOW_CONFIDENCE_THRESHOLD &&
+        image.page_type_confidence < MEDIUM_CONFIDENCE_THRESHOLD)
     );
   }
 
