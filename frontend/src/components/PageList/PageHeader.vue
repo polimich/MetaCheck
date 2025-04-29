@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { useViewMode, useGridColumns } from 'src/composables/ui';
-import { useFilters } from 'src/composables';
+import { useViewMode, useGridColumns, useFilters } from './composables';
 import { computed, watch } from 'vue';
 
 const props = defineProps({

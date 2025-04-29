@@ -143,7 +143,8 @@ const handleViewModeChange = (newMode: string) => {
 .collection-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - 50px);
+  overflow: hidden;
 }
 
 .collection-header {
@@ -154,6 +155,11 @@ const handleViewModeChange = (newMode: string) => {
 }
 
 .loading-state {
+  flex: 1;
+  overflow: auto;
+}
+
+:deep(.page-list-container) {
   flex: 1;
   overflow: auto;
 }

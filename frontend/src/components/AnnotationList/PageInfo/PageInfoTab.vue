@@ -3,6 +3,8 @@ import { computed } from 'vue';
 import { ImageState } from 'src/types/frontend-state';
 import PageInfoItem from './PageInfoItem.vue';
 import { useImageStore } from 'src/stores/image/storeImages';
+import { getImageById } from 'src/api/imageApiService';
+import { ImageDAtoState } from 'src/types/mapper';
 
 const props = defineProps<{
   image: ImageState;
@@ -44,6 +46,26 @@ const handlePageInfoUpdate = ({
   // Save the changes
   imageStore.saveImage();
 };
+
+// Handle refreshing the image after saving changes
+const handleRefresh = async (imageId: string) => {
+  console.log(`Refreshing image data for ${imageId}`);
+
+  // Fetch the updated image data
+  const response = await getImageById(imageId);
+
+  if (response.error) {
+    console.error(`Error refreshing image: ${response.error}`);
+    return;
+  }
+
+  if (response.data) {
+    // Update the image data in the store
+    const updatedImage = ImageDAtoState(response.data);
+    Object.assign(imageStore.image, updatedImage);
+    console.log('Image refreshed successfully');
+  }
+};
 </script>
 
 <template>
@@ -65,6 +87,7 @@ const handlePageInfoUpdate = ({
       :imageId="image.id"
       :loading="loading"
       @save="handlePageInfoUpdate"
+      @refresh="handleRefresh"
     />
 
     <!-- Page Type -->
@@ -76,6 +99,7 @@ const handlePageInfoUpdate = ({
       :imageId="image.id"
       :loading="loading"
       @save="handlePageInfoUpdate"
+      @refresh="handleRefresh"
     />
   </div>
 

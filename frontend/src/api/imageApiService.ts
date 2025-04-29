@@ -133,3 +133,38 @@ export const getImageById = async (
     return { data: null, error };
   }
 };
+
+/**
+ * Update an image's page index
+ * @returns Error message if there's an error, empty string if successful
+ */
+export const updateImagePageIndex = async (
+  imageId: string,
+  pageIndex: string,
+): Promise<string> => {
+  try {
+    await axios.post(`/image/update_page_index/${imageId}/${pageIndex}`);
+    return '';
+  } catch (e) {
+    return axiosErrorHandler(e);
+  }
+};
+
+/**
+ * Update an image's page type
+ * @returns Error message if there's an error, empty string if successful
+ */
+export const updateImagePageType = async (
+  imageId: string,
+  pageType: string,
+): Promise<string> => {
+  try {
+    console.log(
+      `Calling updateImagePageType with imageId=${imageId}, pageType=${pageType}`,
+    );
+    await axios.post(`/image/update_page_type/${imageId}/${pageType}`);
+    return '';
+  } catch (e) {
+    return axiosErrorHandler(e);
+  }
+};

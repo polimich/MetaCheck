@@ -16,7 +16,7 @@ import {
   useImageStatusDisplay,
   useImageSelection,
   useFilteringFunctions,
-} from 'src/composables';
+} from './composables';
 import { QScrollArea } from 'quasar';
 import PageHeader from './PageHeader.vue';
 import PageStatistics from './PageStatistics.vue';
@@ -383,17 +383,24 @@ onMounted(() => {
             :isActive="image.id === activeImageId"
             :isSelected="selectedImages.includes(image.id)"
             :selectMode="selectMode"
-            :needsAttention="
-              confidence.needsAttention(image.id, hasUnverifiedDetections)
-            "
-            :hasLowConfidence="hasLowConfidenceDetections(image.id)"
-            :hasMediumConfidence="hasMediumConfidenceDetections(image.id)"
-            :hasUnverifiedDetections="hasUnverifiedDetections(image.id)"
-            :verificationStatusColor="getVerificationStatusColor(image.id)"
-            :verificationTooltip="getVerificationTooltip(image.id)"
             :viewMode="viewMode"
-            :LOW_CONFIDENCE_THRESHOLD="LOW_CONFIDENCE_THRESHOLD"
-            :MEDIUM_CONFIDENCE_THRESHOLD="MEDIUM_CONFIDENCE_THRESHOLD"
+            :flags="{
+              needsAttention: confidence.needsAttention(
+                image.id,
+                hasUnverifiedDetections,
+              ),
+              hasLowConfidence: hasLowConfidenceDetections(image.id),
+              hasMediumConfidence: hasMediumConfidenceDetections(image.id),
+              hasUnverifiedDetections: hasUnverifiedDetections(image.id),
+            }"
+            :verificationStatus="{
+              color: getVerificationStatusColor(image.id),
+              tooltip: getVerificationTooltip(image.id),
+            }"
+            :confidenceThresholds="{
+              low: LOW_CONFIDENCE_THRESHOLD,
+              medium: MEDIUM_CONFIDENCE_THRESHOLD,
+            }"
             @click="navigateToImage"
             @select="(id, shiftKey) => toggleImageSelection(id, shiftKey)"
           />

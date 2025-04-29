@@ -19,8 +19,6 @@ export function useImageConfidence() {
 
     // Check if any confidence value is below the low threshold
     return (
-      (image.confidence !== undefined &&
-        image.confidence < LOW_CONFIDENCE_THRESHOLD) ||
       (image.page_index_confidence !== undefined &&
         image.page_index_confidence < LOW_CONFIDENCE_THRESHOLD) ||
       (image.page_type_confidence !== undefined &&
@@ -39,8 +37,6 @@ export function useImageConfidence() {
 
     // If any confidence is low, we don't consider it medium
     if (
-      (image.confidence !== undefined &&
-        image.confidence < LOW_CONFIDENCE_THRESHOLD) ||
       (image.page_index_confidence !== undefined &&
         image.page_index_confidence < LOW_CONFIDENCE_THRESHOLD) ||
       (image.page_type_confidence !== undefined &&
@@ -51,9 +47,6 @@ export function useImageConfidence() {
 
     // Check if any confidence is between low and medium thresholds
     return (
-      (image.confidence !== undefined &&
-        image.confidence >= LOW_CONFIDENCE_THRESHOLD &&
-        image.confidence < MEDIUM_CONFIDENCE_THRESHOLD) ||
       (image.page_index_confidence !== undefined &&
         image.page_index_confidence >= LOW_CONFIDENCE_THRESHOLD &&
         image.page_index_confidence < MEDIUM_CONFIDENCE_THRESHOLD) ||

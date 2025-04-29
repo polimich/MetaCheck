@@ -6,6 +6,11 @@ import {
   getConfidenceColorClass,
   getAttentionLevel,
 } from '../utils/confidenceUtils';
+import {
+  updateImagePageIndex,
+  updateImagePageType,
+} from 'src/api/imageApiService';
+import { useQuasar } from 'quasar';
 
 const props = defineProps<{
   type: 'page_index' | 'page_type';
@@ -16,7 +21,7 @@ const props = defineProps<{
 }>();
 
 // Events for parent component
-const emit = defineEmits(['update:value', 'save']);
+const emit = defineEmits(['update:value', 'save', 'refresh']);
 
 // Local state to track edits
 const localValue = ref(props.value);
@@ -24,6 +29,7 @@ const isEdited = ref(false);
 
 // Stores
 const loadingState = useLoadingState();
+const $q = useQuasar();
 
 // Format confidence as percentage for display
 const confidencePercent = computed(() =>
@@ -64,23 +70,60 @@ const handleValueChange = () => {
 };
 
 // Save changes
-const saveChanges = () => {
-  const operationId = `save-${props.type}-${props.imageId || 'unknown'}`;
+const saveChanges = async () => {
+  if (!props.imageId) {
+    $q.notify({
+      type: 'negative',
+      message: 'Cannot save: No image ID provided',
+    });
+    return;
+  }
+
+  const operationId = `save-${props.type}-${props.imageId}`;
   loadingState.startLoading(
     operationId,
     `Saving ${displayInfo.value.label}...`,
   );
 
   try {
+    let error = '';
+
+    if (props.type === 'page_index') {
+      const pageIndex = localValue.value;
+      error = await updateImagePageIndex(props.imageId, pageIndex);
+    } else if (props.type === 'page_type') {
+      console.log(
+        `Calling updateImagePageType with imageId=${props.imageId}, pageType=${localValue.value}`,
+      );
+      error = await updateImagePageType(props.imageId, localValue.value);
+    }
+
+    if (error) {
+      throw new Error(error);
+    }
+
+    // Still emit event for parent component awareness
     emit('save', {
       type: props.type,
       value: localValue.value,
       confidence: 1, // Set to 100% when manually edited
     });
 
+    // Emit refresh event to reload the image
+    emit('refresh', props.imageId);
+
+    $q.notify({
+      type: 'positive',
+      message: `${displayInfo.value.label} updated successfully`,
+    });
+
     isEdited.value = false;
   } catch (error) {
     console.error(`Error saving ${props.type}:`, error);
+    $q.notify({
+      type: 'negative',
+      message: `Failed to save: ${error instanceof Error ? error.message : String(error)}`,
+    });
   } finally {
     loadingState.stopLoading(operationId);
   }
@@ -136,7 +179,6 @@ const saveChanges = () => {
                 `save-${props.type}-${props.imageId || 'unknown'}`,
               )
             "
-            :disable="!isEdited"
           >
             <q-tooltip>Save changes</q-tooltip>
           </q-btn>
