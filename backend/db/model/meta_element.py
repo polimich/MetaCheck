@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 if TYPE_CHECKING:
     from db.model.collection import Collection
     from db.model.image import Image
+    from db.model.meta_element_detection import MetaElementDetection
 
 from db.model.meta_element_type import MetaElementType
 from db.model.base import Entity, create_fk_relationship
@@ -72,6 +73,13 @@ class MetaElement(Entity):
     # JSONB attribute to store type-specific properties
     attributes: Mapped[Dict[str, Any]] = mapped_column(
         JSONB, default=dict, nullable=False, server_default="{}"
+    )
+    
+    meta_element_detections: Mapped[List["MetaElementDetection"]] = relationship(
+        "MetaElementDetection",
+        back_populates="meta_element",
+        lazy="selectin",
+        cascade="all, delete-orphan"
     )
     
     @property

@@ -10,7 +10,7 @@ import aiofiles
 from aiofiles import os as aiofiles_os
 from aiopath import AsyncPath
 from fastapi import HTTPException
-from sqlalchemy import exc, select
+from sqlalchemy import exc, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -282,3 +282,45 @@ async def get_preview_path(image_id: UUID) -> str:
     path = os.path.join(config.IMAGE_PREVIEW_DIR, image_id[:2])
     await aiofiles_os.makedirs(path, exist_ok=True)
     return os.path.join(path, f"{image_id}.jpg")
+
+
+async def update_page_type(db: AsyncSession, image_id: UUID, page_type: str):
+    """Update the page_type and page_type_confidence of an image.
+    
+    This function uses a direct SQL UPDATE statement and doesn't return anything.
+    """
+    try:
+        # Direct UPDATE statement without fetching the image first
+        stmt = (
+            update(model.Image)
+            .where(model.Image.id == image_id)
+            .values(page_type=page_type, page_type_confidence=1.0)
+        )
+        
+        await db.execute(stmt)
+        await db.commit()
+    except exc.SQLAlchemyError as e:
+        await db.rollback()
+        logger.exception(f"Failed to update page_type for image {image_id}")
+        raise DBError(f"Failed to update page_type for image {image_id}") from e
+
+
+async def update_page_index(db: AsyncSession, image_id: UUID, page_index: str):
+    """Update the page_index and page_index_confidence of an image.
+    
+    This function uses a direct SQL UPDATE statement and doesn't return anything.
+    """
+    try:
+        # Direct UPDATE statement without fetching the image first
+        stmt = (
+            update(model.Image)
+            .where(model.Image.id == image_id)
+            .values(page_index=page_index, page_index_confidence=1.0)
+        )
+        
+        await db.execute(stmt)
+        await db.commit()
+    except exc.SQLAlchemyError as e:
+        await db.rollback()
+        logger.exception(f"Failed to update page_index for image {image_id}")
+        raise DBError(f"Failed to update page_index for image {image_id}") from e

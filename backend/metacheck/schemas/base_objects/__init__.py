@@ -43,6 +43,9 @@ from metacheck.schemas.base_objects.collection import (
     Collection,
     CollectionNew,
     CollectionUpdate,
+    CollectionHierarchical,
+    DetectionHierarchical,
+    MetaElementHierarchical
 )
 
 from metacheck.schemas.base_objects.image import (
@@ -85,14 +88,17 @@ __all__ = [
     "Detection",
     "DetectionNew",
     "DetectionUpdate",
+    "DetectionHierarchical",
     "Image",
     "ImageUpdate",
     "Collection",
     "CollectionNew",
     "CollectionUpdate",
+    "CollectionHierarchical",
     "MetaElement",
     "MetaElementNew",
     "MetaElementUpdate",
+    "MetaElementHierarchical",
     "MetaElementDetection",
     "MetaElementDetectionNew",
     "MetaElementDetectionUpdate",

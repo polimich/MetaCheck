@@ -43,6 +43,7 @@ class Image(Entity):
     page_type_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)
     page_index: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     page_index_confidence: Mapped[Optional[float]] = mapped_column(nullable=True)
+    page_index_bbox: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
     
     collection: Mapped["Collection"] = relationship(
         "Collection", 

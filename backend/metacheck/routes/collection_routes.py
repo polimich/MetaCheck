@@ -86,3 +86,15 @@ async def get_collection_full(
         
         # Return Pydantic model
         return base_objects.Collection.model_validate(collection_dict)
+
+
+
+@collection_route.get(
+    "/{collection_id}/hierarchical",
+    response_model=base_objects.CollectionHierarchical,
+    tags=["Collection"],
+)
+async def get_collection_hierarchical(
+    collection_id: UUID, db: AsyncSession = Depends(get_async_session)
+):
+    return await crud_collection.get_collection_hierarchical(db, collection_id)

@@ -56,3 +56,24 @@ class CollectionUpdate(BaseModel):
 # Import at the end to avoid circular references
 from metacheck.schemas.base_objects.image import Image
 from metacheck.schemas.base_objects.meta_element import MetaElement
+from metacheck.schemas.base_objects.detection import Detection
+from metacheck.schemas.base_objects.meta_element_detection import MetaElementDetection
+from metacheck.schemas.base_objects.meta_element_type import MetaElementType
+
+class DetectionHierarchical(Detection, BaseEntity):
+    """Schema for a detection with hierarchical structure."""
+
+    meta_element_detections: "MetaElementDetection"
+
+class MetaElementHierarchical(MetaElement, BaseEntity):
+    """Schema for a meta element with hierarchical structure."""
+
+    detections: List["DetectionHierarchical"] = []
+    children: List["MetaElementHierarchical"] = []
+    images: List["Image"] = []
+
+class CollectionHierarchical(CollectionNew, BaseEntity):
+    """Schema for a collection with hierarchical structure."""
+
+    global_structure: MetaElementHierarchical
+    

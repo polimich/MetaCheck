@@ -18,6 +18,7 @@ from db import model
 from metacheck.constants import META_ELEMENT_TYPE_IDS, ElementTypeEnum
 from metacheck.database import DBError
 from metacheck.schemas import base_objects
+from metacheck.schemas.base_objects.collection import CollectionHierarchical, DetectionHierarchical, MetaElementHierarchical
 from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
@@ -402,91 +403,140 @@ async def _create_or_update_collection(db: AsyncSession, metakat_data: dict):
 
 
 async def _process_meta_elements(db: AsyncSession, metakat_data: dict, collection_id: UUID, success_counters: dict):
-    """Process all meta elements (volumes, issues, titles, etc.)"""
+    """Process all meta elements (volumes, issues, titles, etc.) in hierarchical order"""
     from metacheck.cruds import crud_meta_element
     from metacheck.constants import META_ELEMENT_TYPE_IDS
     
-    logger.info("PHASE 1: Processing meta elements...")
+    logger.info("PHASE 1: Processing meta elements in hierarchical order...")
     
-    async with db.begin():
-        # Process volumes
-        for volume_data in metakat_data.get("volumes", []):
-            try:
-                element_id = volume_data.get("id")
-                if not element_id:
-                    logger.warning("Found volume without ID, skipping")
-                    continue
-                
-                element_check = await db.execute(
-                    select(model.MetaElement).filter(model.MetaElement.id == element_id)
-                )
-                if element_check.unique().scalar_one_or_none():
-                    logger.info(f"Volume already exists: {element_id}")
-                    success_counters["volumes"] += 1
-                    continue
-                
-                attributes = {}
-                for field in ["periodical"]:
-                    if field in volume_data:
-                        attributes[field] = volume_data.get(field)
-                
-                volume_element = base_objects.MetaElementNew(
-                    id=element_id,
-                    collection_id=collection_id,
-                    meta_element_type_id=META_ELEMENT_TYPE_IDS["volume"],
-                    parent_id=None,
-                    attributes=attributes
-                )
-                
-                await crud_meta_element.create_meta_element(db, volume_element)
-                success_counters["volumes"] += 1
-                logger.info(f"Created volume: {element_id}")
-            except Exception as e:
-                logger.warning(f"Failed to process volume {volume_data.get('id')}: {e}")
+    # Define the correct hierarchical order for processing elements
+    # This ensures parent elements exist before child elements reference them
+    element_processing_order = ["titles", "volumes", "issues", "chapters", "articles", "supplements"]
+    
+    # Process each element type in order with separate transactions
+    for element_type in element_processing_order:
+        if element_type not in metakat_data or not metakat_data[element_type]:
+            logger.info(f"No {element_type} to process, skipping")
+            continue
+            
+        logger.info(f"Processing {element_type}...")
         
-        # Process other element types
-        for element_type in ["issues", "titles", "chapters", "articles", "supplements"]:
-            if element_type in metakat_data and metakat_data[element_type]:
-                logger.info(f"Processing {element_type}...")
-                
-                element_type_singular = element_type[:-1]
-                meta_element_type_id = META_ELEMENT_TYPE_IDS.get(element_type_singular)
-                
-                if not meta_element_type_id:
-                    logger.warning(f"No meta element type ID found for {element_type_singular}, skipping")
-                    continue
-                
-                for element_data in metakat_data[element_type]:
-                    try:
-                        element_id = element_data.get("id")
-                        if not element_id:
-                            logger.warning(f"Found {element_type_singular} without ID, skipping")
-                            continue
-                        
-                        element_check = await db.execute(
-                            select(model.MetaElement).filter(model.MetaElement.id == element_id)
-                        )
-                        if element_check.unique().scalar_one_or_none():
-                            logger.info(f"{element_type_singular.capitalize()} already exists: {element_id}")
-                            success_counters[element_type] += 1
-                            continue
-                        
-                        attributes = {k: v for k, v in element_data.items() 
-                                     if k not in ["id", "parent_id", "collection_id", "type"]}
-                        
-                        element_obj = base_objects.MetaElementNew(
-                            id=element_id,
-                            collection_id=collection_id,
-                            meta_element_type_id=meta_element_type_id,
-                            parent_id=element_data.get("parent_id"),
-                            attributes=attributes
-                        )
-                        
-                        await crud_meta_element.create_meta_element(db, element_obj)
+        element_type_singular = element_type[:-1]  # Remove 's' to get singular form
+        meta_element_type_id = META_ELEMENT_TYPE_IDS.get(element_type_singular)
+        
+        if not meta_element_type_id:
+            logger.warning(f"No meta element type ID found for {element_type_singular}, skipping")
+            continue
+        
+        # Initialize counter if not exists
+        if element_type not in success_counters:
+            success_counters[element_type] = 0
+        
+        # Process each element of the current type in a single transaction
+        async with db.begin():
+            for element_data in metakat_data[element_type]:
+                try:
+                    element_id = element_data.get("id")
+                    if not element_id:
+                        logger.warning(f"Found {element_type_singular} without ID, skipping")
+                        continue
+                    
+                    # Check if element already exists
+                    element_check = await db.execute(
+                        select(model.MetaElement).filter(model.MetaElement.id == element_id)
+                    )
+                    if element_check.unique().scalar_one_or_none():
+                        logger.info(f"{element_type_singular.capitalize()} already exists: {element_id}")
                         success_counters[element_type] += 1
-                        logger.info(f"Created {element_type_singular}: {element_id}")
-                    except Exception as e:
-                        logger.warning(f"Failed to process {element_type_singular} {element_data.get('id')}: {e}")
+                        continue
+                    
+                    # Verify parent exists if parent_id is provided
+                    parent_id = element_data.get("parent_id")
+                    if parent_id:
+                        parent_check = await db.execute(
+                            select(model.MetaElement).filter(model.MetaElement.id == parent_id)
+                        )
+                        parent_exists = parent_check.unique().scalar_one_or_none()
+                        if not parent_exists:
+                            logger.warning(f"Parent element {parent_id} for {element_type_singular} {element_id} does not exist, will be created with no parent")
+                            parent_id = None
+                        else:
+                            logger.info(f"Found parent {parent_id} for element {element_id}")
+                    
+                    # Filter out fields that are not attributes
+                    # Only include non-detection fields like boolean values, integers, etc.
+                    attributes = {}
+                    for k, v in element_data.items():
+                        # Skip system fields
+                        if k in ["id", "parent_id", "collection_id", "type"]:
+                            continue
+                            
+                        # Skip detection fields (either tuple or list of tuples)
+                        if isinstance(v, tuple) and len(v) == 3 and isinstance(v[0], str) and isinstance(v[1], (int, float)):
+                            continue
+                        if isinstance(v, list) and v and isinstance(v[0], tuple) and len(v[0]) == 3:
+                            continue
+                            
+                        # Keep primitive values (bool, int, etc.)
+                        if v is None or isinstance(v, (bool, int, float, str)):
+                            attributes[k] = v
+                    
+                    # Create the element object
+                    element_obj = base_objects.MetaElementNew(
+                        id=element_id,
+                        collection_id=collection_id,
+                        meta_element_type_id=meta_element_type_id,
+                        parent_id=parent_id,
+                        attributes=attributes
+                    )
+                    
+                    # Use the raw SQLAlchemy model to ensure all fields are set
+                    db_element = model.MetaElement(
+                        id=element_id,
+                        collection_id=collection_id,
+                        meta_element_type_id=meta_element_type_id,
+                        parent_id=parent_id,
+                        attributes=attributes
+                    )
+                    db.add(db_element)
+                    
+                    success_counters[element_type] += 1
+                    logger.info(f"Created {element_type_singular}: {element_id} with parent_id: {parent_id}")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to process {element_type_singular} {element_data.get('id')}: {e}")
+                    logger.exception(e)
+        
+        # Log completion of processing for this element type
+        logger.info(f"Completed processing {element_type}, created/updated {success_counters[element_type]} elements")
+            
+    # Verify parent-child relationships as a final check
+    async with db.begin():
+        logger.info("Verifying parent-child relationships...")
+        all_elements = await db.execute(
+            select(model.MetaElement)
+            .where(model.MetaElement.collection_id == collection_id)
+        )
+        db_elements = all_elements.unique().scalars().all()
+        
+        elements_with_parent = 0
+        elements_without_parent = 0
+        
+        for element in db_elements:
+            if element.parent_id:
+                elements_with_parent += 1
+                parent_check = await db.execute(
+                    select(model.MetaElement).filter(model.MetaElement.id == element.parent_id)
+                )
+                parent = parent_check.unique().scalar_one_or_none()
+                if parent:
+                    logger.info(f"Verified parent-child relationship: {element.id} -> {parent.id}")
+                else:
+                    logger.warning(f"Element {element.id} has parent_id {element.parent_id} but parent doesn't exist")
+            else:
+                elements_without_parent += 1
+        
+        logger.info(f"Parent-child verification complete. Elements with parents: {elements_with_parent}, root elements: {elements_without_parent}")
 
 
 async def _process_images(db: AsyncSession, metakat_data: dict, collection_id: UUID, project_root: str, success_counters: dict):
@@ -621,22 +671,20 @@ async def _process_detections(db: AsyncSession, metakat_data: dict, collection_i
     logger.info("PHASE 3: Processing detections...")
     
     regular_detections = metakat_data.get("detections", [])
-    page_number_detections = metakat_data.get("page_number_detections", [])
     
     verification_stats = {
-        "total_detections": len(regular_detections) + len(page_number_detections),
+        "total_detections": len(regular_detections),
         "success": 0,
-        "failed": 0,
-        "page_numbers": 0
+        "failed": 0
     }
     
     if verification_stats["total_detections"] == 0:
         logger.info("No detections to process")
         return verification_stats
     
-    logger.info(f"Processing {len(regular_detections)} regular detections and {len(page_number_detections)} page number detections")
+    logger.info(f"Processing {len(regular_detections)} detections")
     
-    # First process regular detections
+    # Process regular detections
     try:
         async with db.begin():
             meta_roles_query = await db.execute(select(model.MetaRole))
@@ -668,6 +716,7 @@ async def _process_detections(db: AsyncSession, metakat_data: dict, collection_i
                     
                     if not image_id:
                         logger.warning(f"No image found for detection: {detection_id}, skipping")
+                        verification_stats["failed"] += 1
                         continue
                     
                     image_check = await db.execute(
@@ -676,7 +725,7 @@ async def _process_detections(db: AsyncSession, metakat_data: dict, collection_i
                     db_image = image_check.unique().scalar_one_or_none()
                     
                     if not db_image:
-                        logger.warning(f"Image {image_id} doesn't exist for detection {detection_id}")
+                        logger.warning(f"No image found for detection: {detection_id}, skipping")
                         verification_stats["failed"] += 1
                         continue
                     else:
@@ -726,8 +775,181 @@ async def _process_detections(db: AsyncSession, metakat_data: dict, collection_i
                 except Exception as e:
                     detection_id = detection.get("id", "unknown")
                     logger.warning(f"Failed to process detection {detection_id}: {e}")
+                    verification_stats["failed"] += 1
     except Exception as e:
-        logger.error(f"Error processing regular detections: {e}")
+        logger.error(f"Error processing detections: {e}")
+        verification_stats["failed"] += len(regular_detections)
     
     return verification_stats
 
+
+async def get_collection_hierarchical(db: AsyncSession, collection_id: UUID):
+    """Get a collection with all its images and meta_elements explicitly loaded in a hierarchical structure"""
+    try:
+        # Get the collection with basic information
+        async with db.begin():
+            collection_query = await db.execute(
+                select(model.Collection)
+                .where(model.Collection.id == collection_id)
+            )
+            db_collection = collection_query.unique().scalar_one_or_none()
+            
+            if not db_collection:
+                return None
+            
+            # Break down the query into simpler parts to avoid SQL aliasing issues
+            
+            # First, get all meta elements for this collection
+            meta_elements_query = await db.execute(
+                select(model.MetaElement)
+                .where(model.MetaElement.collection_id == collection_id)
+            )
+            db_meta_elements = meta_elements_query.unique().scalars().all()
+            
+            # Get all meta element types in a single query
+            meta_element_types_query = await db.execute(
+                select(model.MetaElementType)
+            )
+            db_meta_element_types = meta_element_types_query.unique().scalars().all()
+            
+            # Create a mapping of meta element types by ID for quick lookup
+            meta_element_types_by_id = {str(met.id): met for met in db_meta_element_types}
+            
+            # Get all meta roles in a single query
+            meta_roles_query = await db.execute(
+                select(model.MetaRole)
+            )
+            db_meta_roles = meta_roles_query.unique().scalars().all()
+            
+            # Create a mapping of meta roles by ID for quick lookup
+            meta_roles_by_id = {str(mr.id): mr for mr in db_meta_roles}
+            
+            # First pass: Create all meta elements without relationships
+            meta_elements_by_id = {}
+            root_elements = []
+            
+            for element in db_meta_elements:
+                # Convert to Pydantic model
+                meta_element_dict = model.orm2dict(element)
+                
+                # Initialize with empty lists for relationships
+                meta_element_dict["detections"] = []
+                meta_element_dict["children"] = []
+                meta_element_dict["images"] = []
+                
+                # Add meta_element_type relationship
+                if element.meta_element_type_id and str(element.meta_element_type_id) in meta_element_types_by_id:
+                    meta_element_type = meta_element_types_by_id[str(element.meta_element_type_id)]
+                    meta_element_dict["meta_element_type"] = base_objects.MetaElementType(
+                        **model.orm2dict(meta_element_type)
+                    )
+                
+                # Create MetaElementHierarchical object
+                meta_element = MetaElementHierarchical(**meta_element_dict)
+                meta_elements_by_id[str(element.id)] = meta_element
+                
+                # Collect root elements for later
+                if not element.parent_id:
+                    root_elements.append(meta_element)
+            
+            # Second pass: Build parent-child relationships
+            for element in db_meta_elements:
+                if element.parent_id:
+                    # Get the parent ID as string for lookup
+                    parent_id_str = str(element.parent_id)
+                    child_id_str = str(element.id)
+                    
+                    # Only proceed if both parent and child exist in our map
+                    if parent_id_str in meta_elements_by_id and child_id_str in meta_elements_by_id:
+                        parent = meta_elements_by_id[parent_id_str]
+                        child = meta_elements_by_id[child_id_str]
+                        
+                        # Append child to parent's children
+                        parent.children.append(child)
+                    else:
+                        logger.warning(f"Parent-child relationship not found: parent_id={parent_id_str}, child_id={child_id_str}")
+            
+            # For each meta element, get its images
+            for element_id, element in meta_elements_by_id.items():
+                images_query = await db.execute(
+                    select(model.Image)
+                    .where(model.Image.parent_meta_element_id == UUID(element_id))
+                )
+                db_images = images_query.unique().scalars().all()
+                
+                for image in db_images:
+                    image_dict = model.orm2dict(image)
+                    image_obj = base_objects.Image(**image_dict)
+                    element.images.append(image_obj)
+            
+            # For each meta element, get its meta element detections and associated detections
+            for element_id, element in meta_elements_by_id.items():
+                # Get meta element detections
+                meta_element_detections_query = await db.execute(
+                    select(model.MetaElementDetection)
+                    .where(model.MetaElementDetection.meta_element_id == UUID(element_id))
+                )
+                db_meta_element_detections = meta_element_detections_query.unique().scalars().all()
+                
+                # For each meta element detection, get the associated detection
+                for med in db_meta_element_detections:
+                    detection_query = await db.execute(
+                        select(model.Detection)
+                        .where(model.Detection.id == med.detection_id)
+                    )
+                    db_detection = detection_query.unique().scalar_one_or_none()
+                    
+                    if db_detection:
+                        # Check if this detection is already processed
+                        detection_exists = any(d.id == db_detection.id for d in element.detections)
+                        
+                        if not detection_exists:
+                            detection_dict = model.orm2dict(db_detection)
+                            
+                            # Create the meta_element_detection link with meta_role
+                            meta_element_detection_dict = model.orm2dict(med)
+                            
+                            # Add meta_role to meta_element_detection if it exists
+                            if med.meta_role_id and str(med.meta_role_id) in meta_roles_by_id:
+                                meta_role = meta_roles_by_id[str(med.meta_role_id)]
+                                meta_element_detection_dict["meta_role"] = base_objects.MetaRole(
+                                    **model.orm2dict(meta_role)
+                                )
+                            
+                            meta_element_detection = base_objects.MetaElementDetection(**meta_element_detection_dict)
+                            
+                            # Create DetectionHierarchical object with a single meta_element_detection
+                            detection_dict["meta_element_detections"] = meta_element_detection
+                            detection_obj = DetectionHierarchical(**detection_dict)
+                            
+                            # Add to element's detections
+                            element.detections.append(detection_obj)
+            
+            # Check if we have any root elements
+            if not root_elements:
+                logger.warning(f"No root elements found for collection {collection_id}")
+                return None
+                
+            # If multiple root elements, select the first one
+            root_element = root_elements[0]
+            if len(root_elements) > 1:
+                logger.warning(f"Multiple root elements found for collection {collection_id}, using the first one")
+                
+            # Create the final hierarchical collection with a single global_structure
+            collection_dict = model.orm2dict(db_collection)
+            collection_dict["global_structure"] = root_element
+            
+            # Add debug information
+            logger.info(f"Root element ID: {root_element.id}")
+            logger.info(f"Root element has {len(root_element.children)} children")
+            for i, child in enumerate(root_element.children):
+                logger.info(f"  Child {i+1} ID: {child.id}, has {len(child.children)} children")
+            
+            return CollectionHierarchical(**collection_dict)
+            
+    except exc.SQLAlchemyError as e:
+        logger.exception(f"Failed reading hierarchical collection from database")
+        raise DBError(f"Failed reading hierarchical collection from database") from e
+    
+    
+    

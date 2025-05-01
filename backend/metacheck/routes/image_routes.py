@@ -193,3 +193,13 @@ async def put_image_detection(
     db: AsyncSession = Depends(get_async_session),
 ):
     await crud_general.update_obj(db, detection_update, model.Detection)
+
+
+@image_route.post("/update_page_type/{image_id}/{page_type}", tags=["Image"])
+async def update_page_type(image_id: UUID, page_type: str, db: AsyncSession = Depends(get_async_session)):
+    await crud_image.update_page_type(db, image_id, page_type)
+
+
+@image_route.post("/update_page_index/{image_id}/{page_index}", tags=["Image"])
+async def update_page_index(image_id: UUID, page_index: str, db: AsyncSession = Depends(get_async_session)):
+    await crud_image.update_page_index(db, image_id, page_index)

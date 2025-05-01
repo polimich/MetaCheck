@@ -248,26 +248,36 @@ def extract_detections_from_element(element, detection_to_bbox, detection_to_pag
         value = data[field_name]
         snake_field_name = camel_to_snake(field_name)
         
+        # Skip type field as it's an Enum, not a detection
+        if field_name == "type":
+            continue
+            
+        # Skip pageNumber field since page_index is set during image creation
+        if field_name == "pageNumber" and data.get("type") == ElementType.page:
+            continue
+            
         # Single detection
         if isinstance(value, tuple) and len(value) == 3 and isinstance(value[0], str) and \
            isinstance(value[1], float) and isinstance(value[2], UUID):
             text, confidence, detection_uuid = value
             bbox = detection_to_bbox.get(detection_uuid)
-            page_id = detection_to_page_mapping.get(detection_uuid)
+            page_id = detection_to_page_mapping.get(str(detection_uuid))
+            if page_id is None:
+                page_id = detection_to_page_mapping.get(detection_uuid)
             
-            # Only add detections with a bbox
-            if bbox:
-                detection_data = {
-                    "id": str(detection_uuid),
-                    "value": text,
-                    "confidence": confidence,
-                    "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None,
-                    "parent_element_id": str(data.get("id")),
-                    "element_type": data.get("type"),
-                    "meta_attribute_type": snake_field_name,
-                    "page_id": page_id
-                }
-                detections.append(detection_data)
+            # Include all detections, even if bbox is None
+            detection_data = {
+                "id": str(detection_uuid),
+                "value": text,
+                "confidence": confidence,
+                "bbox": f"{float(bbox[0])},{float(bbox[1])},{float(bbox[2])},{float(bbox[3])}" if bbox else None,
+                "parent_element_id": str(data.get("id")),
+                "element_type": data.get("type").value if hasattr(data.get("type"), "value") else data.get("type"),
+                "meta_attribute_type": snake_field_name,
+                "page_id": str(page_id) if page_id else None
+            }
+            
+            detections.append(detection_data)
         
         # List of detections
         elif isinstance(value, list) and value and isinstance(value[0], tuple):
@@ -277,21 +287,23 @@ def extract_detections_from_element(element, detection_to_bbox, detection_to_pag
                    isinstance(det[2], UUID):
                     text, confidence, detection_uuid = det
                     bbox = detection_to_bbox.get(detection_uuid)
-                    page_id = detection_to_page_mapping.get(detection_uuid)
+                    page_id = detection_to_page_mapping.get(str(detection_uuid))
+                    if page_id is None:
+                        page_id = detection_to_page_mapping.get(detection_uuid)
                     
-                    # Only add detections with a bbox
-                    if bbox:
-                        detection_data = {
-                            "id": str(detection_uuid),
-                            "value": text,
-                            "confidence": confidence,
-                            "bbox": f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}" if bbox else None,
-                            "parent_element_id": str(data.get("id")),
-                            "element_type": data.get("type"),
-                            "meta_attribute_type": snake_field_name,
-                            "page_id": page_id
-                        }
-                        detections.append(detection_data)
+                    # Include all detections, even if bbox is None
+                    detection_data = {
+                        "id": str(detection_uuid),
+                        "value": text,
+                        "confidence": confidence,
+                        "bbox": f"{float(bbox[0])},{float(bbox[1])},{float(bbox[2])},{float(bbox[3])}" if bbox else None,
+                        "parent_element_id": str(data.get("id")),
+                        "element_type": data.get("type").value if hasattr(data.get("type"), "value") else data.get("type"),
+                        "meta_attribute_type": snake_field_name,
+                        "page_id": str(page_id) if page_id else None
+                    }
+                    
+                    detections.append(detection_data)
     
     return detections
 
@@ -417,7 +429,6 @@ class MetaKatImport(BaseModel):
             result["page_to_alto_mapping"] = {
                 str(k): v for k, v in self.page_to_alto_mapping.items()
             }
-            
         return result
 
 
@@ -428,7 +439,7 @@ class MetaKatImport(BaseModel):
 
 def main():
     with open(
-        "/Users/michaelpolivka/PycharmProjects/MetaCheck/output_samples/monograph/0b1cb770-d7e7-11ea-9c41-005056827e52.97b800fd-3b9b-47ab-8133-c5911a630163.json",
+        "/Users/michaelpolivka/PycharmProjects/MetaCheck/output_samples/monographmulti/0accda90-9d76-11e9-bc42-5ef3fc9ae867.8571411c-8266-4a0d-89bb-665d825ddb86.json",
         "r",
         encoding="utf-8",
     ) as f:

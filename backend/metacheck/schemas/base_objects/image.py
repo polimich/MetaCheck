@@ -34,12 +34,13 @@ class Image(BaseEntity):
     detections: List[Detection] = []
     detection_count: int
     annotated_detection_count: int
-    parent_meta_element: Optional[MetaElement] = None  # Renamed from page_meta_element
+    parent_meta_element: Optional[MetaElement] = None  
     order: int
-    page_index: Optional[str] = None  # Changed from Detection to string
-    page_index_confidence: Optional[float] = None  # Add page_index_confidence field
-    page_type: Optional[PageType] = None  # Add page_type field
-    page_type_confidence: Optional[float] = None  # Add page_type_confidence field
+    page_index: Optional[str] = None  
+    page_index_confidence: Optional[float] = None  
+    page_index_bbox: Optional[str] = None  
+    page_type: Optional[PageType] = None
+    page_type_confidence: Optional[float] = None
     
     class Config:
         from_attributes = True
