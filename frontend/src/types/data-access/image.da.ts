@@ -1,8 +1,8 @@
-import { BaseDA } from 'src/types/data-access/base.da.ts';
+import { BaseEntityType } from 'src/types/data-access/base.da.ts';
 import { DetectionDA } from 'src/types/data-access/detection.da.ts';
 import { MetaElementDA } from './meta_element.da';
 
-export type ImageDA = BaseDA & {
+export type ImageDA = BaseEntityType & {
   collection_id: string;
   name: string;
   height: number;

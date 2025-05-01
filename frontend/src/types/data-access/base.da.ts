@@ -1,4 +1,4 @@
-export type BaseDA = {
+export type BaseEntityType = {
   id: string;
   created_date: string;
   last_change: string;

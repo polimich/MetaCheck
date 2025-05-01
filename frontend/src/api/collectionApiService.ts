@@ -1,9 +1,10 @@
 import { axios, axiosErrorHandler } from './index';
 import {
-  CollectionDA,
-  CollectionNewDA,
+  CollectionType,
+  CollectionNewType,
   CollectionUpdateDA,
   ImageDA,
+  CollectionHierarchical,
 } from 'src/types/data-access';
 import {
   CollectionListSchema,
@@ -14,6 +15,7 @@ import {
 } from 'src/types/validation';
 import { z } from 'zod';
 import { normalizeBbox } from 'src/utils/bboxUtils';
+import { DAResponse } from 'src/stores/data-access/types';
 
 /**
  * Handle Zod validation errors
@@ -30,8 +32,8 @@ const handleZodError = (error: unknown, entityName: string): string => {
  * Normalize bounding box formats in collection data
  */
 const normalizeBboxInCollection = (
-  collection: Partial<CollectionDA>,
-): Partial<CollectionDA> => {
+  collection: Partial<CollectionType>,
+): Partial<CollectionType> => {
   if (!collection || !collection.images) return collection;
 
   // Deep clone to avoid mutating the original
@@ -55,18 +57,18 @@ const normalizeBboxInCollection = (
  * Get all collections
  */
 export const getCollections = async (): Promise<{
-  data: CollectionDA[];
+  data: CollectionType[];
   error: string;
 }> => {
   try {
     console.log('API: Fetching all collections');
-    const { data } = await axios.get<CollectionDA[]>('collection');
+    const { data } = await axios.get<CollectionType[]>('collection');
     console.log('API: Collections:', data);
 
     // Validate the response data
     try {
       const validatedData = CollectionListSchema.parse(data);
-      return { data: validatedData as unknown as CollectionDA[], error: '' };
+      return { data: validatedData as unknown as CollectionType[], error: '' };
     } catch (validationError) {
       const errorMessage = handleZodError(validationError, 'collections');
       console.error('Validation error:', validationError);
@@ -84,7 +86,7 @@ export const getCollections = async (): Promise<{
  */
 export const getCollection = async (
   collectionId: string,
-): Promise<{ data: CollectionDA | null; error: string }> => {
+): Promise<{ data: CollectionType | null; error: string }> => {
   if (!collectionId) {
     console.error('No collection ID provided');
     return { data: null, error: 'No collection ID provided' };
@@ -102,7 +104,7 @@ export const getCollection = async (
 
   try {
     console.log(`API: Fetching collection ${collectionId}`);
-    const { data } = await axios.get<CollectionDA>(
+    const { data } = await axios.get<CollectionType>(
       `/collection/${collectionId}`,
     );
 
@@ -113,7 +115,7 @@ export const getCollection = async (
     try {
       const validatedData = CollectionSchema.parse(normalizedData);
       console.log(`API: Successfully fetched collection ${collectionId}`);
-      return { data: validatedData as unknown as CollectionDA, error: '' };
+      return { data: validatedData as unknown as CollectionType, error: '' };
     } catch (validationError) {
       const errorMessage = handleZodError(validationError, 'collection');
       console.error('Validation error:', validationError);
@@ -130,7 +132,7 @@ export const getCollection = async (
  * Create a new collection
  */
 export const addCollection = async (
-  collection: CollectionNewDA,
+  collection: CollectionNewType,
 ): Promise<string> => {
   try {
     // Validate the request data
@@ -232,5 +234,21 @@ export const importCollection = async (file: File): Promise<string> => {
     return '';
   } catch (error) {
     return axiosErrorHandler(error);
+  }
+};
+
+/**
+ * Get a collection with its hierarchial structure
+ */
+export const apiGetCollectionHierarchical = async (
+  collectionId: string,
+): Promise<DAResponse<CollectionHierarchical>> => {
+  try {
+    const { data } = await axios.get<CollectionHierarchical>(
+      `/collection/${collectionId}/hierarchical`,
+    );
+    return { data, error: '' };
+  } catch (error) {
+    return { data: undefined, error: axiosErrorHandler(error) };
   }
 };

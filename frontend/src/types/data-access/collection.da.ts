@@ -1,17 +1,20 @@
-import { BaseDA } from 'src/types/data-access/base.da.ts';
+import { BaseEntityType } from 'src/types/data-access/base.da.ts';
 import { ImageDA } from 'src/types/data-access/image.da.ts';
 import { WorkState } from 'src/types/data-access/enums.ts';
-import { MetaElementDA } from 'src/types/data-access/meta_element.da.ts';
+import {
+  MetaElementDA,
+  MetaElementHierarchical,
+} from 'src/types/data-access/meta_element.da.ts';
 
-export type CollectionNewDA = {
+export type CollectionNewType = {
   id: string;
   name: string;
   description: string;
   info: string;
 };
 
-export type CollectionDA = BaseDA &
-  CollectionNewDA & {
+export type CollectionType = BaseEntityType &
+  CollectionNewType & {
     confidence?: number;
     work_state: WorkState;
     image_count: number;
@@ -35,3 +38,8 @@ export type CollectionUpdateDA = {
   is_public?: boolean;
   deleted?: boolean;
 };
+
+export type CollectionHierarchical = BaseEntityType &
+  CollectionType & {
+    global_structure: MetaElementHierarchical;
+  };

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useImageStore } from 'src/stores';
-import { useCollectionDataAccess } from 'stores/data-access';
+import { useCollectionDataAccess, useDataAccess } from 'stores/data-access';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { useStateManager } from 'src/stores/app/stateManager';
@@ -19,6 +19,7 @@ const stateManager = useStateManager();
 const imageStore = useImageStore();
 const collectionDA = useCollectionDataAccess();
 const currentCollection = useCurrentCollectionState();
+const dataAccess = useDataAccess();
 const $q = useQuasar();
 
 // State for connection status
@@ -92,6 +93,7 @@ const initApplication = async () => {
       collectionDA.init(),
       currentCollection.init(),
       imageStore.init(),
+      dataAccess.init(),
     ]);
 
     initProgress.value = 50;

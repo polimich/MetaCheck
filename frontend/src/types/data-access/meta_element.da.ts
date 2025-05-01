@@ -1,8 +1,12 @@
-import { BaseDA } from 'src/types/data-access/base.da.ts';
-import { DetectionDA } from 'src/types/data-access/detection.da.ts';
+import { BaseEntityType } from 'src/types/data-access/base.da.ts';
+import {
+  DetectionDA,
+  DetectionHierarchical,
+} from 'src/types/data-access/detection.da.ts';
 import { MetaRoleDA } from './meta_role.da';
+import { ImageDA } from './image.da';
 
-export type MetaElementTypeDA = BaseDA & {
+export type MetaElementTypeDA = BaseEntityType & {
   name: string;
   display_name?: string;
 };
@@ -21,7 +25,7 @@ export type MetaElementAttributes = {
       >;
 };
 
-export type MetaElementDA = BaseDA & {
+export type MetaElementDA = BaseEntityType & {
   collection_id: string;
   meta_element_type_id: string;
   parent_id?: string;
@@ -33,7 +37,7 @@ export type MetaElementDA = BaseDA & {
   children?: MetaElementDA[];
 };
 
-export type MetaElementDetectionDA = BaseDA & {
+export type MetaElementDetectionDA = BaseEntityType & {
   meta_element_id: string;
   meta_role_id: string;
   detection_id: string;
@@ -44,7 +48,14 @@ export type MetaElementDetectionDA = BaseDA & {
   detection?: DetectionDA;
 };
 
-export type MetaElementDetectionAttributeTypeDA = BaseDA & {
+export type MetaElementHierarchical = BaseEntityType &
+  MetaElementDA & {
+    detections: DetectionHierarchical[];
+    children: MetaElementHierarchical[];
+    images: ImageDA[];
+  };
+
+export type MetaElementDetectionAttributeTypeDA = BaseEntityType & {
   name: string;
   display_name?: string;
 };

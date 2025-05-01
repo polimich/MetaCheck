@@ -15,11 +15,6 @@ const routes: RouteRecordRaw[] = [
         name: 'collections',
         component: () => import('pages/CollectionsPage.vue'),
       },
-      {
-        path: 'dev',
-        name: 'dev',
-        component: () => import('pages/DevPage.vue'),
-      },
     ],
   },
   {
@@ -41,6 +36,11 @@ const routes: RouteRecordRaw[] = [
         path: ':imageId',
         name: 'image',
         component: () => import('pages/ImageDetailPage.vue'),
+      },
+      {
+        path: 'dev',
+        name: 'dev',
+        component: () => import('pages/DevPage.vue'),
       },
     ],
   },

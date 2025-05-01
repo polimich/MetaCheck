@@ -1,6 +1,7 @@
-import { BaseDA } from 'src/types/data-access/base.da.ts';
+import { BaseEntityType } from 'src/types/data-access/base.da.ts';
+import { MetaElementDetectionDA } from './meta_element.da';
 
-export type DetectionTypeDA = BaseDA & {
+export type DetectionTypeDA = BaseEntityType & {
   name: string;
   color: string;
   display_name: string;
@@ -14,7 +15,7 @@ export type DetectionNewDA = {
   confidence?: number;
 };
 
-export type DetectionDA = BaseDA &
+export type DetectionDA = BaseEntityType &
   DetectionNewDA & {
     annotated: boolean;
     computed_color: string;
@@ -31,3 +32,8 @@ export type DetectionUpdateDA = {
   bbox?: string;
   deleted?: boolean;
 };
+
+export type DetectionHierarchical = BaseEntityType &
+  DetectionDA & {
+    meta_element_detection: MetaElementDetectionDA;
+  };

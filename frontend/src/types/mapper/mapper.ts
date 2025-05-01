@@ -1,7 +1,7 @@
 import {
-  CollectionNewDA,
+  CollectionNewType,
   CollectionUpdateDA,
-  CollectionDA,
+  CollectionType,
   DetectionDA,
   DetectionNewDA,
   DetectionTypeDA,
@@ -20,7 +20,7 @@ import {
 } from 'src/types/frontend-state';
 
 // Collection mappers
-function CollectionDAtoState(collectionDA: CollectionDA): CollectionState {
+function CollectionDAtoState(collectionDA: CollectionType): CollectionState {
   const images = collectionDA.images.map((image: ImageDA) =>
     ImageDAtoState(image),
   );
@@ -92,7 +92,7 @@ function CollectionStateToDA(
 
 function CollectionStateToNewDA(
   collectionState: CollectionState,
-): CollectionNewDA {
+): CollectionNewType {
   // No meta_elements field in the new collection, they are added separately
   return {
     id: collectionState.id,

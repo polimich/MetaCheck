@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import {
-  CollectionDA,
+  CollectionType as CollectionTypeDA,
   ImageDA,
   DetectionState,
   MetaRoleOption,
@@ -36,8 +36,8 @@ export const useCollectionDataAccess = defineStore(
   'collectionDataAccessStore',
   () => {
     // State
-    const collection = ref<CollectionDA>();
-    const collections = ref<CollectionDA[]>([]);
+    const collection = ref<CollectionTypeDA>();
+    const collections = ref<CollectionTypeDA[]>([]);
     const loading = ref(false);
     const loaded = ref(false);
     const error = ref('');
@@ -73,7 +73,7 @@ export const useCollectionDataAccess = defineStore(
     // Methods with deduplication and caching
     const loadCollection = async (
       collectionId: string,
-    ): Promise<DAResponse<CollectionDA>> => {
+    ): Promise<DAResponse<CollectionTypeDA>> => {
       // If we're loading a different collection, reset the state
       if (currentCollectionId.value !== collectionId) {
         resetState();
@@ -93,7 +93,7 @@ export const useCollectionDataAccess = defineStore(
       // Deduplication: If a request for this collection is already in progress, return that promise
       const requestKey = generateRequestKey('loadCollection', collectionId);
       const existingRequest = pendingRequests.value[requestKey] as
-        | Promise<DAResponse<CollectionDA>>
+        | Promise<DAResponse<CollectionTypeDA>>
         | undefined;
       if (existingRequest) {
         console.log(
@@ -106,7 +106,7 @@ export const useCollectionDataAccess = defineStore(
       error.value = '';
 
       // Create a new promise for this request
-      const requestPromise = new Promise<DAResponse<CollectionDA>>(
+      const requestPromise = new Promise<DAResponse<CollectionTypeDA>>(
         async (resolve) => {
           try {
             const response = await apiGetCollection(collectionId); // Use renamed import
@@ -159,7 +159,9 @@ export const useCollectionDataAccess = defineStore(
       return requestPromise;
     };
 
-    const loadCollections = async (): Promise<DAResponse<CollectionDA[]>> => {
+    const loadCollections = async (): Promise<
+      DAResponse<CollectionTypeDA[]>
+    > => {
       // Check if we already have collections cached and they're still valid
       if (
         collections.value.length > 0 &&
@@ -173,7 +175,7 @@ export const useCollectionDataAccess = defineStore(
       // Deduplication: If a request for collections is already in progress, return that promise
       const requestKey = generateRequestKey('loadCollections');
       const existingRequest = pendingRequests.value[requestKey] as
-        | Promise<DAResponse<CollectionDA[]>>
+        | Promise<DAResponse<CollectionTypeDA[]>>
         | undefined;
       if (existingRequest) {
         console.log(
@@ -186,7 +188,7 @@ export const useCollectionDataAccess = defineStore(
       error.value = '';
 
       // Create a new promise for this request
-      const requestPromise = new Promise<DAResponse<CollectionDA[]>>(
+      const requestPromise = new Promise<DAResponse<CollectionTypeDA[]>>(
         async (resolve) => {
           try {
             const response = await apiGetCollections(); // Use renamed import
@@ -197,7 +199,7 @@ export const useCollectionDataAccess = defineStore(
             } else {
               // Cast Collection[] to CollectionDA[] - Requires careful type checking or transformation
               // For now, assume Collection is compatible enough or needs mapping
-              collections.value = response.data as CollectionDA[];
+              collections.value = response.data as CollectionTypeDA[];
               lastCollectionsFetch.value = Date.now();
               resolve({ data: collections.value, error: undefined }); // Return the potentially casted data
             }

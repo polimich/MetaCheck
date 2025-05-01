@@ -5,7 +5,7 @@ import { useCollectionDataAccess } from 'src/stores/data-access';
 import { ref, onMounted, computed } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'vue-router';
-import { CollectionDA } from 'src/types';
+import { CollectionType } from 'src/types';
 import { TableSkeleton } from 'src/components';
 
 defineOptions({
@@ -91,7 +91,7 @@ const handleResetImport = () => {
   collectionToImport.value = null;
 };
 
-const onRowClick = (_evt: Event, row: CollectionDA) => {
+const onRowClick = (_evt: Event, row: CollectionType) => {
   router.push({
     name: 'collection',
     params: { collectionId: row.id },
