@@ -783,173 +783,386 @@ async def _process_detections(db: AsyncSession, metakat_data: dict, collection_i
     return verification_stats
 
 
-async def get_collection_hierarchical(db: AsyncSession, collection_id: UUID):
-    """Get a collection with all its images and meta_elements explicitly loaded in a hierarchical structure"""
+async def get_collection_hierarchical(
+    db: AsyncSession, 
+    collection_id: UUID, 
+    max_depth: int = 2, 
+    limit_children: int = 20,
+    limit_images: int = 10, 
+    limit_detections: int = 10,
+    load_images: bool = True,
+    load_detections: bool = True
+):
+    """Get a collection with its meta_elements in a hierarchical structure with efficient loading
+    
+    Args:
+        db: The database session
+        collection_id: The UUID of the collection to retrieve
+        max_depth: Maximum depth of child elements to load (default: 2)
+        limit_children: Maximum number of children to load per meta element (default: 20)
+        limit_images: Maximum number of images to load per meta element (default: 10)
+        limit_detections: Maximum number of detections to load per meta element (default: 10)
+        load_images: Whether to load images (default: True)
+        load_detections: Whether to load detections (default: True)
+    """
     try:
-        # Get the collection with basic information
-        async with db.begin():
-            collection_query = await db.execute(
-                select(model.Collection)
-                .where(model.Collection.id == collection_id)
+        # Get the collection with basic information - no transaction needed for reads
+        collection_query = await db.execute(
+            select(model.Collection)
+            .where(model.Collection.id == collection_id)
+        )
+        db_collection = collection_query.unique().scalar_one_or_none()
+        
+        if not db_collection:
+            logger.warning(f"Collection {collection_id} not found")
+            return None
+        
+        # Get all meta element types in a single query for quick lookup
+        meta_element_types_query = await db.execute(
+            select(model.MetaElementType)
+        )
+        db_meta_element_types = meta_element_types_query.unique().scalars().all()
+        meta_element_types_by_id = {str(met.id): met for met in db_meta_element_types}
+        
+        # First get root elements only
+        root_elements_query = await db.execute(
+            select(model.MetaElement)
+            .where(
+                model.MetaElement.collection_id == collection_id,
+                model.MetaElement.parent_id == None
             )
-            db_collection = collection_query.unique().scalar_one_or_none()
+            .limit(10)  # Limit root elements
+        )
+        db_root_elements = root_elements_query.unique().scalars().all()
+        
+        if not db_root_elements:
+            logger.warning(f"No root elements found for collection {collection_id}")
+            return None
+        
+        # Create root element objects
+        meta_elements_by_id = {}
+        root_elements = []
+        
+        for element in db_root_elements:
+            # Convert to Pydantic model
+            meta_element_dict = model.orm2dict(element)
             
-            if not db_collection:
-                return None
+            # Initialize with empty lists for relationships
+            meta_element_dict["detections"] = []
+            meta_element_dict["children"] = []
+            meta_element_dict["images"] = []
             
-            # Break down the query into simpler parts to avoid SQL aliasing issues
-            
-            # First, get all meta elements for this collection
-            meta_elements_query = await db.execute(
-                select(model.MetaElement)
-                .where(model.MetaElement.collection_id == collection_id)
-            )
-            db_meta_elements = meta_elements_query.unique().scalars().all()
-            
-            # Get all meta element types in a single query
-            meta_element_types_query = await db.execute(
-                select(model.MetaElementType)
-            )
-            db_meta_element_types = meta_element_types_query.unique().scalars().all()
-            
-            # Create a mapping of meta element types by ID for quick lookup
-            meta_element_types_by_id = {str(met.id): met for met in db_meta_element_types}
-            
-            # Get all meta roles in a single query
-            meta_roles_query = await db.execute(
-                select(model.MetaRole)
-            )
-            db_meta_roles = meta_roles_query.unique().scalars().all()
-            
-            # Create a mapping of meta roles by ID for quick lookup
-            meta_roles_by_id = {str(mr.id): mr for mr in db_meta_roles}
-            
-            # First pass: Create all meta elements without relationships
-            meta_elements_by_id = {}
-            root_elements = []
-            
-            for element in db_meta_elements:
-                # Convert to Pydantic model
-                meta_element_dict = model.orm2dict(element)
-                
-                # Initialize with empty lists for relationships
-                meta_element_dict["detections"] = []
-                meta_element_dict["children"] = []
-                meta_element_dict["images"] = []
-                
-                # Add meta_element_type relationship
-                if element.meta_element_type_id and str(element.meta_element_type_id) in meta_element_types_by_id:
-                    meta_element_type = meta_element_types_by_id[str(element.meta_element_type_id)]
-                    meta_element_dict["meta_element_type"] = base_objects.MetaElementType(
-                        **model.orm2dict(meta_element_type)
-                    )
-                
-                # Create MetaElementHierarchical object
-                meta_element = MetaElementHierarchical(**meta_element_dict)
-                meta_elements_by_id[str(element.id)] = meta_element
-                
-                # Collect root elements for later
-                if not element.parent_id:
-                    root_elements.append(meta_element)
-            
-            # Second pass: Build parent-child relationships
-            for element in db_meta_elements:
-                if element.parent_id:
-                    # Get the parent ID as string for lookup
-                    parent_id_str = str(element.parent_id)
-                    child_id_str = str(element.id)
-                    
-                    # Only proceed if both parent and child exist in our map
-                    if parent_id_str in meta_elements_by_id and child_id_str in meta_elements_by_id:
-                        parent = meta_elements_by_id[parent_id_str]
-                        child = meta_elements_by_id[child_id_str]
-                        
-                        # Append child to parent's children
-                        parent.children.append(child)
-                    else:
-                        logger.warning(f"Parent-child relationship not found: parent_id={parent_id_str}, child_id={child_id_str}")
-            
-            # For each meta element, get its images
-            for element_id, element in meta_elements_by_id.items():
-                images_query = await db.execute(
-                    select(model.Image)
-                    .where(model.Image.parent_meta_element_id == UUID(element_id))
+            # Add meta_element_type relationship
+            if element.meta_element_type_id and str(element.meta_element_type_id) in meta_element_types_by_id:
+                meta_element_type = meta_element_types_by_id[str(element.meta_element_type_id)]
+                meta_element_dict["meta_element_type"] = base_objects.MetaElementType(
+                    **model.orm2dict(meta_element_type)
                 )
-                db_images = images_query.unique().scalars().all()
-                
-                for image in db_images:
-                    image_dict = model.orm2dict(image)
-                    image_obj = base_objects.Image(**image_dict)
-                    element.images.append(image_obj)
             
-            # For each meta element, get its meta element detections and associated detections
-            for element_id, element in meta_elements_by_id.items():
-                # Get meta element detections
-                meta_element_detections_query = await db.execute(
-                    select(model.MetaElementDetection)
-                    .where(model.MetaElementDetection.meta_element_id == UUID(element_id))
+            # Create MetaElementHierarchical object
+            meta_element = MetaElementHierarchical(**meta_element_dict)
+            meta_elements_by_id[str(element.id)] = meta_element
+            root_elements.append(meta_element)
+        
+        # Recursively fetch children up to max_depth
+        if max_depth > 0:
+            for root_element in root_elements:
+                await _fetch_children_recursive(
+                    db, 
+                    root_element, 
+                    meta_elements_by_id, 
+                    meta_element_types_by_id, 
+                    0, 
+                    max_depth, 
+                    limit_children
                 )
-                db_meta_element_detections = meta_element_detections_query.unique().scalars().all()
-                
-                # For each meta element detection, get the associated detection
-                for med in db_meta_element_detections:
-                    detection_query = await db.execute(
-                        select(model.Detection)
-                        .where(model.Detection.id == med.detection_id)
-                    )
-                    db_detection = detection_query.unique().scalar_one_or_none()
-                    
-                    if db_detection:
-                        # Check if this detection is already processed
-                        detection_exists = any(d.id == db_detection.id for d in element.detections)
-                        
-                        if not detection_exists:
-                            detection_dict = model.orm2dict(db_detection)
-                            
-                            # Create the meta_element_detection link with meta_role
-                            meta_element_detection_dict = model.orm2dict(med)
-                            
-                            # Add meta_role to meta_element_detection if it exists
-                            if med.meta_role_id and str(med.meta_role_id) in meta_roles_by_id:
-                                meta_role = meta_roles_by_id[str(med.meta_role_id)]
-                                meta_element_detection_dict["meta_role"] = base_objects.MetaRole(
-                                    **model.orm2dict(meta_role)
-                                )
-                            
-                            meta_element_detection = base_objects.MetaElementDetection(**meta_element_detection_dict)
-                            
-                            # Create DetectionHierarchical object with a single meta_element_detection
-                            detection_dict["meta_element_detections"] = meta_element_detection
-                            detection_obj = DetectionHierarchical(**detection_dict)
-                            
-                            # Add to element's detections
-                            element.detections.append(detection_obj)
-            
-            # Check if we have any root elements
-            if not root_elements:
-                logger.warning(f"No root elements found for collection {collection_id}")
-                return None
-                
-            # If multiple root elements, select the first one
-            root_element = root_elements[0]
-            if len(root_elements) > 1:
-                logger.warning(f"Multiple root elements found for collection {collection_id}, using the first one")
-                
-            # Create the final hierarchical collection with a single global_structure
-            collection_dict = model.orm2dict(db_collection)
-            collection_dict["global_structure"] = root_element
-            
-            # Add debug information
-            logger.info(f"Root element ID: {root_element.id}")
-            logger.info(f"Root element has {len(root_element.children)} children")
-            for i, child in enumerate(root_element.children):
-                logger.info(f"  Child {i+1} ID: {child.id}, has {len(child.children)} children")
-            
-            return CollectionHierarchical(**collection_dict)
+        
+        # If multiple root elements, select the first one
+        root_element = root_elements[0] if root_elements else None
+        
+        # Only load images and detections if requested
+        if load_images:
+            await _load_images_for_elements(db, meta_elements_by_id, limit_images)
+        
+        if load_detections:
+            await _load_detections_for_elements(db, meta_elements_by_id, limit_detections)
+        
+        # Create the final hierarchical collection with a single global_structure
+        collection_dict = model.orm2dict(db_collection)
+        collection_dict["global_structure"] = root_element
+        
+        return CollectionHierarchical(**collection_dict)
             
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed reading hierarchical collection from database")
         raise DBError(f"Failed reading hierarchical collection from database") from e
+
+
+async def _fetch_children_recursive(
+    db, 
+    parent_element, 
+    meta_elements_by_id, 
+    meta_element_types_by_id, 
+    current_depth, 
+    max_depth, 
+    limit_children
+):
+    """Recursively fetch children for an element"""
+    if current_depth >= max_depth:
+        return
     
+    # Get children for this parent
+    children_query = await db.execute(
+        select(model.MetaElement)
+        .where(model.MetaElement.parent_id == parent_element.id)
+        .limit(limit_children)
+    )
+    db_children = children_query.unique().scalars().all()
     
+    # Process each child
+    for child in db_children:
+        # Convert to Pydantic model
+        child_dict = model.orm2dict(child)
+        
+        # Initialize with empty lists for relationships
+        child_dict["detections"] = []
+        child_dict["children"] = []
+        child_dict["images"] = []
+        
+        # Add meta_element_type relationship
+        if child.meta_element_type_id and str(child.meta_element_type_id) in meta_element_types_by_id:
+            meta_element_type = meta_element_types_by_id[str(child.meta_element_type_id)]
+            child_dict["meta_element_type"] = base_objects.MetaElementType(
+                **model.orm2dict(meta_element_type)
+            )
+        
+        # Create MetaElementHierarchical object
+        child_element = MetaElementHierarchical(**child_dict)
+        meta_elements_by_id[str(child.id)] = child_element
+        
+        # Add child to parent
+        parent_element.children.append(child_element)
+        
+        # Recursively fetch grandchildren
+        await _fetch_children_recursive(
+            db, 
+            child_element, 
+            meta_elements_by_id, 
+            meta_element_types_by_id, 
+            current_depth + 1, 
+            max_depth, 
+            limit_children
+        )
+
+
+async def _load_images_for_elements(db, meta_elements_by_id, limit_per_element=10):
+    """Load images for elements in batches for better performance"""
+    try:
+        element_ids = list(meta_elements_by_id.keys())
+        batch_size = 20
+        
+        for i in range(0, len(element_ids), batch_size):
+            batch_ids = element_ids[i:i+batch_size]
+            
+            for element_id in batch_ids:
+                element = meta_elements_by_id[element_id]
+                
+                # Get images with limit
+                images_query = await db.execute(
+                    select(model.Image)
+                    .where(model.Image.parent_meta_element_id == UUID(element_id))
+                    .order_by(model.Image.order)
+                    .limit(limit_per_element)
+                )
+                db_images = images_query.unique().scalars().all()
+                
+                # Add images to element
+                for image in db_images:
+                    image_dict = model.orm2dict(image)
+                    image_obj = base_objects.Image(**image_dict)
+                    element.images.append(image_obj)
+        
+        logger.info(f"Loaded images for {len(element_ids)} elements")
+    except Exception as e:
+        logger.exception(f"Error loading images: {e}")
+
+
+async def _load_detections_for_elements(db, meta_elements_by_id, limit_per_element=10):
+    """Load detections for elements in batches for better performance"""
+    try:
+        # Load meta roles once for the entire operation
+        meta_roles_query = await db.execute(select(model.MetaRole))
+        db_meta_roles = meta_roles_query.unique().scalars().all()
+        meta_roles_by_id = {str(mr.id): base_objects.MetaRole(**model.orm2dict(mr)) for mr in db_meta_roles}
+        
+        element_ids = list(meta_elements_by_id.keys())
+        batch_size = 20
+        
+        for i in range(0, len(element_ids), batch_size):
+            batch_ids = element_ids[i:i+batch_size]
+            
+            for element_id in batch_ids:
+                element = meta_elements_by_id[element_id]
+                
+                # Get detections with JOIN and limit
+                joined_query = await db.execute(
+                    select(model.MetaElementDetection, model.Detection)
+                    .join(model.Detection, model.MetaElementDetection.detection_id == model.Detection.id)
+                    .where(model.MetaElementDetection.meta_element_id == UUID(element_id))
+                    .limit(limit_per_element)
+                )
+                results = joined_query.unique().all()
+                
+                # Process detections
+                for med, detection in results:
+                    # Create detection dict
+                    detection_dict = model.orm2dict(detection)
+                    
+                    # Create meta_element_detection with meta_role
+                    med_dict = model.orm2dict(med)
+                    if med.meta_role_id and str(med.meta_role_id) in meta_roles_by_id:
+                        med_dict["meta_role"] = meta_roles_by_id[str(med.meta_role_id)]
+                    
+                    # Create detection object with meta_element_detection
+                    detection_dict["meta_element_detections"] = base_objects.MetaElementDetection(**med_dict)
+                    detection_obj = DetectionHierarchical(**detection_dict)
+                    
+                    # Add to element
+                    element.detections.append(detection_obj)
+        
+        logger.info(f"Loaded detections for {len(element_ids)} elements")
+    except Exception as e:
+        logger.exception(f"Error loading detections: {e}")
+
+
+# Add a new endpoint for lazily loading additional data
+async def get_meta_element_children(
+    db: AsyncSession,
+    meta_element_id: UUID,
+    limit: int = 20,
+    offset: int = 0
+):
+    """Get children for a specific meta element with pagination"""
+    try:
+        # Get children with pagination
+        children_query = await db.execute(
+            select(model.MetaElement)
+            .options(joinedload(model.MetaElement.meta_element_type))
+            .where(model.MetaElement.parent_id == meta_element_id)
+            .order_by(model.MetaElement.id)
+            .offset(offset)
+            .limit(limit)
+        )
+        db_children = children_query.unique().scalars().all()
+        
+        # Create result objects
+        children = []
+        for child in db_children:
+            child_dict = model.orm2dict(child)
+            child_dict["children"] = [] 
+            child_dict["images"] = []
+            child_dict["detections"] = []
+            
+            # Add meta_element_type
+            if child.meta_element_type:
+                child_dict["meta_element_type"] = base_objects.MetaElementType(
+                    **model.orm2dict(child.meta_element_type)
+                )
+            
+            children.append(MetaElementHierarchical(**child_dict))
+            
+        return children
     
+    except exc.SQLAlchemyError as e:
+        logger.exception(f"Failed reading meta element children from database")
+        raise DBError(f"Failed reading meta element children from database") from e
+
+
+# Add a new endpoint for lazily loading images
+async def get_meta_element_images(
+    db: AsyncSession,
+    meta_element_id: UUID,
+    limit: int = 20,
+    offset: int = 0
+):
+    """Get images for a specific meta element with pagination"""
+    try:
+        # Get images with pagination
+        images_query = await db.execute(
+            select(model.Image)
+            .where(model.Image.parent_meta_element_id == meta_element_id)
+            .order_by(model.Image.order)
+            .offset(offset)
+            .limit(limit)
+        )
+        db_images = images_query.unique().scalars().all()
+        
+        # Create result objects
+        images = []
+        for image in db_images:
+            image_dict = model.orm2dict(image)
+            images.append(base_objects.Image(**image_dict))
+            
+        return images
+    
+    except exc.SQLAlchemyError as e:
+        logger.exception(f"Failed reading meta element images from database")
+        raise DBError(f"Failed reading meta element images from database") from e
+
+
+# Add a new endpoint for lazily loading detections
+async def get_meta_element_detections(
+    db: AsyncSession,
+    meta_element_id: UUID,
+    limit: int = 20,
+    offset: int = 0
+):
+    """Get detections for a specific meta element with pagination"""
+    try:
+        # Load meta roles for the operation
+        meta_roles_query = await db.execute(select(model.MetaRole))
+        db_meta_roles = meta_roles_query.unique().scalars().all()
+        meta_roles_by_id = {str(mr.id): base_objects.MetaRole(**model.orm2dict(mr)) for mr in db_meta_roles}
+        
+        # Get detections with pagination using JOIN
+        joined_query = await db.execute(
+            select(
+                model.MetaElementDetection, 
+                model.Detection
+            )
+            .join(
+                model.Detection, 
+                model.MetaElementDetection.detection_id == model.Detection.id
+            )
+            .where(model.MetaElementDetection.meta_element_id == meta_element_id)
+            .order_by(model.Detection.id)
+            .offset(offset)
+            .limit(limit)
+        )
+        results = joined_query.unique().all()
+        
+        # Create result objects
+        detections = []
+        for med, detection in results:
+            # Create detection dictionary
+            detection_dict = model.orm2dict(detection)
+            
+            # Create meta_element_detection with meta_role
+            med_dict = model.orm2dict(med)
+            if med.meta_role_id:
+                meta_role_id_str = str(med.meta_role_id)
+                if meta_role_id_str in meta_roles_by_id:
+                    med_dict["meta_role"] = meta_roles_by_id[meta_role_id_str]
+            
+            # Create detection object with meta_element_detection
+            detection_dict["meta_element_detections"] = base_objects.MetaElementDetection(**med_dict)
+            detection_obj = DetectionHierarchical(**detection_dict)
+            
+            # Add to element
+            element.detections.append(detection_obj)
+            
+        return detections
+    
+    except exc.SQLAlchemyError as e:
+        logger.exception(f"Failed reading meta element detections from database")
+        raise DBError(f"Failed reading meta element detections from database") from e
