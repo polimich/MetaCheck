@@ -5,9 +5,18 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional, Type, TypeVar, Union, Callable
 
-from sqlalchemy import Column, ForeignKey, Table
+from sqlalchemy import Column, ForeignKey, Table, MetaData
 from sqlalchemy.orm import Mapped, DeclarativeBase, mapped_column, relationship
 from sqlalchemy.inspection import inspect
+
+# Define naming convention for consistent constraint and index names
+naming_convention = {
+    "ix": "ix_%(table_name)s_%(column_0_N_name)s",
+    "uq": "uq_%(table_name)s_%(column_0_N_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
 
 # Updated to include both table columns and SQLAlchemy computed properties
 def orm2dict(r):
@@ -28,6 +37,13 @@ def orm2dict(r):
         except (json.JSONDecodeError, TypeError):
             pass  # Keep as is if not valid JSON
     
+    # Convert UUID objects to strings for JSON serializability
+    for key, value in result.items():
+        if isinstance(value, uuid.UUID):
+            result[key] = str(value)
+        elif isinstance(value, datetime):
+            result[key] = value.isoformat()
+    
     return result
 
 # converts CORE row object to dict
@@ -39,6 +55,9 @@ T = TypeVar('T', bound='Base')
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models."""
+
+    # Use consistent naming convention for constraints and indexes
+    metadata = MetaData(naming_convention=naming_convention)
 
     # Default lazy loading strategy for all relationships
     __lazy_strategy__ = 'select'

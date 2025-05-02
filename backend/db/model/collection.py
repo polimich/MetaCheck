@@ -1,7 +1,8 @@
 import uuid
-from typing import List, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Optional, Dict, Any
+from sqlalchemy.dialects.postgresql import JSONB
 
-from sqlalchemy import ForeignKey, String, func, select, event, text
+from sqlalchemy import ForeignKey, String, func, select, event, text, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 from db.model.base import Entity, create_fk_relationship
@@ -17,6 +18,15 @@ class Collection(Entity):
     """Represents a collection of images and metadata."""
 
     __tablename__ = "collections"
+    
+    # Table-level indexes using automatic naming convention
+    __table_args__ = (
+        # Composite index for fast primary key lookups that include deleted filter
+        Index(None, 'id', 'deleted'),
+        
+        # Index for work state filtering
+        Index(None, 'work_state'),
+    )
 
     # Fields
     name: Mapped[str] = mapped_column(String(300), nullable=False)
@@ -34,6 +44,18 @@ class Collection(Entity):
         ForeignKey("images.id", ondelete="SET NULL", name="fk_collections_preview_image_id"),
         index=True, nullable=True
     )
+    
+    # Reference to the root meta element of the collection's hierarchy
+    root_meta_element_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("meta_elements.id", ondelete="SET NULL", name="fk_collections_root_meta_element_id"),
+        index=True, nullable=True
+    )
+    
+    # Cached hierarchical structure
+    hierarchical_structure: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSONB, nullable=True
+    )
+
 
     # Display settings
     preview_image_height: Mapped[int] = mapped_column(default=337, nullable=False)
@@ -55,6 +77,14 @@ class Collection(Entity):
         foreign_keys="MetaElement.collection_id",
         cascade="all, delete-orphan",
         lazy="selectin",
+    )
+    
+    # Relationship to root meta element
+    root_meta_element: Mapped[Optional["MetaElement"]] = relationship(
+        "MetaElement",
+        foreign_keys=[root_meta_element_id],
+        lazy="joined",
+        post_update=True,  # Avoids circular dependency issues
     )
 
 

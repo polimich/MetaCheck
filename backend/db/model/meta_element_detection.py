@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.model.detection import Detection
@@ -16,6 +16,18 @@ class MetaElementDetection(Entity):
     """
 
     __tablename__ = "meta_element_detections"
+
+    # Table-level indexes using automatic naming convention
+    __table_args__ = (
+        # Composite index for faster joins between meta elements and detections
+        Index(None, 'meta_element_id', 'detection_id'),
+        
+        # Composite index for role-based filtering of detections
+        Index(None, 'detection_id', 'meta_role_id'),
+        
+        # Unique constraint to prevent duplicate detection-role-element combinations
+        UniqueConstraint('meta_element_id', 'meta_role_id', 'detection_id'),
+    )
 
     # Foreign keys
     meta_element_id: Mapped[uuid.UUID] = mapped_column(

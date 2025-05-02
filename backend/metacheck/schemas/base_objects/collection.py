@@ -19,6 +19,7 @@ class CollectionNew(BaseModel):
     name: str
     description: Optional[str] = ""
     info: Optional[str] = ""
+    root_meta_element_id: Optional[UUID] = None
 
 
 class Collection(CollectionNew, BaseEntity):
@@ -34,6 +35,7 @@ class Collection(CollectionNew, BaseEntity):
     preview_image_width: int
     meta_elements: List["MetaElement"] = []
     images: List["Image"] = []
+    root_meta_element_id: Optional[UUID] = None
 
     class Config:
         from_attributes = True
@@ -51,6 +53,7 @@ class CollectionUpdate(BaseModel):
     last_access: Optional[datetime] = None
     is_public: Optional[bool] = None
     deleted: Optional[bool] = None
+    root_meta_element_id: Optional[UUID] = None
 
 
 # Import at the end to avoid circular references
@@ -75,5 +78,6 @@ class MetaElementHierarchical(MetaElement, BaseEntity):
 class CollectionHierarchical(CollectionNew, BaseEntity):
     """Schema for a collection with hierarchical structure."""
 
-    global_structure: MetaElementHierarchical
+    global_structure: Optional[MetaElementHierarchical] = None
+    root_meta_element_id: Optional[UUID] = None
     

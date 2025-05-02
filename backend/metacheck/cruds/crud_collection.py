@@ -4,13 +4,16 @@ import random
 import shutil
 import uuid
 import zipfile
+import asyncio
+import json
 from typing import Dict, List
 from uuid import UUID
+from datetime import datetime
 
 import aiofiles
 from aiofiles import os as aiofiles_os
 from fastapi import UploadFile, HTTPException
-from sqlalchemy import exc, select, update, delete
+from sqlalchemy import exc, select, update, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -87,6 +90,7 @@ async def _do_check_preview_and_set(db: AsyncSession, collection_id: UUID, image
 async def get_collections(db: AsyncSession) -> list[base_objects.Collection]:
     try:
         async with db.begin():
+            # Use plain select without any joinedload options
             db_collections = await db.execute(select(model.Collection))
             db_collections = db_collections.scalars().all()
             collections = [
@@ -282,6 +286,59 @@ async def import_yolo_collection(file: UploadFile, db: AsyncSession):
 
             await crud_image.create_image_detections(db, image_id, detections)
 
+        # YOLO imports typically don't have meta elements with title/volume hierarchies
+        # But we'll check if any exist that we should set as root
+        try:
+            from metacheck.constants import META_ELEMENT_TYPE_IDS
+            
+            # Look for title or volume elements first
+            title_id = None
+            volume_id = None
+            
+            # Check for title elements
+            title_type_id = META_ELEMENT_TYPE_IDS.get('title')
+            if title_type_id:
+                async with db.begin():
+                    title_query = await db.execute(
+                        select(model.MetaElement)
+                        .where(
+                            model.MetaElement.collection_id == collection_id,
+                            model.MetaElement.meta_element_type_id == title_type_id,
+                            model.MetaElement.parent_id == None
+                        )
+                    )
+                    title_element = title_query.unique().scalar_one_or_none()
+                    if title_element:
+                        title_id = title_element.id
+                        logger.info(f"Found title element {title_id} to use as root")
+            
+            # Check for volume elements
+            volume_type_id = META_ELEMENT_TYPE_IDS.get('volume')
+            if volume_type_id and not title_id:
+                async with db.begin():
+                    volume_query = await db.execute(
+                        select(model.MetaElement)
+                        .where(
+                            model.MetaElement.collection_id == collection_id,
+                            model.MetaElement.meta_element_type_id == volume_type_id,
+                            model.MetaElement.parent_id == None
+                        )
+                    )
+                    volume_element = volume_query.unique().scalar_one_or_none()
+                    if volume_element:
+                        volume_id = volume_element.id
+                        logger.info(f"Found volume element {volume_id} to use as root")
+            
+            # Set the root element if we found a suitable one
+            if title_id or volume_id:
+                root_id = title_id or volume_id
+                await find_and_set_root_meta_element(db, collection_id, title_id, volume_id)
+                logger.info(f"Set root element to {root_id} for YOLO collection {collection_id}")
+            else:
+                logger.info(f"No suitable root element found for YOLO collection {collection_id}")
+        except Exception as e:
+            logger.warning(f"Failed to check for root elements in YOLO import: {str(e)}")
+            
         # Delete extracted folder
         shutil.rmtree(extracted_dir_path)
         return {"message": "YOLO collection imported successfully", "collection_id": str(collection_id)}
@@ -291,748 +348,394 @@ async def import_yolo_collection(file: UploadFile, db: AsyncSession):
         raise HTTPException(status_code=500, detail="Failed to process the file.")
 
 
-async def import_metakat_collection(file: UploadFile, db: AsyncSession):
-    """Import a MetaKat formatted dataset"""
-    if "json" not in file.content_type:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type - only json files are supported.",
-        )
-    
+async def invalidate_collection_cache(db: AsyncSession, collection_id: UUID):
+    """Invalidate the hierarchical structure cache for a collection"""
     try:
-        from metacheck.cruds import crud_general, crud_image, crud_meta_element
-        from metacheck.schemas.metakat_object import MetaKatImport
+        # Check if transaction is already in progress
+        is_transaction_active = db.in_transaction()
         
-        # Get project root for resolving image paths
-        current_file_dir = os.path.dirname(os.path.abspath(__file__))
-        project_root = os.path.abspath(os.path.join(current_file_dir, "../../.."))
-        logger.info(f"Project root directory: {project_root}")
-        
-        # Parse data and process in phases
-        metakat_data = await _parse_metakat_json(file)
-        success_counters = {"volumes": 0, "images": 0, "issues": 0, "titles": 0, "supplements": 0, 
-                           "chapters": 0, "articles": 0, "detections": 0, "meta_element_detections": 0}
-        
-        collection_id = await _create_or_update_collection(db, metakat_data)
-        await _process_meta_elements(db, metakat_data, collection_id, success_counters)
-        image_id_map = await _process_images(db, metakat_data, collection_id, project_root, success_counters)
-        verification_stats = await _process_detections(db, metakat_data, collection_id, image_id_map, success_counters)
-        
-        # Log summary
-        logger.info(f"Import complete - collection ID: {collection_id}")
-        total_processed = verification_stats['success'] + verification_stats['failed']
-        success_rate = (verification_stats['success'] / total_processed * 100) if total_processed > 0 else 0
-        logger.info(f"VERIFICATION SUMMARY: Successfully verified {verification_stats['success']} out of {total_processed} detections ({success_rate:.2f}%)")
-        if verification_stats['failed'] > 0:
-            logger.warning(f"VERIFICATION WARNING: Failed to verify {verification_stats['failed']} detections")
-        
-        return {
-            "message": "MetaKat collection imported successfully", 
-            "collection_id": str(collection_id),
-            "elements_imported": success_counters,
-            "verification_stats": verification_stats
-        }
-        
-    except Exception as e:
-        logger.exception(f"Failed to process MetaKat import file. Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process the MetaKat import file: {str(e)}")
-
-
-async def _parse_metakat_json(file: UploadFile):
-    """Parse the uploaded MetaKat JSON file"""
-    try:
-        from metacheck.schemas.metakat_object import MetaKatImport
-        content = await file.read()
-        import json
-        
-        try:
-            metakat_import = MetaKatImport.model_validate(json.loads(content.decode('utf-8')))
-            metakat_data = metakat_import.model_dump()
-            
-            logger.info(f"MetaKat import data: batch_id={metakat_data.get('batch_id')}")
-            logger.info(f"Found {len(metakat_data.get('volumes', []))} volumes, {len(metakat_data.get('issues', []))} issues, " +
-                       f"{len(metakat_data.get('pages', []))} pages, {len(metakat_data.get('detections', []))} detections")
-            
-            return metakat_data
-            
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON format in the uploaded file.")
-    except Exception as e:
-        logger.exception(f"Error parsing MetaKat JSON: {str(e)}")
-        raise
-
-
-async def _create_or_update_collection(db: AsyncSession, metakat_data: dict):
-    """Create a new collection or update an existing one"""
-    from metacheck.cruds import crud_general
-
-    async with db.begin():
-        collection_id = metakat_data.get("batch_id")
-        if not collection_id:
-            collection_id = uuid.uuid4()
-            logger.warning(f"No batch_id found in import file, generating a new collection ID: {collection_id}")
-        
-        collection_name = f'Batch: {collection_id}'
-        collection_check = await db.execute(
-            select(model.Collection).filter(model.Collection.id == collection_id)
-        )
-        existing_collection = collection_check.unique().scalar_one_or_none()
-        
-        if existing_collection:
+        if is_transaction_active:
+            # If transaction is active, just run the query
             await db.execute(
                 update(model.Collection)
                 .where(model.Collection.id == collection_id)
-                .values(
-                    name=collection_name,
-                    description=metakat_data.get("description", ""),
-                    info=metakat_data.get("info", "")
-                )
+                .values(hierarchical_structure=None)
             )
-            logger.info(f"Updated existing collection: {collection_id}")
         else:
-            collection = base_objects.CollectionNew(
-                id=collection_id, 
-                name=collection_name,
-                description=metakat_data.get("description", ""),
-                info=metakat_data.get("info", "")
+            # If no transaction is active, start one
+            async with db.begin():
+                await db.execute(
+                    update(model.Collection)
+                    .where(model.Collection.id == collection_id)
+                    .values(hierarchical_structure=None)
+                )
+        
+        logger.info(f"Invalidated hierarchical structure cache for collection {collection_id}")
+    except exc.SQLAlchemyError as e:
+        # Just log the error but don't raise an exception
+        # This is a non-critical operation
+        logger.warning(f"Failed to invalidate cache for collection {collection_id}: {str(e)}")
+
+
+async def get_collection_hierarchical(db: AsyncSession, collection_id: UUID, use_cache: bool = True):
+    """Get a collection with all its images and meta_elements explicitly loaded in a hierarchical structure"""
+    start_time = datetime.now()
+    logger.info(f"[CACHE] Starting hierarchy fetch for collection {collection_id}")
+    
+    try:
+        # Check for cached structure first
+        if use_cache:
+            logger.info(f"[CACHE] Cache enabled, checking for existing cache")
+            collection_query = await db.execute(
+                select(model.Collection)
+                .where(model.Collection.id == collection_id)
             )
-            await crud_general.new(db, collection.model_dump(), model.Collection, start_transaction=False)
-            logger.info(f"Created new collection: {collection_id}")
-    
-    return collection_id
-
-
-async def _process_meta_elements(db: AsyncSession, metakat_data: dict, collection_id: UUID, success_counters: dict):
-    """Process all meta elements (volumes, issues, titles, etc.) in hierarchical order"""
-    from metacheck.cruds import crud_meta_element
-    from metacheck.constants import META_ELEMENT_TYPE_IDS
-    
-    logger.info("PHASE 1: Processing meta elements in hierarchical order...")
-    
-    # Define the correct hierarchical order for processing elements
-    # This ensures parent elements exist before child elements reference them
-    element_processing_order = ["titles", "volumes", "issues", "chapters", "articles", "supplements"]
-    
-    # Process each element type in order with separate transactions
-    for element_type in element_processing_order:
-        if element_type not in metakat_data or not metakat_data[element_type]:
-            logger.info(f"No {element_type} to process, skipping")
-            continue
+            db_collection = collection_query.unique().scalar_one_or_none()
             
-        logger.info(f"Processing {element_type}...")
-        
-        element_type_singular = element_type[:-1]  # Remove 's' to get singular form
-        meta_element_type_id = META_ELEMENT_TYPE_IDS.get(element_type_singular)
-        
-        if not meta_element_type_id:
-            logger.warning(f"No meta element type ID found for {element_type_singular}, skipping")
-            continue
-        
-        # Initialize counter if not exists
-        if element_type not in success_counters:
-            success_counters[element_type] = 0
-        
-        # Process each element of the current type in a single transaction
-        async with db.begin():
-            for element_data in metakat_data[element_type]:
-                try:
-                    element_id = element_data.get("id")
-                    if not element_id:
-                        logger.warning(f"Found {element_type_singular} without ID, skipping")
-                        continue
-                    
-                    # Check if element already exists
-                    element_check = await db.execute(
-                        select(model.MetaElement).filter(model.MetaElement.id == element_id)
-                    )
-                    if element_check.unique().scalar_one_or_none():
-                        logger.info(f"{element_type_singular.capitalize()} already exists: {element_id}")
-                        success_counters[element_type] += 1
-                        continue
-                    
-                    # Verify parent exists if parent_id is provided
-                    parent_id = element_data.get("parent_id")
-                    if parent_id:
-                        parent_check = await db.execute(
-                            select(model.MetaElement).filter(model.MetaElement.id == parent_id)
-                        )
-                        parent_exists = parent_check.unique().scalar_one_or_none()
-                        if not parent_exists:
-                            logger.warning(f"Parent element {parent_id} for {element_type_singular} {element_id} does not exist, will be created with no parent")
-                            parent_id = None
-                        else:
-                            logger.info(f"Found parent {parent_id} for element {element_id}")
-                    
-                    # Filter out fields that are not attributes
-                    # Only include non-detection fields like boolean values, integers, etc.
-                    attributes = {}
-                    for k, v in element_data.items():
-                        # Skip system fields
-                        if k in ["id", "parent_id", "collection_id", "type"]:
-                            continue
-                            
-                        # Skip detection fields (either tuple or list of tuples)
-                        if isinstance(v, tuple) and len(v) == 3 and isinstance(v[0], str) and isinstance(v[1], (int, float)):
-                            continue
-                        if isinstance(v, list) and v and isinstance(v[0], tuple) and len(v[0]) == 3:
-                            continue
-                            
-                        # Keep primitive values (bool, int, etc.)
-                        if v is None or isinstance(v, (bool, int, float, str)):
-                            attributes[k] = v
-                    
-                    # Create the element object
-                    element_obj = base_objects.MetaElementNew(
-                        id=element_id,
-                        collection_id=collection_id,
-                        meta_element_type_id=meta_element_type_id,
-                        parent_id=parent_id,
-                        attributes=attributes
-                    )
-                    
-                    # Use the raw SQLAlchemy model to ensure all fields are set
-                    db_element = model.MetaElement(
-                        id=element_id,
-                        collection_id=collection_id,
-                        meta_element_type_id=meta_element_type_id,
-                        parent_id=parent_id,
-                        attributes=attributes
-                    )
-                    db.add(db_element)
-                    
-                    success_counters[element_type] += 1
-                    logger.info(f"Created {element_type_singular}: {element_id} with parent_id: {parent_id}")
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to process {element_type_singular} {element_data.get('id')}: {e}")
-                    logger.exception(e)
-        
-        # Log completion of processing for this element type
-        logger.info(f"Completed processing {element_type}, created/updated {success_counters[element_type]} elements")
+            # Debug check for cache field
+            logger.debug(f"[CACHE] Collection found, hierarchical_structure is {type(db_collection.hierarchical_structure) if db_collection and hasattr(db_collection, 'hierarchical_structure') else 'None or not present'}")
             
-    # Verify parent-child relationships as a final check
-    async with db.begin():
-        logger.info("Verifying parent-child relationships...")
-        all_elements = await db.execute(
-            select(model.MetaElement)
-            .where(model.MetaElement.collection_id == collection_id)
-        )
-        db_elements = all_elements.unique().scalars().all()
-        
-        elements_with_parent = 0
-        elements_without_parent = 0
-        
-        for element in db_elements:
-            if element.parent_id:
-                elements_with_parent += 1
-                parent_check = await db.execute(
-                    select(model.MetaElement).filter(model.MetaElement.id == element.parent_id)
-                )
-                parent = parent_check.unique().scalar_one_or_none()
-                if parent:
-                    logger.info(f"Verified parent-child relationship: {element.id} -> {parent.id}")
-                else:
-                    logger.warning(f"Element {element.id} has parent_id {element.parent_id} but parent doesn't exist")
+            if db_collection and db_collection.hierarchical_structure:
+                cache_time = datetime.now() - start_time
+                logger.info(f"[CACHE] ✅ Cache hit for collection {collection_id} | Retrieved in {cache_time.total_seconds():.4f}s")
+                return CollectionHierarchical(**db_collection.hierarchical_structure)
             else:
-                elements_without_parent += 1
+                logger.info(f"[CACHE] ❌ Cache miss for collection {collection_id}")
+        else:
+            logger.info(f"[CACHE] Cache disabled for this request")
         
-        logger.info(f"Parent-child verification complete. Elements with parents: {elements_with_parent}, root elements: {elements_without_parent}")
-
-
-async def _process_images(db: AsyncSession, metakat_data: dict, collection_id: UUID, project_root: str, success_counters: dict):
-    """Process and save images to the database, returns a map of image IDs"""
-    from metacheck.cruds import crud_image
-    
-    logger.info("PHASE 2: Processing images...")
-    image_id_map = {}
-    
-    async with db.begin():
-        for page_data in metakat_data.get("pages", []):
-            try:
-                image_id = page_data.get("id")
-                if not image_id:
-                    logger.warning("Found page without ID, skipping")
-                    continue
-                
-                image_check = await db.execute(
-                    select(model.Image).filter(model.Image.id == image_id)
+        # Check if transaction is already in progress
+        is_transaction_active = db.in_transaction()
+        logger.debug(f"[CACHE] Transaction active: {is_transaction_active}")
+        
+        # Get the collection with the root meta element joined
+        if is_transaction_active:
+            # If transaction is active, just run the query
+            collection_query = await db.execute(
+                select(model.Collection)
+                .where(model.Collection.id == collection_id)
+                .options(joinedload(model.Collection.root_meta_element))
+            )
+        else:
+            # If no transaction is active, start one
+            async with db.begin():
+                collection_query = await db.execute(
+                    select(model.Collection)
+                    .where(model.Collection.id == collection_id)
+                    .options(joinedload(model.Collection.root_meta_element))
                 )
-                existing_image = image_check.unique().scalar_one_or_none()
-                
-                if existing_image:
-                    logger.info(f"Image already exists: {image_id}")
-                    image_id_map[str(image_id)] = image_id
-                    success_counters["images"] += 1
-                    continue
-                
-                parent_meta_element_id = page_data.get("parent_id")
-                if not parent_meta_element_id:
-                    logger.warning(f"No parent element found for image: {image_id}, skipping")
-                    continue
-                
-                image_path = page_data.get("image_path")
-                if image_path:
-                    image_name = os.path.basename(image_path)
-                    if image_path.startswith('/'):
-                        image_path = image_path[1:]
-                    
-                    absolute_image_path = os.path.join(project_root, image_path)
-                    logger.info(f"Looking for image at: {absolute_image_path}")
-                    
-                    try:
-                        try:
-                            async with aiofiles.open(absolute_image_path, mode="rb") as f:
-                                raw_image_data = await f.read()
-                        except FileNotFoundError:
-                            logger.warning(f"Image file not found: {absolute_image_path}")
-                            continue
-                        
-                        page_type_info = page_data.get("pageType", {})
-                        page_type_value = None
-                        page_type_confidence = None
-                        
-                        if isinstance(page_type_info, dict):
-                            page_type_value = page_type_info.get("value")
-                            page_type_confidence = page_type_info.get("confidence")
-                        
-                        image_index = page_data.get("pageIndex", 0)
-                        
-                        # Extract page number information
-                        page_number_info = page_data.get("pageNumber", {})
-                        page_number_value = None
-                        page_number_confidence = None
-                        
-                        if isinstance(page_number_info, dict):
-                            page_number_value = page_number_info.get("value")
-                            page_number_confidence = page_number_info.get("confidence")
-                        
-                        try:
-                            await crud_image.save_image_file(
-                                raw_input=raw_image_data, 
-                                image_name=image_name, 
-                                collection_id=collection_id, 
-                                image_id=image_id,
-                                order=image_index, 
-                                db=db,
-                                parent_meta_element_id=parent_meta_element_id,
-                                page_type=page_type_value,
-                                page_type_confidence=page_type_confidence,
-                                page_index=page_number_value,
-                                page_index_confidence=page_number_confidence
-                            )
-                            
-                            logger.info(f"Added image {image_id} to session")
-                            image_id_map[str(image_id)] = image_id
-                            success_counters["images"] += 1
-                        except Exception as e:
-                            logger.warning(f"Failed to save image {image_id}: {str(e)}")
-                    except Exception as e:
-                        logger.warning(f"Failed to process image {image_id}: {str(e)}")
-            except Exception as e:
-                logger.warning(f"Failed to process page/image {page_data.get('id')}: {e}")
-    
-    try:
-        await db.commit()
-        logger.info("Committed images to database")
-    except Exception as e:
-        logger.error(f"Failed to commit images: {str(e)}")
-        image_id_map = {}
-    
-    images_verified = 0
-    images_failed = 0
-    
-    async with db.begin():
-        logger.info(f"Verifying {len(image_id_map)} images...")
-        for image_id in list(image_id_map.values()):
-            try:
-                image_check = await db.execute(
-                    select(model.Image).filter(model.Image.id == image_id)
-                )
-                if image_check.unique().scalar_one_or_none():
-                    images_verified += 1
-                else:
-                    logger.warning(f"Verification failed for image {image_id} - removing from map")
-                    keys_to_remove = [k for k, v in image_id_map.items() if v == image_id]
-                    for k in keys_to_remove:
-                        image_id_map.pop(k, None)
-                    images_failed += 1
-            except Exception as e:
-                logger.warning(f"Error verifying image {image_id}: {str(e)}")
-                images_failed += 1
-    
-    verification_rate = (images_verified / (images_verified + images_failed) * 100) if (images_verified + images_failed) > 0 else 0
-    logger.info(f"Image verification: {images_verified} verified, {images_failed} failed ({verification_rate:.1f}%)")
-    
-    return image_id_map
-
-
-async def _process_detections(db: AsyncSession, metakat_data: dict, collection_id: UUID, image_id_map: dict, success_counters: dict):
-    """Process all detections, linking them to images and meta elements"""
-    logger.info("PHASE 3: Processing detections...")
-    
-    regular_detections = metakat_data.get("detections", [])
-    
-    verification_stats = {
-        "total_detections": len(regular_detections),
-        "success": 0,
-        "failed": 0
-    }
-    
-    if verification_stats["total_detections"] == 0:
-        logger.info("No detections to process")
-        return verification_stats
-    
-    logger.info(f"Processing {len(regular_detections)} detections")
-    
-    # Process regular detections
-    try:
-        async with db.begin():
-            meta_roles_query = await db.execute(select(model.MetaRole))
-            meta_roles = meta_roles_query.unique().scalars().all()
-            
-            meta_roles_by_name = {}
-            for role in meta_roles:
-                if hasattr(role, 'computed_name'):
-                    meta_roles_by_name[role.computed_name] = role.id
-            
-            logger.info(f"Found {len(meta_roles_by_name)} meta roles for classification")
-            
-            # Process regular detections
-            for detection in regular_detections:
-                try:
-                    detection_dict = detection.copy()
-                    detection_id = UUID(detection_dict.get("id"))
-                    
-                    detection_check = await db.execute(
-                        select(model.Detection).filter(model.Detection.id == detection_id)
-                    )
-                    if detection_check.unique().scalar_one_or_none():
-                        logger.info(f"Detection already exists: {detection_id}")
-                        success_counters["detections"] += 1
-                        verification_stats["success"] += 1
-                        continue
-                    
-                    image_id = detection_dict.get("page_id") or detection_dict.get("image_id")
-                    
-                    if not image_id:
-                        logger.warning(f"No image found for detection: {detection_id}, skipping")
-                        verification_stats["failed"] += 1
-                        continue
-                    
-                    image_check = await db.execute(
-                        select(model.Image).filter(model.Image.id == image_id)
-                    )
-                    db_image = image_check.unique().scalar_one_or_none()
-                    
-                    if not db_image:
-                        logger.warning(f"No image found for detection: {detection_id}, skipping")
-                        verification_stats["failed"] += 1
-                        continue
-                    else:
-                        logger.info(f"Found image {image_id} for detection {detection_id}")
-                        mapped_image_id = image_id
-                    
-                    detection_obj = base_objects.DetectionNew(
-                        id=detection_id,
-                        image_id=str(mapped_image_id),
-                        bbox=detection_dict.get("bbox"),
-                        value=detection_dict.get("value"),
-                        confidence=detection_dict.get("confidence")
-                    )
-                    
-                    db_detection = model.Detection(**detection_obj.model_dump())
-                    db.add(db_detection)
-                    success_counters["detections"] += 1
-                    verification_stats["success"] += 1
-                    logger.info(f"Created detection: {detection_id}")
-                    
-                    meta_element_id = detection_dict.get("parent_element_id")
-                    meta_element_type = detection_dict.get("element_type")
-                    meta_attribute_type = detection_dict.get("meta_attribute_type")
-                    
-                    if not meta_element_id or not meta_element_type or not meta_attribute_type:
-                        logger.warning(f"Missing metadata for detection {detection_id}")
-                        continue
-                    
-                    computed_name = f"{meta_element_type}.{meta_attribute_type}"
-                    meta_role_id = meta_roles_by_name.get(computed_name)
-                    if not meta_role_id:
-                        logger.warning(f"No meta role found for {computed_name}")
-                        continue
-                    
-                    meta_element_detection = base_objects.MetaElementDetectionNew(
-                        id=uuid.uuid4(),
-                        detection_id=detection_id,
-                        meta_element_id=meta_element_id,
-                        meta_role_id=meta_role_id
-                    )
-                    
-                    db_meta_element_detection = model.MetaElementDetection(**meta_element_detection.model_dump())
-                    db.add(db_meta_element_detection)  
-                    success_counters["meta_element_detections"] += 1
-                    logger.info(f"Created meta element detection for {computed_name}")
-                    
-                except Exception as e:
-                    detection_id = detection.get("id", "unknown")
-                    logger.warning(f"Failed to process detection {detection_id}: {e}")
-                    verification_stats["failed"] += 1
-    except Exception as e:
-        logger.error(f"Error processing detections: {e}")
-        verification_stats["failed"] += len(regular_detections)
-    
-    return verification_stats
-
-
-async def get_collection_hierarchical(
-    db: AsyncSession, 
-    collection_id: UUID, 
-    max_depth: int = 2, 
-    limit_children: int = 20,
-    limit_images: int = 10, 
-    limit_detections: int = 10,
-    load_images: bool = True,
-    load_detections: bool = True
-):
-    """Get a collection with its meta_elements in a hierarchical structure with efficient loading
-    
-    Args:
-        db: The database session
-        collection_id: The UUID of the collection to retrieve
-        max_depth: Maximum depth of child elements to load (default: 2)
-        limit_children: Maximum number of children to load per meta element (default: 20)
-        limit_images: Maximum number of images to load per meta element (default: 10)
-        limit_detections: Maximum number of detections to load per meta element (default: 10)
-        load_images: Whether to load images (default: True)
-        load_detections: Whether to load detections (default: True)
-    """
-    try:
-        # Get the collection with basic information - no transaction needed for reads
-        collection_query = await db.execute(
-            select(model.Collection)
-            .where(model.Collection.id == collection_id)
-        )
+        
         db_collection = collection_query.unique().scalar_one_or_none()
         
         if not db_collection:
-            logger.warning(f"Collection {collection_id} not found")
-            return None
+            logger.warning(f"[CACHE] Collection {collection_id} not found")
+            raise HTTPException(status_code=404, detail=f"Collection with ID {collection_id} not found")
         
-        # Get all meta element types in a single query for quick lookup
-        meta_element_types_query = await db.execute(
-            select(model.MetaElementType)
-        )
-        db_meta_element_types = meta_element_types_query.unique().scalars().all()
-        meta_element_types_by_id = {str(met.id): met for met in db_meta_element_types}
-        
-        # First get root elements only
-        root_elements_query = await db.execute(
-            select(model.MetaElement)
-            .where(
-                model.MetaElement.collection_id == collection_id,
-                model.MetaElement.parent_id == None
-            )
-            .limit(10)  # Limit root elements
-        )
-        db_root_elements = root_elements_query.unique().scalars().all()
-        
-        if not db_root_elements:
-            logger.warning(f"No root elements found for collection {collection_id}")
-            return None
-        
-        # Create root element objects
-        meta_elements_by_id = {}
-        root_elements = []
-        
-        for element in db_root_elements:
-            # Convert to Pydantic model
-            meta_element_dict = model.orm2dict(element)
-            
-            # Initialize with empty lists for relationships
-            meta_element_dict["detections"] = []
-            meta_element_dict["children"] = []
-            meta_element_dict["images"] = []
-            
-            # Add meta_element_type relationship
-            if element.meta_element_type_id and str(element.meta_element_type_id) in meta_element_types_by_id:
-                meta_element_type = meta_element_types_by_id[str(element.meta_element_type_id)]
-                meta_element_dict["meta_element_type"] = base_objects.MetaElementType(
-                    **model.orm2dict(meta_element_type)
-                )
-            
-            # Create MetaElementHierarchical object
-            meta_element = MetaElementHierarchical(**meta_element_dict)
-            meta_elements_by_id[str(element.id)] = meta_element
-            root_elements.append(meta_element)
-        
-        # Recursively fetch children up to max_depth
-        if max_depth > 0:
-            for root_element in root_elements:
-                await _fetch_children_recursive(
-                    db, 
-                    root_element, 
-                    meta_elements_by_id, 
-                    meta_element_types_by_id, 
-                    0, 
-                    max_depth, 
-                    limit_children
-                )
-        
-        # If multiple root elements, select the first one
-        root_element = root_elements[0] if root_elements else None
-        
-        # Only load images and detections if requested
-        if load_images:
-            await _load_images_for_elements(db, meta_elements_by_id, limit_images)
-        
-        if load_detections:
-            await _load_detections_for_elements(db, meta_elements_by_id, limit_detections)
-        
-        # Create the final hierarchical collection with a single global_structure
+        # Create the collection object without the hierarchical structure first
         collection_dict = model.orm2dict(db_collection)
+        
+        # Check if we have a root meta element
+        root_element_id = db_collection.root_meta_element_id
+        if not root_element_id:
+            logger.warning(f"[CACHE] No root meta element set for collection {collection_id}")
+            # Return the collection without the hierarchical structure
+            collection_dict["global_structure"] = None
+            return CollectionHierarchical(**collection_dict)
+        
+        logger.info(f"[CACHE] Building hierarchy for collection {collection_id} | Root element: {root_element_id}")
+        build_start_time = datetime.now()
+        
+        # Build the hierarchical structure starting from the root
+        root_element = await build_meta_element_hierarchy_optimized(db, root_element_id)
+        if not root_element:
+            logger.warning(f"[CACHE] Failed to build hierarchy using optimized method for root element {root_element_id}")
+            # Try with the original, simpler implementation as a fallback
+            logger.info(f"[CACHE] Trying fallback hierarchy builder for root element {root_element_id}")
+            root_element = await build_meta_element_hierarchy(db, root_element_id)
+            
+            if not root_element:
+                # If both methods fail, return the collection without the hierarchical structure
+                logger.error(f"[CACHE] Both hierarchy builders failed for collection {collection_id}")
+                collection_dict["global_structure"] = None
+                return CollectionHierarchical(**collection_dict)
+        
+        build_time = datetime.now() - build_start_time
+        logger.info(f"[CACHE] Hierarchy built successfully in {build_time.total_seconds():.4f}s")
+        
+        # Add the hierarchical structure to the collection
         collection_dict["global_structure"] = root_element
         
+        # Debug information
+        logger.info(f"[CACHE] Root element ID: {root_element.id}")
+        logger.info(f"[CACHE] Root element has {len(root_element.children)} children")
+        
+        # Store the structure in the cache if caching is enabled
+        if use_cache:
+            try:
+                cache_start_time = datetime.now()
+                logger.info(f"[CACHE] Preparing to update cache for collection {collection_id}")
+                
+                # Create the full result object
+                result = CollectionHierarchical(**collection_dict)
+                
+                # Convert to a JSON-serializable dict with UUIDs as strings and datetimes as ISO format
+                def convert_to_json_safe(obj):
+                    if isinstance(obj, dict):
+                        return {k: convert_to_json_safe(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [convert_to_json_safe(i) for i in obj]
+                    elif isinstance(obj, UUID):
+                        return str(obj)
+                    elif isinstance(obj, datetime):
+                        return obj.isoformat()
+                    else:
+                        return obj
+                
+                # Get model dict and convert UUIDs to strings for JSON serialization
+                json_safe_dict = convert_to_json_safe(result.model_dump())
+                
+                # For debugging, check the size of the cache and save a sample
+                json_size = len(json.dumps(json_safe_dict))
+                logger.info(f"[CACHE] Cache size: {json_size / 1024:.2f} KB")
+                
+                # For debugging, log a small portion of the cache
+                logger.debug(f"[CACHE] Cache sample (first few keys): {list(json_safe_dict.keys())}")
+                
+                # IMPORTANT: Create a separate database session for the cache update
+                # This avoids issues with nested transactions
+                from metacheck.database import get_async_session
+                
+                # Use next() with the generator function
+                async_session_gen = get_async_session()
+                async_db = await anext(async_session_gen)
+                
+                try:
+                    # Execute the update in its own transaction
+                    async with async_db.begin():
+                        logger.debug(f"[CACHE] Starting dedicated transaction for cache update")
+                        query = (
+                            update(model.Collection)
+                            .where(model.Collection.id == collection_id)
+                            .values(hierarchical_structure=json_safe_dict)
+                        )
+                        update_result = await async_db.execute(query)
+                        rows_affected = update_result.rowcount
+                        logger.debug(f"[CACHE] Update query executed, affected {rows_affected} rows")
+                        
+                    # Verify the cache was updated
+                    verification_query = await async_db.execute(
+                        select(model.Collection.hierarchical_structure)
+                        .where(model.Collection.id == collection_id)
+                    )
+                    verification_result = verification_query.scalar_one_or_none()
+                    cache_updated = verification_result is not None
+                    
+                    if cache_updated:
+                        cache_time = datetime.now() - cache_start_time
+                        logger.info(f"[CACHE] ✅ Successfully updated cache in {cache_time.total_seconds():.4f}s")
+                    else:
+                        logger.error(f"[CACHE] ❌ Cache update failed - verification found no data")
+                except Exception as inner_e:
+                    logger.error(f"[CACHE] ❌ Database error during cache update: {str(inner_e)}", exc_info=True)
+                finally:
+                    # Close the dedicated session
+                    await async_db.close()
+                    
+            except Exception as e:
+                logger.error(f"[CACHE] ❌ Failed to update cache: {str(e)}", exc_info=True)
+                # Continue without caching - don't block the response
+        
+        total_time = datetime.now() - start_time
+        logger.info(f"[CACHE] Total fetch time for collection {collection_id}: {total_time.total_seconds():.4f}s")
         return CollectionHierarchical(**collection_dict)
             
-    except exc.SQLAlchemyError as e:
-        logger.exception(f"Failed reading hierarchical collection from database")
-        raise DBError(f"Failed reading hierarchical collection from database") from e
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        logger.warning(f"[CACHE] HTTP exception while fetching collection {collection_id}")
+        raise
+    except Exception as e:
+        total_time = datetime.now() - start_time
+        logger.exception(f"[CACHE] ❌ Failed fetching collection {collection_id} after {total_time.total_seconds():.4f}s: {str(e)}")
+        raise DBError(f"Failed reading hierarchical collection from database: {str(e)}") from e
 
 
-async def _fetch_children_recursive(
-    db, 
-    parent_element, 
-    meta_elements_by_id, 
-    meta_element_types_by_id, 
-    current_depth, 
-    max_depth, 
-    limit_children
-):
-    """Recursively fetch children for an element"""
-    if current_depth >= max_depth:
-        return
+async def build_meta_element_hierarchy_optimized(db: AsyncSession, meta_element_id: UUID, max_depth: int = 10, current_depth: int = 0):
+    """Optimized version of build_meta_element_hierarchy that reduces the N+1 query problem.
     
-    # Get children for this parent
-    children_query = await db.execute(
-        select(model.MetaElement)
-        .where(model.MetaElement.parent_id == parent_element.id)
-        .limit(limit_children)
-    )
-    db_children = children_query.unique().scalars().all()
+    This implementation uses bulk loading of related data and temporary dictionaries to
+    reduce the number of database queries.
+    """
+    if current_depth > max_depth:
+        logger.warning(f"Reached maximum recursion depth of {max_depth} for meta element {meta_element_id}")
+        return None
     
-    # Process each child
-    for child in db_children:
-        # Convert to Pydantic model
-        child_dict = model.orm2dict(child)
+    try:
+        # Get the meta element tree using a more efficient approach
+        # Progress tracking: 1/5 - Getting root element
+        logger.info(f"[PROGRESS] (1/5) Getting root meta element {meta_element_id}...")
         
-        # Initialize with empty lists for relationships
-        child_dict["detections"] = []
-        child_dict["children"] = []
-        child_dict["images"] = []
-        
-        # Add meta_element_type relationship
-        if child.meta_element_type_id and str(child.meta_element_type_id) in meta_element_types_by_id:
-            meta_element_type = meta_element_types_by_id[str(child.meta_element_type_id)]
-            child_dict["meta_element_type"] = base_objects.MetaElementType(
-                **model.orm2dict(meta_element_type)
-            )
-        
-        # Create MetaElementHierarchical object
-        child_element = MetaElementHierarchical(**child_dict)
-        meta_elements_by_id[str(child.id)] = child_element
-        
-        # Add child to parent
-        parent_element.children.append(child_element)
-        
-        # Recursively fetch grandchildren
-        await _fetch_children_recursive(
-            db, 
-            child_element, 
-            meta_elements_by_id, 
-            meta_element_types_by_id, 
-            current_depth + 1, 
-            max_depth, 
-            limit_children
+        # First, get the target meta element
+        root_query = await db.execute(
+            select(model.MetaElement)
+            .options(joinedload(model.MetaElement.meta_element_type))
+            .where(model.MetaElement.id == meta_element_id)
         )
-
-
-async def _load_images_for_elements(db, meta_elements_by_id, limit_per_element=10):
-    """Load images for elements in batches for better performance"""
-    try:
-        element_ids = list(meta_elements_by_id.keys())
-        batch_size = 20
+        root_element = root_query.unique().scalar_one_or_none()
         
-        for i in range(0, len(element_ids), batch_size):
-            batch_ids = element_ids[i:i+batch_size]
+        if not root_element:
+            logger.warning(f"Meta element {meta_element_id} not found")
+            return None
             
-            for element_id in batch_ids:
-                element = meta_elements_by_id[element_id]
-                
-                # Get images with limit
-                images_query = await db.execute(
-                    select(model.Image)
-                    .where(model.Image.parent_meta_element_id == UUID(element_id))
-                    .order_by(model.Image.order)
-                    .limit(limit_per_element)
-                )
-                db_images = images_query.unique().scalars().all()
-                
-                # Add images to element
-                for image in db_images:
-                    image_dict = model.orm2dict(image)
-                    image_obj = base_objects.Image(**image_dict)
-                    element.images.append(image_obj)
+        # Get the collection ID to filter all related meta elements
+        collection_id = root_element.collection_id
         
-        logger.info(f"Loaded images for {len(element_ids)} elements")
-    except Exception as e:
-        logger.exception(f"Error loading images: {e}")
-
-
-async def _load_detections_for_elements(db, meta_elements_by_id, limit_per_element=10):
-    """Load detections for elements in batches for better performance"""
-    try:
-        # Load meta roles once for the entire operation
-        meta_roles_query = await db.execute(select(model.MetaRole))
-        db_meta_roles = meta_roles_query.unique().scalars().all()
-        meta_roles_by_id = {str(mr.id): base_objects.MetaRole(**model.orm2dict(mr)) for mr in db_meta_roles}
+        # Progress tracking: 2/5 - Loading all meta elements
+        logger.info(f"[PROGRESS] (2/5) Loading all meta elements for collection {collection_id}...")
         
-        element_ids = list(meta_elements_by_id.keys())
-        batch_size = 20
+        # Get all meta elements for this collection
+        all_elements_query = await db.execute(
+            select(model.MetaElement)
+            .options(joinedload(model.MetaElement.meta_element_type))
+            .where(model.MetaElement.collection_id == collection_id)
+        )
+        all_elements = all_elements_query.unique().scalars().all()
         
-        for i in range(0, len(element_ids), batch_size):
-            batch_ids = element_ids[i:i+batch_size]
+        logger.info(f"[PROGRESS] (2/5) Loaded {len(all_elements)} meta elements")
+        
+        # Create a dictionary of meta element IDs to their MetaElementHierarchical objects
+        meta_elements_dict = {}
+        meta_element_ids = []
+        
+        for element in all_elements:
+            meta_element_dict = model.orm2dict(element)
+            meta_element_dict["children"] = []
+            meta_element_dict["images"] = []
+            meta_element_dict["detections"] = []
             
-            for element_id in batch_ids:
-                element = meta_elements_by_id[element_id]
-                
-                # Get detections with JOIN and limit
-                joined_query = await db.execute(
-                    select(model.MetaElementDetection, model.Detection)
-                    .join(model.Detection, model.MetaElementDetection.detection_id == model.Detection.id)
-                    .where(model.MetaElementDetection.meta_element_id == UUID(element_id))
-                    .limit(limit_per_element)
+            # Add meta_element_type if available
+            if element.meta_element_type:
+                meta_element_dict["meta_element_type"] = base_objects.MetaElementType(
+                    **model.orm2dict(element.meta_element_type)
                 )
-                results = joined_query.unique().all()
-                
-                # Process detections
-                for med, detection in results:
-                    # Create detection dict
-                    detection_dict = model.orm2dict(detection)
-                    
-                    # Create meta_element_detection with meta_role
-                    med_dict = model.orm2dict(med)
-                    if med.meta_role_id and str(med.meta_role_id) in meta_roles_by_id:
-                        med_dict["meta_role"] = meta_roles_by_id[str(med.meta_role_id)]
-                    
-                    # Create detection object with meta_element_detection
-                    detection_dict["meta_element_detections"] = base_objects.MetaElementDetection(**med_dict)
-                    detection_obj = DetectionHierarchical(**detection_dict)
-                    
-                    # Add to element
-                    element.detections.append(detection_obj)
+            
+            meta_elements_dict[str(element.id)] = MetaElementHierarchical(**meta_element_dict)
+            meta_element_ids.append(str(element.id))
         
-        logger.info(f"Loaded detections for {len(element_ids)} elements")
+        # Progress tracking: 3/5 - Building tree structure
+        logger.info(f"[PROGRESS] (3/5) Building tree structure with {len(meta_element_ids)} elements...")
+        
+        # Build the tree structure by adding children
+        child_count = 0
+        for element in all_elements:
+            if element.parent_id and str(element.parent_id) in meta_elements_dict and str(element.id) in meta_elements_dict:
+                parent = meta_elements_dict[str(element.parent_id)]
+                child = meta_elements_dict[str(element.id)]
+                parent.children.append(child)
+                child_count += 1
+        
+        logger.info(f"[PROGRESS] (3/5) Tree structure built with {child_count} parent-child relationships")
+        
+        # Progress tracking: 4/5 - Loading images
+        logger.info(f"[PROGRESS] (4/5) Loading images for meta elements...")
+        
+        # Get all images for all meta elements in one query
+        images_query = await db.execute(
+            select(model.Image)
+            .where(model.Image.parent_meta_element_id.in_(meta_element_ids))
+        )
+        images = images_query.scalars().all()
+        
+        logger.info(f"[PROGRESS] (4/5) Loaded {len(images)} images")
+        
+        # Assign images to their parent meta elements
+        image_count = 0
+        for image in images:
+            if image.parent_meta_element_id and str(image.parent_meta_element_id) in meta_elements_dict:
+                image_dict = model.orm2dict(image)
+                meta_elements_dict[str(image.parent_meta_element_id)].images.append(
+                    base_objects.Image(**image_dict)
+                )
+                image_count += 1
+        
+        logger.info(f"[PROGRESS] (4/5) Assigned {image_count} images to meta elements")
+        
+        # Progress tracking: 5/5 - Loading detections
+        logger.info(f"[PROGRESS] (5/5) Loading detections for meta elements...")
+        
+        # Get all meta element detections and their meta roles in one query
+        if meta_element_ids:  # Only query if we have meta element IDs
+            med_query = await db.execute(
+                select(model.MetaElementDetection)
+                .options(joinedload(model.MetaElementDetection.meta_role))
+                .where(model.MetaElementDetection.meta_element_id.in_(meta_element_ids))
+            )
+            med_list = med_query.unique().scalars().all()
+            
+            logger.info(f"[PROGRESS] (5/5) Loaded {len(med_list)} meta element detections")
+            
+            # Group detections by meta element ID
+            med_by_meta_element = {}
+            detection_ids = []
+            
+            for med in med_list:
+                med_by_meta_element.setdefault(str(med.meta_element_id), []).append(med)
+                detection_ids.append(str(med.detection_id))
+            
+            # Get all detections in one query
+            if detection_ids:  # Only query if we have detection IDs
+                logger.info(f"[PROGRESS] (5/5) Loading {len(detection_ids)} detections...")
+                detections_query = await db.execute(
+                    select(model.Detection)
+                    .where(model.Detection.id.in_(detection_ids))
+                )
+                detections = {
+                    str(d.id): d
+                    for d in detections_query.scalars().all()
+                }
+                
+                logger.info(f"[PROGRESS] (5/5) Loaded {len(detections)} detections")
+                
+                # Assign detections to their meta elements
+                detection_count = 0
+                for meta_element_id_str, meds in med_by_meta_element.items():
+                    if meta_element_id_str in meta_elements_dict:
+                        meta_element = meta_elements_dict[meta_element_id_str]
+                        
+                        for med in meds:
+                            detection_id_str = str(med.detection_id)
+                            if detection_id_str in detections:
+                                detection = detections[detection_id_str]
+                                detection_dict = model.orm2dict(detection)
+                                
+                                # Create meta element detection with meta role
+                                med_dict = model.orm2dict(med)
+                                if med.meta_role:
+                                    med_dict["meta_role"] = base_objects.MetaRole(**model.orm2dict(med.meta_role))
+                                
+                                med_obj = base_objects.MetaElementDetection(**med_dict)
+                                
+                                # Create detection with meta element detection
+                                detection_dict["meta_element_detections"] = med_obj
+                                detection_obj = DetectionHierarchical(**detection_dict)
+                                
+                                meta_element.detections.append(detection_obj)
+                                detection_count += 1
+                
+                logger.info(f"[PROGRESS] (5/5) Assigned {detection_count} detections to meta elements")
+            else:
+                logger.info(f"[PROGRESS] (5/5) No detections to load")
+        else:
+            logger.info(f"[PROGRESS] (5/5) No meta elements to load detections for")
+        
+        # Progress tracking: completed
+        logger.info(f"[PROGRESS] Hierarchy build completed successfully!")
+        
+        # Return the root element
+        return meta_elements_dict.get(str(meta_element_id))
+    
     except Exception as e:
-        logger.exception(f"Error loading detections: {e}")
+        logger.exception(f"Error building meta element hierarchy: {str(e)}")
+        return None
 
 
 # Add a new endpoint for lazily loading additional data
@@ -1166,3 +869,251 @@ async def get_meta_element_detections(
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed reading meta element detections from database")
         raise DBError(f"Failed reading meta element detections from database") from e
+
+
+async def import_metakat_collection(file: UploadFile, db: AsyncSession):
+    """Import a MetaKat formatted dataset - optimized for large batches"""
+    from metacheck.cruds import crud_import
+    return await crud_import.import_metakat_collection(file, db)
+
+
+async def build_meta_element_hierarchy(db: AsyncSession, meta_element_id: UUID, max_depth: int = 10, current_depth: int = 0):
+    """Recursively build the hierarchy for a meta element.
+    
+    Args:
+        db: Database session
+        meta_element_id: ID of the meta element to build hierarchy for
+        max_depth: Maximum depth to build (to prevent infinite recursion)
+        current_depth: Current depth in the recursion
+        
+    Returns:
+        A MetaElementHierarchical object with children populated
+    """
+    if current_depth > max_depth:
+        logger.warning(f"Reached maximum recursion depth of {max_depth} for meta element {meta_element_id}")
+        return None
+    
+    # Get the meta element with its type
+    meta_element_query = await db.execute(
+        select(model.MetaElement)
+        .options(joinedload(model.MetaElement.meta_element_type))
+        .where(model.MetaElement.id == meta_element_id)
+    )
+    meta_element = meta_element_query.unique().scalar_one_or_none()
+    
+    if not meta_element:
+        logger.warning(f"Meta element {meta_element_id} not found")
+        return None
+    
+    # Create the basic meta element
+    meta_element_dict = model.orm2dict(meta_element)
+    meta_element_dict["children"] = []
+    meta_element_dict["images"] = []
+    meta_element_dict["detections"] = []
+    
+    # Add meta_element_type if available
+    if meta_element.meta_element_type:
+        meta_element_dict["meta_element_type"] = base_objects.MetaElementType(
+            **model.orm2dict(meta_element.meta_element_type)
+        )
+    
+    element = MetaElementHierarchical(**meta_element_dict)
+    
+    # Get direct children
+    children_query = await db.execute(
+        select(model.MetaElement)
+        .where(model.MetaElement.parent_id == meta_element_id)
+    )
+    children = children_query.unique().scalars().all()
+    
+    # Recursively build children
+    for child in children:
+        child_hier = await build_meta_element_hierarchy(
+            db, child.id, max_depth, current_depth + 1
+        )
+        if child_hier:
+            element.children.append(child_hier)
+    
+    # Get images for this element
+    images_query = await db.execute(
+        select(model.Image)
+        .where(model.Image.parent_meta_element_id == meta_element_id)
+    )
+    images = images_query.unique().scalars().all()
+    
+    for image in images:
+        image_dict = model.orm2dict(image)
+        element.images.append(base_objects.Image(**image_dict))
+    
+    # Get detections for this meta element
+    meta_element_detections_query = await db.execute(
+        select(model.MetaElementDetection)
+        .options(joinedload(model.MetaElementDetection.meta_role))
+        .where(model.MetaElementDetection.meta_element_id == meta_element_id)
+    )
+    meta_element_detections = meta_element_detections_query.unique().scalars().all()
+    
+    # For each meta element detection, get the detection
+    for med in meta_element_detections:
+        detection_query = await db.execute(
+            select(model.Detection)
+            .where(model.Detection.id == med.detection_id)
+        )
+        detection = detection_query.unique().scalar_one_or_none()
+        
+        if detection:
+            detection_dict = model.orm2dict(detection)
+            
+            # Create meta element detection with meta_role
+            med_dict = model.orm2dict(med)
+            if med.meta_role:
+                med_dict["meta_role"] = base_objects.MetaRole(**model.orm2dict(med.meta_role))
+                
+            med_obj = base_objects.MetaElementDetection(**med_dict)
+            
+            # Create detection with meta_element_detection
+            detection_dict["meta_element_detections"] = med_obj
+            detection_obj = DetectionHierarchical(**detection_dict)
+            
+            element.detections.append(detection_obj)
+    
+    return element
+
+
+async def check_hierarchical_cache_status(db: AsyncSession, collection_id: UUID):
+    """
+    Check and report on the status of the hierarchical cache for a collection.
+    
+    This is a diagnostic function to help debug caching issues.
+    """
+    try:
+        logger.info(f"[CACHE-CHECK] Checking cache status for collection {collection_id}")
+        
+        # Get the collection with its hierarchical structure
+        collection_query = await db.execute(
+            select(model.Collection)
+            .where(model.Collection.id == collection_id)
+        )
+        db_collection = collection_query.unique().scalar_one_or_none()
+        
+        if not db_collection:
+            logger.warning(f"[CACHE-CHECK] Collection {collection_id} not found")
+            return {"status": "error", "message": "Collection not found"}
+        
+        # Check if the column exists in the model
+        has_column = hasattr(model.Collection, 'hierarchical_structure')
+        logger.info(f"[CACHE-CHECK] Model has hierarchical_structure column: {has_column}")
+        
+        # Check if hierarchical structure is cached
+        has_attribute = hasattr(db_collection, 'hierarchical_structure')
+        logger.info(f"[CACHE-CHECK] Instance has hierarchical_structure attribute: {has_attribute}")
+        
+        # Get value type
+        value_type = type(db_collection.hierarchical_structure) if has_attribute else None
+        logger.info(f"[CACHE-CHECK] Cache attribute type: {value_type}")
+        
+        # Check for NULL in the database
+        if not has_attribute or db_collection.hierarchical_structure is None:
+            logger.info(f"[CACHE-CHECK] No cache exists for collection {collection_id}")
+            
+            # Check if the column exists in the database
+            try:
+                # Direct raw query to check column existence
+                from sqlalchemy import text
+                raw_query = text("SELECT column_name FROM information_schema.columns WHERE table_name = 'collections' AND column_name = 'hierarchical_structure'")
+                result = await db.execute(raw_query)
+                column_exists = result.scalar_one_or_none() is not None
+                logger.info(f"[CACHE-CHECK] Column exists in database: {column_exists}")
+            except Exception as schema_e:
+                logger.error(f"[CACHE-CHECK] Error checking schema: {str(schema_e)}")
+                column_exists = "Unknown (error checking)"
+            
+            return {
+                "status": "missing", 
+                "message": "No cache exists",
+                "has_column_in_model": has_column,
+                "has_attribute_in_instance": has_attribute,
+                "column_exists_in_db": column_exists,
+                "value_type": str(value_type)
+            }
+        
+        # Get cache details
+        cache_data = db_collection.hierarchical_structure
+        
+        # Calculate size
+        try:
+            json_dump = json.dumps(cache_data)
+            cache_size_bytes = len(json_dump)
+            cache_size_kb = cache_size_bytes / 1024
+            
+            # Log cache structure details
+            logger.info(f"[CACHE-CHECK] Cache exists for collection {collection_id}")
+            logger.info(f"[CACHE-CHECK] Cache size: {cache_size_kb:.2f} KB")
+            
+            # Check for global_structure
+            has_global_structure = "global_structure" in cache_data
+            logger.info(f"[CACHE-CHECK] Has global_structure: {has_global_structure}")
+            
+            # Debug: log all top-level keys
+            logger.info(f"[CACHE-CHECK] Top-level keys: {list(cache_data.keys())}")
+            
+            # Check for basic required fields
+            required_fields = ["id", "name", "created_date", "last_change", "last_access"]
+            missing_fields = [field for field in required_fields if field not in cache_data]
+            
+            if missing_fields:
+                logger.warning(f"[CACHE-CHECK] Missing required fields in cache: {missing_fields}")
+            else:
+                logger.info(f"[CACHE-CHECK] All required fields present in cache")
+            
+            # If global_structure exists, check its depth
+            max_depth = 0
+            child_counts = []
+            
+            if has_global_structure and cache_data["global_structure"]:
+                # Function to recursively check hierarchy depth
+                def check_depth(element, current_depth=0):
+                    nonlocal max_depth, child_counts
+                    if current_depth > max_depth:
+                        max_depth = current_depth
+                    
+                    children = element.get("children", [])
+                    child_count = len(children)
+                    child_counts.append(child_count)
+                    
+                    for child in children:
+                        check_depth(child, current_depth + 1)
+                
+                # Start depth check from root
+                check_depth(cache_data["global_structure"])
+                
+                logger.info(f"[CACHE-CHECK] Max hierarchy depth: {max_depth}")
+                logger.info(f"[CACHE-CHECK] Average children per node: {sum(child_counts)/len(child_counts) if child_counts else 0:.2f}")
+                logger.info(f"[CACHE-CHECK] Max children at any node: {max(child_counts) if child_counts else 0}")
+            
+            return {
+                "status": "valid" if has_global_structure else "incomplete",
+                "size_kb": cache_size_kb,
+                "has_global_structure": has_global_structure,
+                "max_depth": max_depth,
+                "missing_fields": missing_fields,
+                "top_level_keys": list(cache_data.keys()),
+                "has_column_in_model": has_column,
+                "has_attribute_in_instance": has_attribute,
+                "value_type": str(value_type),
+                "message": "Cache valid and complete" if has_global_structure and not missing_fields else "Cache exists but may be incomplete"
+            }
+        except Exception as json_e:
+            logger.error(f"[CACHE-CHECK] Error processing cache JSON: {str(json_e)}")
+            return {
+                "status": "error", 
+                "message": f"Cache exists but cannot be processed: {str(json_e)}",
+                "has_column_in_model": has_column,
+                "has_attribute_in_instance": has_attribute,
+                "value_type": str(value_type),
+                "raw_data_sample": str(cache_data)[:200] + "..." if len(str(cache_data)) > 200 else str(cache_data)
+            }
+        
+    except Exception as e:
+        logger.exception(f"[CACHE-CHECK] Error checking cache status: {str(e)}")
+        return {"status": "error", "message": f"Error checking cache: {str(e)}"}

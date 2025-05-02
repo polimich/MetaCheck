@@ -1,7 +1,7 @@
 import uuid
 from typing import List, cast, TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, String, func, select, event, Column
+from sqlalchemy import ForeignKey, String, func, select, event, Column, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 # Use TYPE_CHECKING to avoid circular imports
@@ -15,7 +15,21 @@ from metacheck.schemas.base_objects.enums import WorkState, PageType
 
 
 class Image(Entity):
+    """Represents an image in the system with its metadata."""
+    
     __tablename__ = "images"
+
+    # Table-level indexes using automatic naming convention
+    __table_args__ = (
+        # Composite index for fast image lookup by collection and hash
+        Index(None, 'collection_id', 'imagehash'),
+        
+        # Composite index for finding images by meta element with deleted filter
+        Index(None, 'parent_meta_element_id', 'deleted'),
+        
+        # Composite index for collection-based filtering with deleted filter
+        Index(None, 'collection_id', 'deleted'),
+    )
 
     collection_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("collections.id", ondelete="CASCADE", name="fk_images_collection_id"), 

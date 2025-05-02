@@ -286,15 +286,9 @@ async def get_all(
                 query = query.options(
                     selectinload(table.detections)
                 )
-            # Eager loading for Collections when listing all collections
-            elif table.__name__ == "Collection":
-                from sqlalchemy.orm import selectinload
-                # Explicitly load the images and meta_elements
-                query = query.options(
-                    selectinload(table.images),
-                    selectinload(table.meta_elements)
-                )
-                
+            # For Collections, do not load any relationships
+            # This removes the eager loading that was causing performance issues
+            
             db_objects = await db.execute(query)
             db_objects = db_objects.unique().scalars().all()
             
@@ -303,9 +297,9 @@ async def get_all(
             
             # Process objects based on type
             if table.__name__ == "Collection":
-                # For collections, use sqlalchemy_to_dict to include the loaded relationships
+                # For collections, use orm2dict which doesn't include relationships
                 for obj in db_objects:
-                    obj_dict = sqlalchemy_to_dict(obj)  # Use sqlalchemy_to_dict instead of orm2dict
+                    obj_dict = orm2dict(obj)  # Use orm2dict instead of sqlalchemy_to_dict
                     result.append(model_class.model_validate(obj_dict))
             else:
                 # Normal handling for other objects

@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,8 +20,17 @@ class MetaElement(Entity):
 
     __tablename__ = "meta_elements"
     
+    # Table-level indexes using automatic naming convention
+    __table_args__ = (
+        # Composite index for fast filtering by collection and element type
+        Index(None, 'collection_id', 'meta_element_type_id'),
+        
+        # Composite index for hierarchical queries
+        Index(None, 'parent_id', 'collection_id'),
+    )
+    
     collection_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("collections.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("collections.id", ondelete="CASCADE"), nullable=False, index=True
     )
     
     # Use string reference to avoid circular imports

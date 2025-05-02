@@ -1,7 +1,7 @@
 import uuid
 from typing import List, TYPE_CHECKING, Optional
 
-from sqlalchemy import ForeignKey, String, select, text, event
+from sqlalchemy import ForeignKey, String, select, text, event, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 from db.model.base import Entity
@@ -16,7 +16,18 @@ if TYPE_CHECKING:
 
 
 class Detection(Entity):
+    """Represents a detection region within an image."""
+    
     __tablename__ = "detections"
+
+    # Table-level indexes using automatic naming convention
+    __table_args__ = (
+        # Composite index for filtering annotated detections by image
+        Index(None, 'image_id', 'annotated'),
+        
+        # Composite index for filtering active detections by image
+        Index(None, 'image_id', 'deleted'),
+    )
 
     # Foreign keys
     image_id: Mapped[uuid.UUID] = mapped_column(
