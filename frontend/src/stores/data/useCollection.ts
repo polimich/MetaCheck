@@ -31,6 +31,14 @@ export interface HierarchicalImage {
   annotated_detection_count?: number;
 }
 
+// Interface for hierarchical section item with its parent info
+export interface HierarchicalSection {
+  section: MetaElementHierarchical;
+  path: string[];
+  level: number;
+  parentId: string | null;
+}
+
 export const useCollection = defineStore('collection', () => {
   const collection = ref<CollectionHierarchical>();
   const collectionMetaRoles = ref<MetaRole[]>([]);
@@ -43,59 +51,119 @@ export const useCollection = defineStore('collection', () => {
   // Sorting and filtering state
   const currentSortOption = ref<SortOption>('order');
 
-  // computed properties
+  // Helper function to flatten the meta element structure into a list of sections with path information
+  const flattenMetaElements = (
+    elements: MetaElementHierarchical[],
+    parentPath: string[] = [],
+    parentId: string | null = null,
+    level: number = 0,
+  ): HierarchicalSection[] => {
+    let result: HierarchicalSection[] = [];
+
+    elements.forEach((element) => {
+      const currentPath = [...parentPath, element.id];
+
+      // Add current element to result
+      result.push({
+        section: element,
+        path: currentPath,
+        level,
+        parentId,
+      });
+
+      // Recursively process children if they exist
+      if (element.children && element.children.length > 0) {
+        const childrenSections = flattenMetaElements(
+          element.children,
+          currentPath,
+          element.id,
+          level + 1,
+        );
+        result = [...result, ...childrenSections];
+      }
+    });
+
+    return result;
+  };
+
+  // Get all sections in a flattened structure with hierarchy information
+  const allSectionsFlattenedWithStructure = computed(
+    (): HierarchicalSection[] => {
+      if (!collection.value?.global_structure) return [];
+
+      let result: HierarchicalSection[] = [];
+
+      // Add top-level section (global structure) if it has images
+      if (
+        collection.value.global_structure.images &&
+        collection.value.global_structure.images.length > 0
+      ) {
+        result.push({
+          section: collection.value.global_structure,
+          path: ['global'],
+          level: 0,
+          parentId: null,
+        });
+      }
+
+      // Add children sections with hierarchy information
+      if (
+        collection.value.global_structure.children &&
+        collection.value.global_structure.children.length > 0
+      ) {
+        const childrenSections = flattenMetaElements(
+          collection.value.global_structure.children,
+          ['global'],
+          'global',
+          1,
+        );
+        result = [...result, ...childrenSections];
+      }
+
+      return result;
+    },
+  );
+
+  // Get flattened hierarchical structure of all sections
+  const hierarchicalSections = computed(() => {
+    return allSectionsFlattenedWithStructure.value;
+  });
+
+  // Get top-level sections only (first level of nesting)
   const metaElementSections = computed(() => {
     if (!collection.value) return [] as MetaElementHierarchical[];
     if (!collection.value.global_structure)
       return [] as MetaElementHierarchical[];
 
-    // Access children from global_structure instead of meta_elements
+    // Access children from global_structure
     return (collection.value.global_structure.children ||
       []) as MetaElementHierarchical[];
   });
 
+  // Get child sections for a specific parent section
+  const getChildSections = computed(() => {
+    return (parentId: string): HierarchicalSection[] => {
+      return hierarchicalSections.value.filter(
+        (section) => section.parentId === parentId,
+      );
+    };
+  });
+
+  // Collect all images from all levels
   const allImagesFlattened = computed((): HierarchicalImage[] => {
     if (!collection.value) return [];
 
     const allImages: HierarchicalImage[] = [];
 
-    // Helper function to recursively collect images from hierarchical structure
-    const collectImagesRecursively = (element: MetaElementHierarchical) => {
-      // Add images from current element
-      if (element.images && Array.isArray(element.images)) {
-        allImages.push(...element.images);
+    // Add images from all sections at all levels
+    hierarchicalSections.value.forEach((sectionData) => {
+      if (
+        sectionData.section.images &&
+        Array.isArray(sectionData.section.images)
+      ) {
+        allImages.push(...sectionData.section.images);
       }
-
-      // Recursively process children
-      if (element.children && Array.isArray(element.children)) {
-        element.children.forEach((childElement) => {
-          // Ensure the child is a MetaElementHierarchical before processing
-          if (
-            childElement &&
-            'detections' in childElement &&
-            'images' in childElement
-          ) {
-            collectImagesRecursively(childElement as MetaElementHierarchical);
-          }
-        });
-      }
-    };
-
-    // Use metaElementSections if available
-    if (metaElementSections.value && metaElementSections.value.length > 0) {
-      // Process each section and its children recursively
-      metaElementSections.value.forEach((section) => {
-        collectImagesRecursively(section);
-      });
-    }
-    // Fallback to global structure images if available
-    else if (collection.value.global_structure) {
-      collectImagesRecursively(collection.value.global_structure);
-    }
-    // Fallback to collection images if all else fails
-    else if (collection.value.images) {
-      allImages.push(...collection.value.images);
-    }
+    });
 
     return allImages;
   });
@@ -105,6 +173,12 @@ export const useCollection = defineStore('collection', () => {
     return (imageId: string): HierarchicalImage | undefined => {
       return allImagesFlattened.value.find((img) => img.id === imageId);
     };
+  });
+
+  // Get images from global structure if available
+  const topLevelImages = computed((): HierarchicalImage[] => {
+    if (!collection.value?.global_structure?.images) return [];
+    return collection.value.global_structure.images;
   });
 
   // NEW: Sorted images getter
@@ -173,7 +247,28 @@ export const useCollection = defineStore('collection', () => {
     };
   });
 
-  // NEW: Filtered images by section
+  // NEW: Get images for any section by its ID
+  const getImagesForSection = computed(() => {
+    return (sectionId: string): HierarchicalImage[] => {
+      // Handle global section specially
+      if (
+        sectionId === 'global' &&
+        collection.value?.global_structure?.images
+      ) {
+        return collection.value.global_structure.images;
+      }
+
+      // Find the section in our flattened structure
+      const sectionData = hierarchicalSections.value.find(
+        (s) => s.section.id === sectionId,
+      );
+      if (!sectionData) return [];
+
+      return sectionData.section.images || [];
+    };
+  });
+
+  // NEW: Filtered images by section id
   const getFilteredImagesForSection = computed(() => {
     return (
       sectionId: string,
@@ -187,13 +282,28 @@ export const useCollection = defineStore('collection', () => {
       getVerificationStatus: (id: string) => string,
     ): HierarchicalImage[] => {
       // Get the section's images
-      const section = metaElementSections.value.find(
-        (section) => section.id === sectionId,
-      );
-      if (!section || !section.images || !Array.isArray(section.images))
-        return [];
+      let sectionImages: HierarchicalImage[] = [];
 
-      let sectionImages = [...section.images];
+      // Special case for global section
+      if (
+        sectionId === 'global' &&
+        collection.value?.global_structure?.images
+      ) {
+        sectionImages = [...collection.value.global_structure.images];
+      } else {
+        // Find the section in our hierarchical structure
+        const sectionData = hierarchicalSections.value.find(
+          (s) => s.section.id === sectionId,
+        );
+        if (
+          !sectionData ||
+          !sectionData.section.images ||
+          !Array.isArray(sectionData.section.images)
+        ) {
+          return [];
+        }
+        sectionImages = [...sectionData.section.images];
+      }
 
       // Apply search filter
       if (searchQuery && searchQuery.trim() !== '') {
@@ -284,28 +394,57 @@ export const useCollection = defineStore('collection', () => {
                 collection.value.global_structure,
               );
 
+              // Log children if available
               if (collection.value.global_structure.children) {
                 console.log(
                   'Children count:',
                   collection.value.global_structure.children.length,
                 );
-                console.log(
-                  'First child:',
-                  collection.value.global_structure.children[0],
-                );
-              } else {
-                console.log('No children in global structure');
+
+                if (collection.value.global_structure.children.length > 0) {
+                  console.log(
+                    'First child:',
+                    collection.value.global_structure.children[0],
+                  );
+
+                  // Log nested children if available
+                  const firstChild =
+                    collection.value.global_structure.children[0];
+                  if (firstChild.children && firstChild.children.length > 0) {
+                    console.log(
+                      'Nested children found:',
+                      firstChild.children.length,
+                    );
+                  }
+                }
               }
-            } else {
-              console.log('No global structure in the collection');
+
+              // Log top-level images if available
+              if (
+                collection.value.global_structure.images &&
+                collection.value.global_structure.images.length > 0
+              ) {
+                console.log(
+                  'Top-level images found:',
+                  collection.value.global_structure.images.length,
+                );
+              }
             }
 
             loaded.value = true;
 
-            // Auto-expand all sections by default
+            // Auto-expand all top-level sections by default
             if (collection.value.global_structure?.children) {
               expandedSections.value =
                 collection.value.global_structure.children.map((me) => me.id);
+
+              // Also add global section to expanded if it has images
+              if (
+                collection.value.global_structure.images &&
+                collection.value.global_structure.images.length > 0
+              ) {
+                expandedSections.value.push('global');
+              }
             }
 
             const metaRolesResponse =
@@ -341,46 +480,50 @@ export const useCollection = defineStore('collection', () => {
     return requestPromise;
   };
 
-  const getImagesForMetaElement = (metaElementId: string) => {
-    if (!collection.value || !collection.value.global_structure) return [];
-
-    // Try to find the meta element - first at the top level, then search recursively
-    const metaElement = findMetaElementRecursively(
-      collection.value.global_structure,
-      metaElementId,
-    );
-
-    return metaElement?.images || [];
-  };
-
-  // Helper function to find a meta element by ID recursively
-  const findMetaElementRecursively = (
-    element: MetaElementHierarchical,
-    targetId: string,
-  ): MetaElementHierarchical | undefined => {
-    // Check if this is the element we're looking for
-    if (element.id === targetId) {
-      return element;
-    }
-
-    // If not, search in children if they exist
-    if (element.children && Array.isArray(element.children)) {
-      for (const child of element.children) {
-        // Skip non-hierarchical children
-        if (!child || !('detections' in child) || !('images' in child))
-          continue;
-
-        const found = findMetaElementRecursively(
-          child as MetaElementHierarchical,
-          targetId,
+  // Check if a section has children
+  const hasSectionChildren = computed(() => {
+    return (sectionId: string): boolean => {
+      // Handle global section specially
+      if (sectionId === 'global') {
+        return (
+          !!collection.value?.global_structure?.children &&
+          collection.value.global_structure.children.length > 0
         );
-        if (found) return found;
       }
-    }
 
-    // Not found in this branch
-    return undefined;
-  };
+      // Find section in our structure
+      const sectionData = hierarchicalSections.value.find(
+        (s) => s.section.id === sectionId,
+      );
+      if (!sectionData) return false;
+
+      return (
+        !!sectionData.section.children &&
+        sectionData.section.children.length > 0
+      );
+    };
+  });
+
+  // Get direct children of a section
+  const getChildrenMetaElements = computed(() => {
+    return (sectionId: string): MetaElementHierarchical[] => {
+      // Handle global section specially
+      if (
+        sectionId === 'global' &&
+        collection.value?.global_structure?.children
+      ) {
+        return collection.value.global_structure.children;
+      }
+
+      // Find section in our structure
+      const sectionData = hierarchicalSections.value.find(
+        (s) => s.section.id === sectionId,
+      );
+      if (!sectionData || !sectionData.section.children) return [];
+
+      return sectionData.section.children;
+    };
+  });
 
   const toggleSection = (sectionId: string) => {
     const index = expandedSections.value.indexOf(sectionId);
@@ -396,10 +539,14 @@ export const useCollection = defineStore('collection', () => {
   };
 
   const expandAllSections = () => {
-    if (!collection.value?.global_structure?.children) return;
-    expandedSections.value = collection.value.global_structure.children.map(
-      (me) => me.id,
-    );
+    const sectionsToExpand = ['global']; // Start with global
+
+    // Add all section IDs from our flattened structure
+    hierarchicalSections.value.forEach((section) => {
+      sectionsToExpand.push(section.section.id);
+    });
+
+    expandedSections.value = sectionsToExpand;
   };
 
   const collapseAllSections = () => {
@@ -420,15 +567,20 @@ export const useCollection = defineStore('collection', () => {
     loading,
     expandedSections,
     metaElementSections,
+    hierarchicalSections,
+    getChildSections,
+    topLevelImages,
     allImagesFlattened,
     getImageById,
     getSortedImages,
     getFilteredImagesForSection,
+    getImagesForSection,
     currentSortOption,
     setSortOption,
     init,
     loadCollection,
-    getImagesForMetaElement,
+    hasSectionChildren,
+    getChildrenMetaElements,
     toggleSection,
     isSectionExpanded,
     expandAllSections,

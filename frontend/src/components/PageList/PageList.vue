@@ -21,20 +21,10 @@ import ImageThumbnail from './ImageThumbnail.vue';
 import BulkActions from './BulkActions.vue';
 import { useCollection } from 'src/stores/data/useCollection';
 import { usePageListStore } from 'src/stores/ui/pageListStore';
+import { MetaElementHierarchical } from 'src/types/data-access';
 
 // Optimization: Use a Map to cache filtered images by section - but keep it inside the reactive system
 const filteredImagesCache = reactive(new Map());
-
-// Define an interface for the image items
-interface ImageItem {
-  id: string;
-  name: string;
-  confidence?: number;
-  order?: number;
-  annotated?: boolean;
-  detection_count?: number;
-  annotated_detection_count?: number;
-}
 
 interface PageListProps {
   collectionId: string;
@@ -160,9 +150,7 @@ watch(
 );
 
 // Get filtered images with caching for better performance
-function getFilteredImagesForSection(sectionId: string, images: ImageItem[]) {
-  if (!images || !images.length) return [];
-
+function getFilteredImagesForSection(sectionId: string) {
   const cacheKey = `${sectionId}:${filterCacheKey.value}`;
 
   // Check if we have this section's filtered images in cache
@@ -187,6 +175,123 @@ function getFilteredImagesForSection(sectionId: string, images: ImageItem[]) {
   filteredImagesCache.set(cacheKey, result);
   return result;
 }
+
+// Check if a section has images after filtering
+function sectionHasFilteredImages(sectionId: string) {
+  const filteredImages = getFilteredImagesForSection(sectionId);
+  return filteredImages && filteredImages.length > 0;
+}
+
+// Get display name for a section
+function getSectionDisplayName(section: MetaElementHierarchical) {
+  // Prioritize meta_element_type display_name, then name, then fall back to ID
+  return (
+    section.meta_element_type?.display_name ||
+    section.meta_element_type?.name ||
+    section.id
+  );
+}
+
+// Computed property to filter child sections that have images
+const filteredChildSections = computed(() => {
+  return (parentSection: MetaElementHierarchical) => {
+    if (!parentSection.children) return [];
+    return parentSection.children.filter((child: MetaElementHierarchical) =>
+      sectionHasFilteredImages(child.id),
+    );
+  };
+});
+
+// Check if a section has nested children that should be displayed
+const sectionHasDisplayableChildren = computed(() => {
+  return (section: MetaElementHierarchical): boolean => {
+    if (!section.children || section.children.length === 0) return false;
+
+    // Check if at least one child has filtered images or its own displayable children
+    return section.children.some((childSection: MetaElementHierarchical) => {
+      const hasFilteredImages = sectionHasFilteredImages(childSection.id);
+      const hasDisplayableChildren =
+        childSection.children &&
+        childSection.children.length > 0 &&
+        childSection.children.some((grandchild: MetaElementHierarchical) =>
+          sectionHasFilteredImages(grandchild.id),
+        );
+
+      return hasFilteredImages || hasDisplayableChildren;
+    });
+  };
+});
+
+// Computed property to filter grand-child sections that have images
+const filteredGrandChildSections = computed(() => {
+  return (childSection: MetaElementHierarchical) => {
+    if (!childSection.children) return [];
+    return childSection.children.filter((grandChild: MetaElementHierarchical) =>
+      sectionHasFilteredImages(grandChild.id),
+    );
+  };
+});
+
+// Count total images in a section including all nested children
+const getTotalImagesInSection = computed(() => {
+  return (section: MetaElementHierarchical): number => {
+    // Start with direct images in this section
+    let totalImages = section.images?.length || 0;
+
+    // Add images from children
+    if (section.children && section.children.length > 0) {
+      section.children.forEach((childSection: MetaElementHierarchical) => {
+        // Add direct images in child section
+        totalImages += childSection.images?.length || 0;
+
+        // Add images from grandchildren
+        if (childSection.children && childSection.children.length > 0) {
+          childSection.children.forEach(
+            (grandChildSection: MetaElementHierarchical) => {
+              totalImages += grandChildSection.images?.length || 0;
+            },
+          );
+        }
+      });
+    }
+
+    return totalImages;
+  };
+});
+
+// Count nested sections at each level
+const getNestedSectionCounts = computed(() => {
+  return (
+    section: MetaElementHierarchical,
+  ): { children: number; grandchildren: number } => {
+    let childCount = section.children?.length || 0;
+    let grandChildCount = 0;
+
+    // Count grandchildren
+    if (section.children && section.children.length > 0) {
+      section.children.forEach((childSection: MetaElementHierarchical) => {
+        grandChildCount += childSection.children?.length || 0;
+      });
+    }
+
+    return { children: childCount, grandchildren: grandChildCount };
+  };
+});
+
+// Get a formatted title for global section
+const getGlobalSectionTitle = computed(() => {
+  if (!collectionStore.value.collection?.global_structure) return 'Global';
+
+  const globalStructure = collectionStore.value.collection.global_structure;
+
+  // Try to get name from meta_element_type
+  const typeName =
+    globalStructure.meta_element_type?.display_name ||
+    globalStructure.meta_element_type?.name ||
+    'Global';
+
+  return typeName;
+});
 
 // Initialize the store with the correct layout
 onMounted(() => {
@@ -399,8 +504,8 @@ watch(
 
 // Determine if the collection is empty
 const isCollectionEmpty = computed(() => {
-  // Only check hierarchical data now
-  return !collectionStore.value.metaElementSections.length;
+  // Check all levels for images
+  return collectionStore.value.allImagesFlattened.length === 0;
 });
 
 // Optimized loadCollection with better caching and error handling
@@ -603,7 +708,7 @@ function navigateToImage(imageId: string, shiftKey = false) {
             </div>
           </div>
 
-          <!-- Hierarchical view (now the default and only view) -->
+          <!-- Hierarchical view -->
           <div class="hierarchical-container">
             <!-- Section controls -->
             <div class="section-controls q-px-md q-py-sm bg-grey-2">
@@ -628,7 +733,10 @@ function navigateToImage(imageId: string, shiftKey = false) {
 
             <!-- Empty state when no sections exist -->
             <div
-              v-if="collectionStore.metaElementSections.length === 0"
+              v-if="
+                collectionStore.hierarchicalSections.length === 0 &&
+                !collectionStore.topLevelImages.length
+              "
               class="empty-state q-pa-xl text-center"
             >
               <q-icon name="category" size="48px" color="grey-6" />
@@ -640,14 +748,122 @@ function navigateToImage(imageId: string, shiftKey = false) {
               </div>
             </div>
 
-            <!-- Sections container -->
-            <div v-else class="sections-container">
-              <!-- Render each section -->
+            <!-- Global Section (if it has images) -->
+            <div
+              v-if="collectionStore.topLevelImages.length > 0"
+              class="meta-element-section q-mb-md"
+              :ref="(el) => setSectionRef(el as HTMLElement, 'global')"
+            >
+              <!-- Global section header -->
               <div
-                v-for="section in collectionStore.metaElementSections"
-                :key="section.id"
+                class="section-header q-pa-sm q-px-md cursor-pointer"
+                @click="handleSectionToggle('global')"
+              >
+                <div class="row items-center no-wrap">
+                  <q-icon
+                    :name="
+                      collectionStore.isSectionExpanded('global')
+                        ? 'expand_more'
+                        : 'chevron_right'
+                    "
+                    size="1.5em"
+                    class="q-mr-sm"
+                  />
+                  <div class="text-subtitle1">
+                    {{ getGlobalSectionTitle }}
+                  </div>
+                  <!-- Summary badges -->
+                  <q-badge color="primary" class="q-ml-sm">
+                    {{ collectionStore.topLevelImages.length }} images
+                  </q-badge>
+                  <q-badge
+                    color="secondary"
+                    class="q-ml-sm"
+                    v-if="collectionStore.metaElementSections.length > 0"
+                  >
+                    {{ collectionStore.metaElementSections.length }} sections
+                  </q-badge>
+                  <q-space />
+                </div>
+              </div>
+
+              <!-- Global section content -->
+              <q-slide-transition>
+                <div
+                  v-if="collectionStore.isSectionExpanded('global')"
+                  class="section-content q-pa-sm"
+                >
+                  <!-- Images Container -->
+                  <div
+                    :class="[
+                      'image-container',
+                      `view-${pageListStore.viewMode}`,
+                    ]"
+                    :style="{
+                      'grid-template-columns':
+                        pageListStore.viewMode === 'grid'
+                          ? `repeat(${pageListStore.effectiveGridColumns}, minmax(200px, 1fr))`
+                          : 'none',
+                    }"
+                  >
+                    <ImageThumbnail
+                      v-for="image in getFilteredImagesForSection('global')"
+                      :key="image.id"
+                      :image="image"
+                      :isActive="image.id === activeImageId"
+                      :isSelected="
+                        pageListStore.selectedImages.includes(image.id)
+                      "
+                      :selectMode="pageListStore.selectMode"
+                      :viewMode="pageListStore.viewMode"
+                      :flags="{
+                        needsAttention: pageListStore.needsAttention(image.id),
+                        hasLowConfidence:
+                          pageListStore.hasLowConfidenceDetections(image.id),
+                        hasMediumConfidence:
+                          pageListStore.hasMediumConfidenceDetections(image.id),
+                        hasUnverifiedDetections:
+                          pageListStore.hasUnverifiedDetections(image.id),
+                      }"
+                      :verificationStatus="{
+                        color: pageListStore.getVerificationStatusColor(
+                          image.id,
+                        ),
+                        tooltip: pageListStore.getVerificationTooltip(image.id),
+                      }"
+                      :confidenceThresholds="{
+                        low: pageListStore.LOW_CONFIDENCE_THRESHOLD,
+                        medium: pageListStore.MEDIUM_CONFIDENCE_THRESHOLD,
+                      }"
+                      @click="navigateToImage"
+                      @select="
+                        (id, shiftKey) =>
+                          pageListStore.toggleImageSelection(id, shiftKey)
+                      "
+                      :ref="
+                        image.id === activeImageId
+                          ? setActiveThumbnailRef
+                          : undefined
+                      "
+                    />
+                  </div>
+                </div>
+              </q-slide-transition>
+            </div>
+
+            <!-- Sections container -->
+            <template
+              v-for="section in collectionStore.metaElementSections"
+              :key="section.id"
+            >
+              <div
                 class="meta-element-section q-mb-md"
                 :ref="(el) => setSectionRef(el as HTMLElement, section.id)"
+                :class="{ 'section-level-1': true }"
+                v-if="
+                  sectionHasFilteredImages(section.id) ||
+                  sectionHasDisplayableChildren(section)
+                "
               >
                 <!-- Section header -->
                 <div
@@ -665,14 +881,37 @@ function navigateToImage(imageId: string, shiftKey = false) {
                       class="q-mr-sm"
                     />
                     <div class="text-subtitle1">
-                      {{
-                        section.meta_element_type?.display_name ||
-                        section.meta_element_type?.name ||
-                        section.id
-                      }}
+                      {{ getSectionDisplayName(section) }}
                     </div>
-                    <q-badge color="primary" class="q-ml-sm">
-                      {{ section.images?.length || 0 }} images
+                    <!-- Summary badges -->
+                    <q-badge
+                      color="primary"
+                      class="q-ml-sm"
+                      v-tooltip="'Total images in this section and subsections'"
+                    >
+                      {{ getTotalImagesInSection(section) }} images total
+                    </q-badge>
+                    <q-badge
+                      color="primary"
+                      class="q-ml-sm"
+                      v-if="section.images && section.images.length > 0"
+                      v-tooltip="'Images directly in this section'"
+                    >
+                      ({{ section.images.length }} direct)
+                    </q-badge>
+                    <q-badge
+                      color="secondary"
+                      class="q-ml-sm"
+                      v-if="getNestedSectionCounts(section).children > 0"
+                      v-tooltip="'Nested subsections'"
+                    >
+                      {{ getNestedSectionCounts(section).children }} subsections
+                      <span
+                        v-if="getNestedSectionCounts(section).grandchildren > 0"
+                      >
+                        ({{ getNestedSectionCounts(section).grandchildren }}
+                        nested)
+                      </span>
                     </q-badge>
                     <q-space />
                   </div>
@@ -684,96 +923,392 @@ function navigateToImage(imageId: string, shiftKey = false) {
                     v-if="collectionStore.isSectionExpanded(section.id)"
                     class="section-content q-pa-sm"
                   >
-                    <!-- Empty section message -->
+                    <!-- Show images at this level if there are any -->
                     <div
-                      v-if="!section.images || section.images.length === 0"
-                      class="empty-section q-pa-md text-center"
+                      v-if="section.images && section.images.length > 0"
+                      :class="[
+                        'image-container',
+                        `view-${pageListStore.viewMode}`,
+                      ]"
+                      :style="{
+                        'grid-template-columns':
+                          pageListStore.viewMode === 'grid'
+                            ? `repeat(${pageListStore.effectiveGridColumns}, minmax(200px, 1fr))`
+                            : 'none',
+                      }"
                     >
-                      <q-icon
-                        name="image_not_supported"
-                        size="32px"
-                        color="grey-6"
+                      <ImageThumbnail
+                        v-for="image in getFilteredImagesForSection(section.id)"
+                        :key="image.id"
+                        :image="image"
+                        :isActive="image.id === activeImageId"
+                        :isSelected="
+                          pageListStore.selectedImages.includes(image.id)
+                        "
+                        :selectMode="pageListStore.selectMode"
+                        :viewMode="pageListStore.viewMode"
+                        :flags="{
+                          needsAttention: pageListStore.needsAttention(
+                            image.id,
+                          ),
+                          hasLowConfidence:
+                            pageListStore.hasLowConfidenceDetections(image.id),
+                          hasMediumConfidence:
+                            pageListStore.hasMediumConfidenceDetections(
+                              image.id,
+                            ),
+                          hasUnverifiedDetections:
+                            pageListStore.hasUnverifiedDetections(image.id),
+                        }"
+                        :verificationStatus="{
+                          color: pageListStore.getVerificationStatusColor(
+                            image.id,
+                          ),
+                          tooltip: pageListStore.getVerificationTooltip(
+                            image.id,
+                          ),
+                        }"
+                        :confidenceThresholds="{
+                          low: pageListStore.LOW_CONFIDENCE_THRESHOLD,
+                          medium: pageListStore.MEDIUM_CONFIDENCE_THRESHOLD,
+                        }"
+                        @click="navigateToImage"
+                        @select="
+                          (id, shiftKey) =>
+                            pageListStore.toggleImageSelection(id, shiftKey)
+                        "
+                        :ref="
+                          image.id === activeImageId
+                            ? setActiveThumbnailRef
+                            : undefined
+                        "
                       />
-                      <div class="text-caption q-mt-sm">
-                        No images in this section
-                      </div>
                     </div>
 
-                    <!-- Section images -->
-                    <template v-else>
-                      <!-- Filter images based on current filters -->
+                    <!-- Display child sections -->
+                    <template
+                      v-if="section.children && section.children.length > 0"
+                    >
                       <div
-                        :class="[
-                          'image-container',
-                          `view-${pageListStore.viewMode}`,
-                        ]"
-                        :style="{
-                          'grid-template-columns':
-                            pageListStore.viewMode === 'grid'
-                              ? `repeat(${pageListStore.effectiveGridColumns}, minmax(200px, 1fr))`
-                              : 'none',
-                        }"
+                        v-for="childSection in filteredChildSections(section)"
+                        :key="childSection.id"
+                        class="meta-element-section q-mb-md child-section"
+                        :ref="
+                          (el) =>
+                            setSectionRef(el as HTMLElement, childSection.id)
+                        "
+                        :class="{ 'section-level-2': true }"
                       >
-                        <!-- Optimization: Use cached filtered images -->
-                        <template v-if="section.images">
-                          <ImageThumbnail
-                            v-for="image in getFilteredImagesForSection(
-                              section.id,
-                              section.images,
-                            )"
-                            :key="image.id"
-                            :image="image"
-                            :isActive="image.id === activeImageId"
-                            :isSelected="
-                              pageListStore.selectedImages.includes(image.id)
+                        <!-- Child section header -->
+                        <div
+                          class="section-header q-pa-sm q-px-md cursor-pointer"
+                          @click="handleSectionToggle(childSection.id)"
+                        >
+                          <div class="row items-center no-wrap">
+                            <q-icon
+                              :name="
+                                collectionStore.isSectionExpanded(
+                                  childSection.id,
+                                )
+                                  ? 'expand_more'
+                                  : 'chevron_right'
+                              "
+                              size="1.5em"
+                              class="q-mr-sm"
+                            />
+                            <div class="text-subtitle1">
+                              {{ getSectionDisplayName(childSection) }}
+                            </div>
+                            <!-- Summary badges -->
+                            <q-badge
+                              color="primary"
+                              class="q-ml-sm"
+                              v-tooltip="
+                                'Total images in this section and subsections'
+                              "
+                            >
+                              {{
+                                childSection.images?.length +
+                                (childSection.children &&
+                                Array.isArray(childSection.children)
+                                  ? childSection.children.reduce(
+                                      (
+                                        sum: number,
+                                        grandchild: MetaElementHierarchical,
+                                      ) =>
+                                        sum + (grandchild.images?.length || 0),
+                                      0,
+                                    )
+                                  : 0)
+                              }}
+                              images total
+                            </q-badge>
+                            <q-badge
+                              color="primary"
+                              class="q-ml-sm"
+                              v-if="
+                                childSection.images &&
+                                childSection.images.length > 0
+                              "
+                              v-tooltip="'Images directly in this section'"
+                            >
+                              ({{ childSection.images.length }} direct)
+                            </q-badge>
+                            <q-badge
+                              color="secondary"
+                              class="q-ml-sm"
+                              v-if="
+                                childSection.children &&
+                                childSection.children.length > 0
+                              "
+                              v-tooltip="'Nested subsections'"
+                            >
+                              {{ childSection.children.length }} subsections
+                            </q-badge>
+                            <q-space />
+                          </div>
+                        </div>
+
+                        <!-- Child section content -->
+                        <q-slide-transition>
+                          <div
+                            v-if="
+                              collectionStore.isSectionExpanded(childSection.id)
                             "
-                            :selectMode="pageListStore.selectMode"
-                            :viewMode="pageListStore.viewMode"
-                            :flags="{
-                              needsAttention: pageListStore.needsAttention(
-                                image.id,
-                              ),
-                              hasLowConfidence:
-                                pageListStore.hasLowConfidenceDetections(
-                                  image.id,
-                                ),
-                              hasMediumConfidence:
-                                pageListStore.hasMediumConfidenceDetections(
-                                  image.id,
-                                ),
-                              hasUnverifiedDetections:
-                                pageListStore.hasUnverifiedDetections(image.id),
-                            }"
-                            :verificationStatus="{
-                              color: pageListStore.getVerificationStatusColor(
-                                image.id,
-                              ),
-                              tooltip: pageListStore.getVerificationTooltip(
-                                image.id,
-                              ),
-                            }"
-                            :confidenceThresholds="{
-                              low: pageListStore.LOW_CONFIDENCE_THRESHOLD,
-                              medium: pageListStore.MEDIUM_CONFIDENCE_THRESHOLD,
-                            }"
-                            @click="navigateToImage"
-                            @select="
-                              (id, shiftKey) =>
-                                pageListStore.toggleImageSelection(id, shiftKey)
-                            "
-                            :ref="
-                              image.id === activeImageId
-                                ? setActiveThumbnailRef
-                                : undefined
-                            "
-                          />
-                        </template>
+                            class="section-content q-pa-sm"
+                          >
+                            <!-- Child section images -->
+                            <div
+                              v-if="
+                                childSection.images &&
+                                childSection.images.length > 0
+                              "
+                              :class="[
+                                'image-container',
+                                `view-${pageListStore.viewMode}`,
+                              ]"
+                              :style="{
+                                'grid-template-columns':
+                                  pageListStore.viewMode === 'grid'
+                                    ? `repeat(${pageListStore.effectiveGridColumns}, minmax(200px, 1fr))`
+                                    : 'none',
+                              }"
+                            >
+                              <ImageThumbnail
+                                v-for="image in getFilteredImagesForSection(
+                                  childSection.id,
+                                )"
+                                :key="image.id"
+                                :image="image"
+                                :isActive="image.id === activeImageId"
+                                :isSelected="
+                                  pageListStore.selectedImages.includes(
+                                    image.id,
+                                  )
+                                "
+                                :selectMode="pageListStore.selectMode"
+                                :viewMode="pageListStore.viewMode"
+                                :flags="{
+                                  needsAttention: pageListStore.needsAttention(
+                                    image.id,
+                                  ),
+                                  hasLowConfidence:
+                                    pageListStore.hasLowConfidenceDetections(
+                                      image.id,
+                                    ),
+                                  hasMediumConfidence:
+                                    pageListStore.hasMediumConfidenceDetections(
+                                      image.id,
+                                    ),
+                                  hasUnverifiedDetections:
+                                    pageListStore.hasUnverifiedDetections(
+                                      image.id,
+                                    ),
+                                }"
+                                :verificationStatus="{
+                                  color:
+                                    pageListStore.getVerificationStatusColor(
+                                      image.id,
+                                    ),
+                                  tooltip: pageListStore.getVerificationTooltip(
+                                    image.id,
+                                  ),
+                                }"
+                                :confidenceThresholds="{
+                                  low: pageListStore.LOW_CONFIDENCE_THRESHOLD,
+                                  medium:
+                                    pageListStore.MEDIUM_CONFIDENCE_THRESHOLD,
+                                }"
+                                @click="navigateToImage"
+                                @select="
+                                  (id, shiftKey) =>
+                                    pageListStore.toggleImageSelection(
+                                      id,
+                                      shiftKey,
+                                    )
+                                "
+                                :ref="
+                                  image.id === activeImageId
+                                    ? setActiveThumbnailRef
+                                    : undefined
+                                "
+                              />
+                            </div>
+
+                            <!-- Grand-child sections (third level) -->
+                            <template
+                              v-if="
+                                childSection.children &&
+                                childSection.children.length > 0
+                              "
+                            >
+                              <div
+                                v-for="grandChildSection in filteredGrandChildSections(
+                                  childSection,
+                                )"
+                                :key="grandChildSection.id"
+                                class="meta-element-section q-mb-md grandchild-section"
+                                :ref="
+                                  (el) =>
+                                    setSectionRef(
+                                      el as HTMLElement,
+                                      grandChildSection.id,
+                                    )
+                                "
+                                :class="{ 'section-level-3': true }"
+                              >
+                                <!-- Grandchild section header -->
+                                <div
+                                  class="section-header q-pa-sm q-px-md cursor-pointer"
+                                  @click="
+                                    handleSectionToggle(grandChildSection.id)
+                                  "
+                                >
+                                  <div class="row items-center no-wrap">
+                                    <q-icon
+                                      :name="
+                                        collectionStore.isSectionExpanded(
+                                          grandChildSection.id,
+                                        )
+                                          ? 'expand_more'
+                                          : 'chevron_right'
+                                      "
+                                      size="1.5em"
+                                      class="q-mr-sm"
+                                    />
+                                    <div class="text-subtitle1">
+                                      {{
+                                        getSectionDisplayName(grandChildSection)
+                                      }}
+                                    </div>
+                                    <!-- Direct images badge -->
+                                    <q-badge color="primary" class="q-ml-sm">
+                                      {{
+                                        grandChildSection.images?.length || 0
+                                      }}
+                                      images
+                                    </q-badge>
+                                    <q-space />
+                                  </div>
+                                </div>
+
+                                <!-- Grandchild section content -->
+                                <q-slide-transition>
+                                  <div
+                                    v-if="
+                                      collectionStore.isSectionExpanded(
+                                        grandChildSection.id,
+                                      )
+                                    "
+                                    class="section-content q-pa-sm"
+                                  >
+                                    <!-- Grandchild section images -->
+                                    <div
+                                      :class="[
+                                        'image-container',
+                                        `view-${pageListStore.viewMode}`,
+                                      ]"
+                                      :style="{
+                                        'grid-template-columns':
+                                          pageListStore.viewMode === 'grid'
+                                            ? `repeat(${pageListStore.effectiveGridColumns}, minmax(200px, 1fr))`
+                                            : 'none',
+                                      }"
+                                    >
+                                      <ImageThumbnail
+                                        v-for="image in getFilteredImagesForSection(
+                                          grandChildSection.id,
+                                        )"
+                                        :key="image.id"
+                                        :image="image"
+                                        :isActive="image.id === activeImageId"
+                                        :isSelected="
+                                          pageListStore.selectedImages.includes(
+                                            image.id,
+                                          )
+                                        "
+                                        :selectMode="pageListStore.selectMode"
+                                        :viewMode="pageListStore.viewMode"
+                                        :flags="{
+                                          needsAttention:
+                                            pageListStore.needsAttention(
+                                              image.id,
+                                            ),
+                                          hasLowConfidence:
+                                            pageListStore.hasLowConfidenceDetections(
+                                              image.id,
+                                            ),
+                                          hasMediumConfidence:
+                                            pageListStore.hasMediumConfidenceDetections(
+                                              image.id,
+                                            ),
+                                          hasUnverifiedDetections:
+                                            pageListStore.hasUnverifiedDetections(
+                                              image.id,
+                                            ),
+                                        }"
+                                        :verificationStatus="{
+                                          color:
+                                            pageListStore.getVerificationStatusColor(
+                                              image.id,
+                                            ),
+                                          tooltip:
+                                            pageListStore.getVerificationTooltip(
+                                              image.id,
+                                            ),
+                                        }"
+                                        :confidenceThresholds="{
+                                          low: pageListStore.LOW_CONFIDENCE_THRESHOLD,
+                                          medium:
+                                            pageListStore.MEDIUM_CONFIDENCE_THRESHOLD,
+                                        }"
+                                        @click="navigateToImage"
+                                        @select="
+                                          (id, shiftKey) =>
+                                            pageListStore.toggleImageSelection(
+                                              id,
+                                              shiftKey,
+                                            )
+                                        "
+                                        :ref="
+                                          image.id === activeImageId
+                                            ? setActiveThumbnailRef
+                                            : undefined
+                                        "
+                                      />
+                                    </div>
+                                  </div>
+                                </q-slide-transition>
+                              </div>
+                            </template>
+                          </div>
+                        </q-slide-transition>
                       </div>
                     </template>
                   </div>
                 </q-slide-transition>
               </div>
-            </div>
+            </template>
           </div>
 
           <!-- Bottom spacer to ensure content doesn't get hidden under the fixed toolbar -->
@@ -918,6 +1453,35 @@ function navigateToImage(imageId: string, shiftKey = false) {
   margin-bottom: 16px;
   transition: all 0.3s ease;
 
+  /* Child section styling */
+  &.child-section {
+    margin-top: 8px;
+    margin-left: 24px; /* Indent child sections */
+    border-left: 3px solid rgba(0, 0, 0, 0.1);
+  }
+
+  /* Grandchild section styling */
+  &.grandchild-section {
+    margin-top: 8px;
+    margin-left: 32px; /* Further indent grandchild sections */
+    border-left: 3px solid rgba(0, 0, 0, 0.15);
+  }
+
+  /* Level specific styling for visual hierarchy */
+  &.section-level-1 {
+    background-color: white;
+  }
+
+  &.section-level-2 {
+    background-color: #fafafa;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+
+  &.section-level-3 {
+    background-color: #f5f5f5;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  }
+
   .section-header {
     background-color: #f5f5f5;
     transition: background-color 0.2s ease;
@@ -928,11 +1492,39 @@ function navigateToImage(imageId: string, shiftKey = false) {
     &:hover {
       background-color: #e0e0e0;
     }
+
+    /* Level specific styling */
+    .section-level-2 & {
+      background-color: #f0f0f0;
+
+      &:hover {
+        background-color: #e5e5e5;
+      }
+    }
+
+    /* Level 3 styling */
+    .section-level-3 & {
+      background-color: #e8e8e8;
+
+      &:hover {
+        background-color: #dedede;
+      }
+    }
   }
 
   .section-content {
     background-color: white;
     overflow: visible; /* Allow content to be fully visible */
+
+    /* Level specific styling */
+    .section-level-2 & {
+      background-color: #fafafa;
+    }
+
+    /* Level 3 styling */
+    .section-level-3 & {
+      background-color: #f5f5f5;
+    }
   }
 }
 
@@ -983,5 +1575,16 @@ function navigateToImage(imageId: string, shiftKey = false) {
   padding: 16px;
   background-color: rgba(0, 0, 0, 0.01);
   border-radius: 4px;
+}
+
+/* New badge styles */
+:deep(.q-badge) {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  margin-right: 0.25rem;
+
+  &.q-badge--secondary {
+    background-color: #2196f3;
+  }
 }
 </style>
