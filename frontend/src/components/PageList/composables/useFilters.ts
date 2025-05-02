@@ -10,7 +10,8 @@ export type SortOption =
   | 'date_desc'
   | 'date_asc'
   | 'confidence_asc'
-  | 'confidence_desc';
+  | 'confidence_desc'
+  | 'detection_count_desc';
 export type VerificationFilter = 'all' | 'verified' | 'unverified';
 
 export interface ConfidenceFilter {
@@ -34,6 +35,7 @@ const sortOptions = [
   { label: 'Oldest first', value: 'date_asc' },
   { label: 'Confidence (Low to High)', value: 'confidence_asc' },
   { label: 'Confidence (High to Low)', value: 'confidence_desc' },
+  { label: 'Most Detections', value: 'detection_count_desc' },
 ];
 
 // Verification filter options
@@ -226,6 +228,10 @@ export function useFilters(
         return images.sort((a, b) => (a.confidence || 0) - (b.confidence || 0));
       case 'confidence_desc':
         return images.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+      case 'detection_count_desc':
+        return images.sort(
+          (a, b) => (b.detection_count || 0) - (a.detection_count || 0),
+        );
       case 'criticalFirst':
         // Sort by attention needed (low confidence or unverified detections)
         if (getAttentionLevel) {

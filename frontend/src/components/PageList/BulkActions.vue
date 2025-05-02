@@ -14,6 +14,10 @@ const props = defineProps({
     type: Array as () => string[],
     default: () => [],
   },
+  layoutMode: {
+    type: String,
+    default: 'sidebar',
+  },
 });
 
 const emit = defineEmits([
@@ -66,7 +70,10 @@ console.log('Select mode is:', props.selectMode);
 </script>
 
 <template>
-  <div class="bulk-actions-container">
+  <div
+    class="bulk-actions-container"
+    :class="{ 'layout-full-width': layoutMode === 'full-width' }"
+  >
     <div class="actions-toolbar q-px-md q-py-sm">
       <!-- Selection mode toggle -->
       <q-btn
@@ -278,13 +285,16 @@ console.log('Select mode is:', props.selectMode);
 
 <style lang="scss" scoped>
 .bulk-actions-container {
-  position: sticky;
+  position: fixed;
   bottom: 0;
+  left: 0;
+  right: 0;
   width: 100%;
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: white;
   border-top: 1px solid rgba(0, 0, 0, 0.12);
-  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
-  z-index: 10;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+  padding: 8px 0;
 }
 
 .actions-toolbar {
@@ -292,6 +302,7 @@ console.log('Select mode is:', props.selectMode);
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
+  padding: 0 16px;
 }
 
 .selection-counter {

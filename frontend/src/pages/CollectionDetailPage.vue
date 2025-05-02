@@ -4,6 +4,7 @@ import { ref, watch, onMounted } from 'vue';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { PageList } from 'components';
+import { useCollection } from 'src/stores/data/useCollection';
 
 // Define view mode type to match what PageList expects
 type ViewMode = 'grid' | 'list-small' | 'list-large';
@@ -15,6 +16,7 @@ defineOptions({
 const route = useRoute();
 const router = useRouter();
 const currentCollection = useCurrentCollectionState();
+const collectionStore = useCollection(); // Add the hierarchical collection store
 const loadingState = useLoadingState();
 const collectionId = ref(route.params.collectionId as string);
 
@@ -53,7 +55,44 @@ const loadCurrentCollection = async () => {
   loadingState.setComponentLoading(componentId, true);
 
   try {
-    await currentCollection.loadCollection(collectionId.value);
+    // Load both the flat view collection data and the hierarchical collection data
+    const [standardResult, hierarchicalResult] = await Promise.all([
+      currentCollection.loadCollection(collectionId.value),
+      collectionStore.loadCollection(collectionId.value),
+    ]);
+
+    console.log('Loaded standard collection:', standardResult);
+    console.log('Loaded hierarchical collection:', hierarchicalResult);
+
+    // Log detailed information about the hierarchical structure
+    if (collectionStore.collection?.global_structure) {
+      console.log('Global structure found');
+      console.log(
+        'Global structure ID:',
+        collectionStore.collection.global_structure.id,
+      );
+
+      if (collectionStore.collection.global_structure.children) {
+        console.log(
+          'Children count:',
+          collectionStore.collection.global_structure.children.length,
+        );
+        console.log(
+          'First child:',
+          collectionStore.collection.global_structure.children[0],
+        );
+      } else {
+        console.log('No children in global structure');
+      }
+    } else {
+      console.log('No global structure in collection');
+    }
+
+    // Log meta elements sections
+    console.log(
+      'Hierarchical meta elements:',
+      collectionStore.metaElementSections.length,
+    );
   } catch (error) {
     console.error('Error loading collection:', error);
   } finally {
@@ -130,6 +169,7 @@ const handleViewModeChange = (newMode: string) => {
       :collectionId="collectionId"
       layout="full-width"
       :initialViewMode="viewMode"
+      :initialHierarchicalMode="true"
       :showHeader="true"
       :showStatistics="true"
       :enableBulkActions="true"
@@ -144,6 +184,7 @@ const handleViewModeChange = (newMode: string) => {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 50px);
+  position: relative;
   overflow: hidden;
 }
 
@@ -152,6 +193,7 @@ const handleViewModeChange = (newMode: string) => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.12);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   z-index: 10;
+  flex-shrink: 0;
 }
 
 .loading-state {
@@ -159,8 +201,11 @@ const handleViewModeChange = (newMode: string) => {
   overflow: auto;
 }
 
-:deep(.page-list-container) {
+/* Make sure PageList takes up the full available space */
+:deep(.page-list-wrapper) {
   flex: 1;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 </style>

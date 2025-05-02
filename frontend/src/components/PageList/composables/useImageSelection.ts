@@ -1,9 +1,11 @@
 import { ref } from 'vue';
 import { useCurrentCollectionState } from 'stores/frontend-state';
+import { useCollection } from 'src/stores/data/useCollection';
 
 export function useImageSelection() {
-  // Get the store
+  // Get the stores
   const currentCollection = useCurrentCollectionState();
+  const collectionStore = useCollection();
 
   // Selection state
   const selectedImages = ref<string[]>([]);
@@ -17,14 +19,12 @@ export function useImageSelection() {
     }
 
     // Handle shift+click for range selection
-    if (
-      shiftKey &&
-      lastSelectedImageId.value &&
-      currentCollection.collection?.images
-    ) {
-      const images = currentCollection.collection.images;
-      const currentIndex = images.findIndex((img) => img.id === imageId);
-      const lastIndex = images.findIndex(
+    if (shiftKey && lastSelectedImageId.value) {
+      // Get all images from all sections in the hierarchical view
+      const allImages = getAllImagesFromHierarchy();
+
+      const currentIndex = allImages.findIndex((img) => img.id === imageId);
+      const lastIndex = allImages.findIndex(
         (img) => img.id === lastSelectedImageId.value,
       );
 
@@ -35,8 +35,8 @@ export function useImageSelection() {
 
         // Select all images in the range
         for (let i = startIdx; i <= endIdx; i++) {
-          if (!selectedImages.value.includes(images[i].id)) {
-            selectedImages.value.push(images[i].id);
+          if (!selectedImages.value.includes(allImages[i].id)) {
+            selectedImages.value.push(allImages[i].id);
           }
         }
       }
@@ -54,6 +54,28 @@ export function useImageSelection() {
     lastSelectedImageId.value = imageId;
   }
 
+  // Helper function to get all images from hierarchical data structure
+  function getAllImagesFromHierarchy() {
+    const allImages: { id: string }[] = [];
+
+    if (
+      collectionStore.metaElementSections &&
+      collectionStore.metaElementSections.length > 0
+    ) {
+      // Use hierarchical data
+      collectionStore.metaElementSections.forEach((section) => {
+        if (section.images && Array.isArray(section.images)) {
+          allImages.push(...section.images);
+        }
+      });
+    } else if (currentCollection.collection?.images) {
+      // Fallback to flat data if hierarchical is not available
+      allImages.push(...currentCollection.collection.images);
+    }
+
+    return allImages;
+  }
+
   function toggleSelectMode() {
     selectMode.value = !selectMode.value;
     if (!selectMode.value) {
@@ -63,11 +85,8 @@ export function useImageSelection() {
   }
 
   function selectAll() {
-    if (!currentCollection.collection?.images) return;
-
-    selectedImages.value = currentCollection.collection.images.map(
-      (img) => img.id,
-    );
+    const allImages = getAllImagesFromHierarchy();
+    selectedImages.value = allImages.map((img) => img.id);
   }
 
   function deselectAll() {

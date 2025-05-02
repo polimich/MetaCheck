@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useViewMode, useGridColumns, useFilters } from './composables';
-import { computed, watch } from 'vue';
+import { computed, watch, ref } from 'vue';
+import { useDebounceFn } from '@vueuse/core';
 
 const props = defineProps({
   searchQuery: {
@@ -94,6 +95,19 @@ const updateGridColumns = (cols: number) => {
   emit('update:userGridColumns', cols);
 };
 
+// Create a local searchQuery ref for debouncing
+const localSearchQuery = ref(props.searchQuery);
+
+// Create a debounced function to update the parent component
+const debouncedSearchUpdate = useDebounceFn((value: string) => {
+  emit('update:searchQuery', value);
+}, 300); // 300ms debounce delay
+
+// Watch for local search query changes to debounce
+watch(localSearchQuery, (newValue) => {
+  debouncedSearchUpdate(newValue);
+});
+
 // Create computed properties with two-way binding for the template
 const sortByComputed = computed({
   get: () => props.sortBy,
@@ -112,20 +126,15 @@ const confidenceFiltersComputed = computed({
     emit('update:confidenceFilters', value),
 });
 
-// Create a wrapper for toggleConfidenceFilter
+// Create a wrapper for toggleConfidenceFilter that prevents unnecessary re-renders
 const handleToggleConfidence = (level: string) => {
   const newFilters = { ...confidenceFiltersComputed.value };
+  if (newFilters[level] === !newFilters[level]) return; // Skip if no change
   newFilters[level] = !newFilters[level];
   emit('update:confidenceFilters', newFilters);
 };
 
-// Create a searchQuery computed property with two-way binding
-const searchQueryComputed = computed({
-  get: () => props.searchQuery,
-  set: (value: string) => emit('update:searchQuery', value),
-});
-
-// Watch for sortBy prop changes
+// Watch for props changes with shallow comparison to reduce reactivity overhead
 watch(
   () => props.sortBy,
   (newValue) => {
@@ -135,7 +144,6 @@ watch(
   },
 );
 
-// Watch for filterVerified prop changes
 watch(
   () => props.filterVerified,
   (newValue) => {
@@ -145,14 +153,38 @@ watch(
   },
 );
 
-// Watch for confidenceFilters prop changes
+// Watch for searchQuery prop changes
+watch(
+  () => props.searchQuery,
+  (newValue) => {
+    if (localSearchQuery.value !== newValue) {
+      localSearchQuery.value = newValue;
+    }
+  },
+);
+
+// Replace deep watching with targeted watching only for changed properties
+// to avoid unnecessary reactivity cascades
 watch(
   () => props.confidenceFilters,
-  (newValue) => {
+  (newValue, oldValue) => {
     const typedValue = newValue as Record<string, boolean>;
-    confidenceFiltersComputed.value = { ...typedValue };
+    const typedOldValue = oldValue as Record<string, boolean>;
+
+    // Only update if actual changes occurred
+    let hasChanged = false;
+    for (const key in typedValue) {
+      if (typedValue[key] !== typedOldValue?.[key]) {
+        hasChanged = true;
+        break;
+      }
+    }
+
+    if (hasChanged) {
+      confidenceFiltersComputed.value = { ...typedValue };
+    }
   },
-  { deep: true },
+  { deep: false }, // Remove deep watching which is expensive
 );
 </script>
 
@@ -232,10 +264,10 @@ watch(
           </div>
         </div>
 
-        <!-- Search Box - fixed width -->
+        <!-- Search Box - fixed width - use debounced local value -->
         <div class="col-auto search-box-container" style="width: 500px">
           <q-input
-            v-model="searchQueryComputed"
+            v-model="localSearchQuery"
             dense
             outlined
             placeholder="Search images..."
@@ -244,11 +276,11 @@ watch(
             <template v-slot:prepend>
               <q-icon name="search" size="xs" />
             </template>
-            <template v-slot:append v-if="searchQueryComputed">
+            <template v-slot:append v-if="localSearchQuery">
               <q-icon
                 name="close"
                 class="cursor-pointer"
-                @click="searchQueryComputed = ''"
+                @click="localSearchQuery = ''"
               />
             </template>
           </q-input>
@@ -276,6 +308,10 @@ watch(
                   {
                     label: 'Confidence (High to Low)',
                     value: 'confidence_desc',
+                  },
+                  {
+                    label: 'Most Detections',
+                    value: 'detection_count_desc',
                   },
                 ]"
                 option-label="label"
@@ -343,7 +379,7 @@ watch(
       <!-- Row 2: Search Bar -->
       <div class="header-row search-row q-px-md q-py-sm">
         <q-input
-          v-model="searchQueryComputed"
+          v-model="localSearchQuery"
           dense
           outlined
           placeholder="Search images..."
@@ -352,11 +388,11 @@ watch(
           <template v-slot:prepend>
             <q-icon name="search" size="xs" />
           </template>
-          <template v-slot:append v-if="searchQueryComputed">
+          <template v-slot:append v-if="localSearchQuery">
             <q-icon
               name="close"
               class="cursor-pointer"
-              @click="searchQueryComputed = ''"
+              @click="localSearchQuery = ''"
             />
           </template>
         </q-input>
@@ -377,6 +413,7 @@ watch(
             { label: 'Oldest first', value: 'date_asc' },
             { label: 'Confidence (Low to High)', value: 'confidence_asc' },
             { label: 'Confidence (High to Low)', value: 'confidence_desc' },
+            { label: 'Most Detections', value: 'detection_count_desc' },
           ]"
           option-label="label"
           option-value="value"

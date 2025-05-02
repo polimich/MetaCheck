@@ -8,20 +8,33 @@ import {
   onBeforeUnmount,
   shallowRef,
   withDefaults,
+  reactive,
+  onActivated,
+  onDeactivated,
+  ComponentPublicInstance,
 } from 'vue';
 import { useCurrentCollectionState } from 'stores/frontend-state';
-import {
-  useImageConfidence,
-  useImageVerification,
-  useImageStatusDisplay,
-  useImageSelection,
-  useFilteringFunctions,
-} from './composables';
 import { QScrollArea } from 'quasar';
 import PageHeader from './PageHeader.vue';
 import PageStatistics from './PageStatistics.vue';
 import ImageThumbnail from './ImageThumbnail.vue';
 import BulkActions from './BulkActions.vue';
+import { useCollection } from 'src/stores/data/useCollection';
+import { usePageListStore } from 'src/stores/ui/pageListStore';
+
+// Optimization: Use a Map to cache filtered images by section - but keep it inside the reactive system
+const filteredImagesCache = reactive(new Map());
+
+// Define an interface for the image items
+interface ImageItem {
+  id: string;
+  name: string;
+  confidence?: number;
+  order?: number;
+  annotated?: boolean;
+  detection_count?: number;
+  annotated_detection_count?: number;
+}
 
 interface PageListProps {
   collectionId: string;
@@ -32,6 +45,7 @@ interface PageListProps {
   layout?: 'full-width' | 'sidebar';
   initialViewMode?: 'list-small' | 'list-large' | 'grid';
   gridColumns?: number;
+  initialHierarchicalMode?: boolean;
 }
 
 // Define props with defaults
@@ -41,6 +55,7 @@ const props = withDefaults(defineProps<PageListProps>(), {
   showViewModeSelector: false,
   enableBulkActions: false,
   layout: 'sidebar',
+  initialHierarchicalMode: true,
 });
 
 const emit = defineEmits<{
@@ -49,8 +64,19 @@ const emit = defineEmits<{
   (e: 'view-mode-change', viewMode: string): void;
 }>();
 
+// Use the centralized Pinia store instead of individual composables
+const pageListStore = usePageListStore();
+
 // Use shallowRef for complex objects that don't need deep reactivity
 const currentCollection = shallowRef(useCurrentCollectionState());
+const collectionStore = shallowRef(useCollection());
+
+// Define the correct type for Vue component ref callback
+type VNodeRef = ComponentPublicInstance | Element | null;
+
+// Optimization: Create refs for DOM elements instead of using querySelector
+const activeThumbnailRef = ref<HTMLElement | null>(null);
+const sectionRefs = reactive(new Map<string, HTMLElement>());
 
 // Default values for optional props
 const showHeader = computed(() => props.showHeader !== false);
@@ -60,93 +86,136 @@ const enableBulkActions = computed(() => props.enableBulkActions !== false);
 // Current active image
 const activeImageId = computed(() => currentCollection.value.selectedImageId);
 
-// View mode options - with and without labels
-const viewModeOptions = computed(() => {
-  const options = [
-    { value: 'list-small', icon: 'view_list', label: 'Compact' },
-    { value: 'list-large', icon: 'view_headline', label: 'Details' },
-    { value: 'grid', icon: 'grid_view', label: 'Grid' },
-  ];
-
-  // If in sidebar mode, remove labels
-  if (props.layout === 'sidebar') {
-    return options.map((option) => ({
-      value: option.value,
-      icon: option.icon,
-    }));
-  }
-
-  return options;
-});
-
-// View mode control - use initialViewMode prop if provided
-const viewMode = ref(props.initialViewMode || 'list-large');
-
-// Watch for changes to initialViewMode prop
-watch(
-  () => props.initialViewMode,
-  (newMode) => {
-    if (newMode && newMode !== viewMode.value) {
-      viewMode.value = newMode;
-    }
-  },
-);
-
-// Use composables
-const verification = useImageVerification();
-const confidence = useImageConfidence();
-const selection = useImageSelection();
-const statusDisplay = useImageStatusDisplay(
-  confidence.getConfidenceLevel,
-  verification.getImageVerificationStatus,
-  confidence.hasLowConfidenceDetections,
-  confidence.hasMediumConfidenceDetections,
-  verification.hasUnverifiedDetections,
-);
-const filtering = useFilteringFunctions({
-  getVerificationStatus: verification.getImageVerificationStatus,
-  getAttentionLevel: (id: string) =>
-    confidence.getAttentionLevel(id, verification.hasUnverifiedDetections),
-  needsAttention: (id: string) =>
-    confidence.needsAttention(id, verification.hasUnverifiedDetections),
-  hasLowConfidence: confidence.hasLowConfidenceDetections,
-  hasMediumConfidence: confidence.hasMediumConfidenceDetections,
-});
-
-// Convenience aliases
-const {
-  LOW_CONFIDENCE_THRESHOLD,
-  MEDIUM_CONFIDENCE_THRESHOLD,
-  hasLowConfidenceDetections,
-  hasMediumConfidenceDetections,
-} = confidence;
-const { hasUnverifiedDetections } = verification;
-const { getVerificationStatusColor, getVerificationTooltip, statistics } =
-  statusDisplay;
-const { sortBy, filterVerified, searchQuery, resetFilters, confidenceFilters } =
-  filtering;
-const {
-  selectedImages,
-  selectMode,
-  toggleImageSelection,
-  toggleSelectMode,
-  selectAll,
-  deselectAll,
-  markSelectedAsVerified,
-  downloadSelected,
-} = selection;
-
 // Ref for the scroll area
 const scrollAreaRef = ref<QScrollArea | null>(null);
 
-// Response to view mode changes
-watch(viewMode, (newMode) => {
-  localStorage.setItem(
-    `pagelist-viewmode-${props.layout || 'default'}`,
-    newMode,
-  );
-  emit('view-mode-change', newMode);
+// Optimization: virtual scrolling state
+const isScrolling = ref(false);
+const visibleStartIndex = ref(0);
+const visibleEndIndex = ref(0);
+const renderBuffer = 10; // Number of items to render above and below visible area
+
+// Optimize performance by using a stable cache key for filtering
+const filterCacheKey = computed(() => {
+  return `${pageListStore.searchQuery}-${pageListStore.filterVerified}-${JSON.stringify(pageListStore.confidenceFilters)}-${pageListStore.sortBy}`;
 });
+
+// Use a single optimization flag to debounce expensive filtering operations
+const isFilterProcessing = ref(false);
+
+// Watch for filter changes to clear cache
+watch(filterCacheKey, () => {
+  // Clear the entire cache when filters change
+  console.log('Filter or sort changed, clearing cache');
+  filteredImagesCache.clear();
+
+  // Debounce filter processing to prevent UI jank
+  if (!isFilterProcessing.value) {
+    isFilterProcessing.value = true;
+    requestAnimationFrame(() => {
+      isFilterProcessing.value = false;
+    });
+  }
+});
+
+// Add specific watch for sort changes to ensure updating
+watch(
+  () => pageListStore.sortBy,
+  (newSortValue) => {
+    console.log('Sort changed to:', newSortValue);
+    // Clear the cache to force refiltering
+    filteredImagesCache.clear();
+  },
+);
+
+// Watch for changes in selection state to ensure UI updates
+watch(
+  () => pageListStore.selectedImages,
+  () => {
+    console.log(
+      'Selection changed:',
+      pageListStore.selectedImages.length,
+      'images selected',
+    );
+    // No need to invalidate cache for selection changes
+  },
+  { deep: true },
+);
+
+// Watch for collection changes to clear cache
+watch(
+  () => props.collectionId,
+  () => {
+    console.log('Collection changed, clearing cache');
+    filteredImagesCache.clear();
+  },
+);
+
+// Watch for select mode changes to ensure UI updates
+watch(
+  () => pageListStore.selectMode,
+  (newValue) => {
+    console.log('Select mode changed:', newValue);
+  },
+);
+
+// Get filtered images with caching for better performance
+function getFilteredImagesForSection(sectionId: string, images: ImageItem[]) {
+  if (!images || !images.length) return [];
+
+  const cacheKey = `${sectionId}:${filterCacheKey.value}`;
+
+  // Check if we have this section's filtered images in cache
+  if (filteredImagesCache.has(cacheKey)) {
+    return filteredImagesCache.get(cacheKey);
+  }
+
+  // Fallback to direct filtering if not in cache
+  const result = collectionStore.value.getFilteredImagesForSection(
+    sectionId,
+    pageListStore.searchQuery,
+    pageListStore.sortBy,
+    pageListStore.filterVerified,
+    pageListStore.confidenceFilters,
+    pageListStore.hasLowConfidenceDetections,
+    pageListStore.hasMediumConfidenceDetections,
+    pageListStore.hasUnverifiedDetections,
+    pageListStore.getVerificationStatus,
+  );
+
+  // Cache the result
+  filteredImagesCache.set(cacheKey, result);
+  return result;
+}
+
+// Initialize the store with the correct layout
+onMounted(() => {
+  pageListStore.setLayout(props.layout);
+
+  // If initialViewMode is provided, override the localStorage value
+  if (props.initialViewMode) {
+    pageListStore.viewMode = props.initialViewMode;
+  }
+
+  // If gridColumns is provided, override the localStorage value
+  if (props.gridColumns) {
+    pageListStore.gridColumns = props.gridColumns;
+  }
+
+  // Optimization: Set up scroll event listener for virtual scrolling
+  setupVirtualScrolling();
+
+  // Optimization: Load expanded sections from localStorage if available
+  loadExpandedSectionsFromLocalStorage();
+});
+
+// Response to view mode changes
+watch(
+  () => pageListStore.viewMode,
+  (newMode) => {
+    emit('view-mode-change', newMode);
+  },
+);
 
 // Optimize the activeImageId watcher to avoid unnecessary scrolling
 watch(
@@ -160,67 +229,179 @@ watch(
   { immediate: false },
 );
 
+// Optimization: Handle component activation/deactivation
+onActivated(() => {
+  setupVirtualScrolling();
+});
+
+onDeactivated(() => {
+  if (scrollAreaRef.value) {
+    const scrollEl = scrollAreaRef.value.getScrollTarget();
+    scrollEl.removeEventListener('scroll', handleScroll);
+  }
+});
+
 // Clean up event listeners
+let resizeTimeout: number | null = null;
+let scrollDebounceTimeout: number | null = null;
+
 onBeforeUnmount(() => {
   if (resizeTimeout) {
     window.clearTimeout(resizeTimeout);
   }
+
+  if (scrollDebounceTimeout) {
+    window.clearTimeout(scrollDebounceTimeout);
+  }
+
+  // Remove scroll listener
+  if (scrollAreaRef.value) {
+    const scrollEl = scrollAreaRef.value.getScrollTarget();
+    scrollEl.removeEventListener('scroll', handleScroll);
+  }
+
+  // Save expanded sections to localStorage
+  saveExpandedSectionsToLocalStorage();
 });
 
-// Function to scroll to active image with requestAnimationFrame
+// Optimization: Virtual scrolling setup
+function setupVirtualScrolling() {
+  nextTick(() => {
+    if (scrollAreaRef.value) {
+      const scrollEl = scrollAreaRef.value.getScrollTarget();
+      scrollEl.addEventListener('scroll', handleScroll, { passive: true });
+
+      // Initial calculation of visible items
+      calculateVisibleIndexes();
+    }
+  });
+}
+
+// Optimization: Debounced scroll handler
+function handleScroll() {
+  isScrolling.value = true;
+
+  if (scrollDebounceTimeout) {
+    window.clearTimeout(scrollDebounceTimeout);
+  }
+
+  // Only use scrolling optimization for performance, not for filtering
+  scrollDebounceTimeout = window.setTimeout(() => {
+    calculateVisibleIndexes();
+    isScrolling.value = false;
+    scrollDebounceTimeout = null;
+  }, 100);
+}
+
+// Calculate which items should be visible based on scroll position
+function calculateVisibleIndexes() {
+  if (!scrollAreaRef.value) return;
+
+  const scrollEl = scrollAreaRef.value.getScrollTarget();
+  const scrollTop = scrollEl.scrollTop;
+  const viewportHeight = scrollEl.clientHeight;
+
+  // Simple estimation - assuming each item is around 100px tall
+  // This would be more accurate with actual measurements of rendered items
+  const itemHeight =
+    pageListStore.viewMode === 'list-small'
+      ? 80
+      : pageListStore.viewMode === 'list-large'
+        ? 150
+        : 250;
+
+  visibleStartIndex.value = Math.floor(scrollTop / itemHeight) - renderBuffer;
+  visibleEndIndex.value =
+    Math.ceil((scrollTop + viewportHeight) / itemHeight) + renderBuffer;
+
+  // Ensure we don't go below 0
+  visibleStartIndex.value = Math.max(0, visibleStartIndex.value);
+}
+
+// Function to save expanded sections state to localStorage
+function saveExpandedSectionsToLocalStorage() {
+  localStorage.setItem(
+    `expanded-sections-${props.collectionId}`,
+    JSON.stringify(collectionStore.value.expandedSections),
+  );
+}
+
+// Function to load expanded sections state from localStorage
+function loadExpandedSectionsFromLocalStorage() {
+  const savedSections = localStorage.getItem(
+    `expanded-sections-${props.collectionId}`,
+  );
+
+  if (savedSections) {
+    try {
+      const parsed = JSON.parse(savedSections);
+
+      // If we have sections to expand and they're in an array format
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Just replace the current expanded sections with the saved ones
+        collectionStore.value.expandedSections = parsed;
+      }
+    } catch (e) {
+      console.error('Error loading saved section states:', e);
+    }
+  }
+}
+
+// Optimization: Improved scroll to active image
 const scrollToActiveImage = async () => {
   if (!activeImageId.value || !scrollAreaRef.value) return;
 
   // Wait for DOM updates
   await nextTick();
 
-  // Use requestAnimationFrame for smoother scrolling
-  requestAnimationFrame(() => {
+  // Find the active thumbnail using its ref or a class selector as fallback
+  if (activeThumbnailRef.value) {
+    // Use requestAnimationFrame for smoother scrolling
+    requestAnimationFrame(() => {
+      if (scrollAreaRef.value && activeThumbnailRef.value) {
+        // Scroll the element into view with smooth behavior
+        scrollAreaRef.value.setScrollPosition(
+          'vertical',
+          activeThumbnailRef.value.offsetTop - 100,
+          300,
+        );
+      }
+    });
+  } else {
+    // Fallback to class selector if ref isn't available
     const activeThumbnail = document.querySelector(
       '.image-thumbnail.thumbnail-active',
     ) as HTMLElement;
 
     if (activeThumbnail && scrollAreaRef.value) {
-      // Scroll the element into view with smooth behavior
       scrollAreaRef.value.setScrollPosition(
         'vertical',
         activeThumbnail.offsetTop - 100,
         300,
       );
     }
-  });
+  }
 };
 
 // Load collection data when component mounts or collectionId changes
-watch(() => props.collectionId, loadCollection, { immediate: true });
+watch(
+  () => props.collectionId,
+  async () => {
+    await loadCollection();
+    // Always load hierarchical collection data
+    await loadHierarchicalCollection();
 
-// Use the filtered images from the filtering composable
-const filteredImages = computed(() => filtering.filteredImages.value);
+    // Optimization: Reset cache when collection changes
+    filteredImagesCache.clear();
+  },
+  { immediate: true },
+);
 
 // Determine if the collection is empty
 const isCollectionEmpty = computed(() => {
-  if (!currentCollection.value.collection?.images) return true;
-  return currentCollection.value.collection.images.length === 0;
+  // Only check hierarchical data now
+  return !collectionStore.value.metaElementSections.length;
 });
-
-// Add userGridColumns ref to track user's column preference
-const userGridColumns = ref(
-  props.gridColumns || (props.layout === 'sidebar' ? 1 : 4),
-);
-
-// Update gridColumns computed property to use the user's preference
-const effectiveGridColumns = computed(() => {
-  // If view mode is not grid, always use 1 column
-  if (viewMode.value !== 'grid') {
-    return 1;
-  }
-
-  // Otherwise use the user's column preference
-  return userGridColumns.value;
-});
-
-// Debounce variable for resize
-let resizeTimeout: number | null = null;
 
 // Optimized loadCollection with better caching and error handling
 async function loadCollection() {
@@ -255,10 +436,93 @@ async function loadCollection() {
   }
 }
 
-// Optimized image navigation with proper type checking
+// Load hierarchical collection data
+async function loadHierarchicalCollection() {
+  if (!props.collectionId) return;
+
+  if (
+    collectionStore.value.loaded &&
+    collectionStore.value.collection?.id === props.collectionId
+  ) {
+    console.log(
+      `PageList: Hierarchical collection ${props.collectionId} already loaded, using cached data.`,
+    );
+    return;
+  }
+
+  if (collectionStore.value.loading) {
+    console.log(
+      `PageList: Hierarchical collection ${props.collectionId} is currently loading, waiting...`,
+    );
+    return;
+  }
+
+  console.log(
+    `PageList: Loading hierarchical collection ${props.collectionId}`,
+  );
+  try {
+    await collectionStore.value.loadCollection(props.collectionId);
+  } catch (error) {
+    console.error(
+      `PageList: Error loading hierarchical collection ${props.collectionId}:`,
+      error,
+    );
+  }
+}
+
+// Optimization: Improved section toggle with ref-based scrolling
+function handleSectionToggle(sectionId: string) {
+  // Toggle the section first
+  collectionStore.value.toggleSection(sectionId);
+
+  // If the section is being expanded, scroll to it after a short delay to allow animation
+  if (collectionStore.value.isSectionExpanded(sectionId)) {
+    // Wait for the DOM to update and animation to start
+    setTimeout(() => {
+      const sectionEl = sectionRefs.get(sectionId);
+
+      if (sectionEl && scrollAreaRef.value) {
+        // Calculate scroll position - position the section header near the top with extra padding
+        const scrollPosition = Math.max(0, sectionEl.offsetTop - 100);
+
+        // Use smooth scrolling for better UX
+        scrollAreaRef.value.setScrollPosition(
+          'vertical',
+          scrollPosition,
+          400, // Slightly longer duration for smoother animation
+        );
+      }
+    }, 150); // Longer delay for more reliable expansion
+  }
+
+  // Save expanded sections state
+  saveExpandedSectionsToLocalStorage();
+}
+
+// Optimization: Cache section ref helper
+function setSectionRef(el: HTMLElement | null, sectionId: string) {
+  if (el) {
+    sectionRefs.set(sectionId, el);
+  }
+}
+
+// Optimization: Cache active thumbnail ref helper
+function setActiveThumbnailRef(el: VNodeRef) {
+  // Cast to HTMLElement if it's an element
+  if (el instanceof HTMLElement) {
+    activeThumbnailRef.value = el;
+  } else if (el && 'el' in el && el.el instanceof HTMLElement) {
+    // Handle component instance with $el property
+    activeThumbnailRef.value = el.el;
+  } else {
+    activeThumbnailRef.value = null;
+  }
+}
+
+// Image navigation with selection support
 function navigateToImage(imageId: string, shiftKey = false) {
-  if (selectMode.value) {
-    toggleImageSelection(imageId, shiftKey);
+  if (pageListStore.selectMode) {
+    pageListStore.toggleImageSelection(imageId, shiftKey);
   } else {
     // Update selected image in the collection state
     currentCollection.value.selectImage(imageId);
@@ -267,278 +531,438 @@ function navigateToImage(imageId: string, shiftKey = false) {
     emit('select-image', imageId);
   }
 }
-
-// Load saved preferences from localStorage
-onMounted(() => {
-  const savedViewMode = localStorage.getItem(
-    `pagelist-viewmode-${props.layout || 'default'}`,
-  );
-  if (
-    savedViewMode &&
-    viewModeOptions.value.some((option) => option.value === savedViewMode)
-  ) {
-    viewMode.value = savedViewMode as 'list-small' | 'list-large' | 'grid';
-  }
-
-  // Load saved grid columns preference
-  const savedColumns = localStorage.getItem(
-    `pagelist-grid-columns-${props.layout || 'default'}`,
-  );
-  if (savedColumns && !isNaN(parseInt(savedColumns))) {
-    userGridColumns.value = parseInt(savedColumns);
-  }
-});
 </script>
 
 <template>
-  <div class="page-list q-pa-md" :class="[`layout-${props.layout}`]">
-    <!-- Header with filters and controls - more compact in fullscreen mode -->
-    <PageHeader
-      v-if="showHeader"
-      v-model:searchQuery="searchQuery"
-      v-model:sortBy="sortBy"
-      v-model:filterVerified="filterVerified"
-      v-model:confidenceFilters="confidenceFilters"
-      v-model:viewMode="viewMode"
-      v-model:userGridColumns="userGridColumns"
-      :class="{ 'header-fullscreen': props.layout === 'full-width' }"
-      :layoutMode="props.layout"
-      :compact="props.layout === 'full-width'"
-      @locate-active-image="scrollToActiveImage"
-    />
-
-    <!-- Statistics and progress indicators - more compact in fullscreen -->
-    <PageStatistics
-      v-if="showStatistics"
-      :statistics="statistics"
-      :filterVerified="filterVerified"
-      :searchQuery="searchQuery"
-      :filteredImagesCount="filteredImages.length"
-      :totalImagesCount="currentCollection.collection?.images?.length || 0"
-      @resetFilters="resetFilters"
-      :class="{ 'stats-fullscreen': props.layout === 'full-width' }"
-      :layoutMode="props.layout"
-      :compact="props.layout === 'full-width'"
-    />
-
-    <!-- Empty Collection State -->
-    <div
-      v-if="isCollectionEmpty && !currentCollection.loading"
-      class="empty-collection q-pa-xl flex flex-center column"
-    >
-      <q-icon name="image_not_supported" size="64px" color="grey-6" />
-      <div class="text-h6 q-mt-md">No Images in Collection</div>
-      <div class="text-body1 text-grey-7 q-mt-sm">
-        This collection doesn't contain any images yet.
-      </div>
-      <q-btn
-        color="primary"
-        class="q-mt-lg"
-        label="Upload Images"
-        icon="upload"
+  <div class="page-list-wrapper" :class="[`layout-${props.layout}`]">
+    <!-- Header with filters and controls -->
+    <div class="page-list-header" v-if="showHeader">
+      <PageHeader
+        v-model:searchQuery="pageListStore.searchQuery"
+        v-model:sortBy="pageListStore.sortBy"
+        v-model:filterVerified="pageListStore.filterVerified"
+        v-model:confidenceFilters="pageListStore.confidenceFilters"
+        v-model:viewMode="pageListStore.viewMode"
+        v-model:userGridColumns="pageListStore.gridColumns"
+        :class="{ 'header-fullscreen': props.layout === 'full-width' }"
+        :layoutMode="props.layout"
+        :compact="props.layout === 'full-width'"
+        @locate-active-image="scrollToActiveImage"
       />
     </div>
 
-    <!-- Image list with status indicators -->
-    <div v-else class="page-list-content">
-      <q-scroll-area class="page-list-scroll" ref="scrollAreaRef">
-        <div v-if="currentCollection.loading" class="flex flex-center q-pa-md">
-          <div class="column items-center">
-            <q-spinner color="primary" size="40px" />
-            <div class="text-subtitle1 q-mt-md">Loading images...</div>
-          </div>
-        </div>
-
-        <div
-          v-else-if="!filteredImages.length"
-          class="empty-state q-pa-xl text-center"
-        >
-          <q-icon name="filter_alt_off" size="48px" color="grey-6" />
-          <div class="text-subtitle1 q-mt-sm">No pages match your filters</div>
-          <div class="text-caption text-grey-7">
-            Try adjusting your search or filter criteria
-          </div>
-          <q-btn
-            flat
-            color="primary"
-            class="q-mt-sm"
-            label="Reset filters"
-            @click="resetFilters"
-          />
-        </div>
-
-        <div
-          v-else
-          :class="[
-            'image-container',
-            `view-${viewMode}`,
-            `grid-cols-${effectiveGridColumns}`,
-          ]"
-        >
-          <!-- Use optimized rendering for thumbnails -->
-          <ImageThumbnail
-            v-for="image in filteredImages"
-            :key="image.id"
-            :image="image"
-            :isActive="image.id === activeImageId"
-            :isSelected="selectedImages.includes(image.id)"
-            :selectMode="selectMode"
-            :viewMode="viewMode"
-            :flags="{
-              needsAttention: confidence.needsAttention(
-                image.id,
-                hasUnverifiedDetections,
-              ),
-              hasLowConfidence: hasLowConfidenceDetections(image.id),
-              hasMediumConfidence: hasMediumConfidenceDetections(image.id),
-              hasUnverifiedDetections: hasUnverifiedDetections(image.id),
-            }"
-            :verificationStatus="{
-              color: getVerificationStatusColor(image.id),
-              tooltip: getVerificationTooltip(image.id),
-            }"
-            :confidenceThresholds="{
-              low: LOW_CONFIDENCE_THRESHOLD,
-              medium: MEDIUM_CONFIDENCE_THRESHOLD,
-            }"
-            @click="navigateToImage"
-            @select="(id, shiftKey) => toggleImageSelection(id, shiftKey)"
-          />
-        </div>
-
-        <!-- Add some bottom padding to ensure scroll area can scroll past the last thumbnail -->
-        <div class="q-pa-lg"></div>
-      </q-scroll-area>
+    <!-- Statistics and progress indicators -->
+    <div class="page-list-stats" v-if="showStatistics">
+      <PageStatistics
+        :statistics="pageListStore.statistics"
+        :filterVerified="pageListStore.filterVerified"
+        :searchQuery="pageListStore.searchQuery"
+        :filteredImagesCount="pageListStore.filteredImages.length"
+        :totalImagesCount="currentCollection.collection?.images?.length || 0"
+        @resetFilters="pageListStore.resetFilters"
+        :class="{ 'stats-fullscreen': props.layout === 'full-width' }"
+        :layoutMode="props.layout"
+        :compact="props.layout === 'full-width'"
+      />
     </div>
 
-    <!-- Bulk action toolbar at the bottom -->
-    <BulkActions
-      v-if="enableBulkActions"
-      :selectMode="selectMode"
-      :selectedImages="selectedImages"
-      @toggleSelectMode="toggleSelectMode"
-      @selectAll="selectAll"
-      @deselectAll="deselectAll"
-      @markSelectedAsVerified="markSelectedAsVerified"
-      @downloadSelected="downloadSelected"
-      :class="{ 'actions-fullscreen': props.layout === 'full-width' }"
-      :layoutMode="props.layout"
-    >
-      <template v-slot:page-count>
-        {{ filteredImages.length }} of
-        {{ currentCollection.collection?.images?.length || 0 }}
-        pages
-      </template>
-    </BulkActions>
+    <!-- Main content area -->
+    <div class="page-list-content">
+      <!-- Empty Collection State -->
+      <div
+        v-if="
+          isCollectionEmpty &&
+          !currentCollection.loading &&
+          !collectionStore.loading
+        "
+        class="empty-collection q-pa-xl flex flex-center column"
+      >
+        <q-icon name="image_not_supported" size="64px" color="grey-6" />
+        <div class="text-h6 q-mt-md">No Images in Collection</div>
+        <div class="text-body1 text-grey-7 q-mt-sm">
+          This collection doesn't contain any images yet.
+        </div>
+        <q-btn
+          color="primary"
+          class="q-mt-lg"
+          label="Upload Images"
+          icon="upload"
+        />
+      </div>
+
+      <!-- Image list with status indicators -->
+      <div v-else class="page-list-scroll-container">
+        <q-scroll-area class="page-list-scroll" ref="scrollAreaRef">
+          <div
+            v-if="currentCollection.loading || collectionStore.loading"
+            class="flex flex-center q-pa-md"
+          >
+            <div class="column items-center">
+              <q-spinner color="primary" size="40px" />
+              <div class="text-subtitle1 q-mt-md">Loading images...</div>
+            </div>
+          </div>
+
+          <!-- Hierarchical view (now the default and only view) -->
+          <div class="hierarchical-container">
+            <!-- Section controls -->
+            <div class="section-controls q-px-md q-py-sm bg-grey-2">
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="unfold_more"
+                @click="collectionStore.expandAllSections"
+                label="Expand All"
+              />
+              <q-btn
+                flat
+                dense
+                size="sm"
+                icon="unfold_less"
+                @click="collectionStore.collapseAllSections"
+                label="Collapse All"
+                class="q-ml-sm"
+              />
+            </div>
+
+            <!-- Empty state when no sections exist -->
+            <div
+              v-if="collectionStore.metaElementSections.length === 0"
+              class="empty-state q-pa-xl text-center"
+            >
+              <q-icon name="category" size="48px" color="grey-6" />
+              <div class="text-subtitle1 q-mt-sm">
+                No sections in this collection
+              </div>
+              <div class="text-caption text-grey-7">
+                This collection doesn't have any organized sections yet
+              </div>
+            </div>
+
+            <!-- Sections container -->
+            <div v-else class="sections-container">
+              <!-- Render each section -->
+              <div
+                v-for="section in collectionStore.metaElementSections"
+                :key="section.id"
+                class="meta-element-section q-mb-md"
+                :ref="(el) => setSectionRef(el as HTMLElement, section.id)"
+              >
+                <!-- Section header -->
+                <div
+                  class="section-header q-pa-sm q-px-md cursor-pointer"
+                  @click="handleSectionToggle(section.id)"
+                >
+                  <div class="row items-center no-wrap">
+                    <q-icon
+                      :name="
+                        collectionStore.isSectionExpanded(section.id)
+                          ? 'expand_more'
+                          : 'chevron_right'
+                      "
+                      size="1.5em"
+                      class="q-mr-sm"
+                    />
+                    <div class="text-subtitle1">
+                      {{
+                        section.meta_element_type?.display_name ||
+                        section.meta_element_type?.name ||
+                        section.id
+                      }}
+                    </div>
+                    <q-badge color="primary" class="q-ml-sm">
+                      {{ section.images?.length || 0 }} images
+                    </q-badge>
+                    <q-space />
+                  </div>
+                </div>
+
+                <!-- Section content -->
+                <q-slide-transition>
+                  <div
+                    v-if="collectionStore.isSectionExpanded(section.id)"
+                    class="section-content q-pa-sm"
+                  >
+                    <!-- Empty section message -->
+                    <div
+                      v-if="!section.images || section.images.length === 0"
+                      class="empty-section q-pa-md text-center"
+                    >
+                      <q-icon
+                        name="image_not_supported"
+                        size="32px"
+                        color="grey-6"
+                      />
+                      <div class="text-caption q-mt-sm">
+                        No images in this section
+                      </div>
+                    </div>
+
+                    <!-- Section images -->
+                    <template v-else>
+                      <!-- Filter images based on current filters -->
+                      <div
+                        :class="[
+                          'image-container',
+                          `view-${pageListStore.viewMode}`,
+                        ]"
+                        :style="{
+                          'grid-template-columns':
+                            pageListStore.viewMode === 'grid'
+                              ? `repeat(${pageListStore.effectiveGridColumns}, minmax(200px, 1fr))`
+                              : 'none',
+                        }"
+                      >
+                        <!-- Optimization: Use cached filtered images -->
+                        <template v-if="section.images">
+                          <ImageThumbnail
+                            v-for="image in getFilteredImagesForSection(
+                              section.id,
+                              section.images,
+                            )"
+                            :key="image.id"
+                            :image="image"
+                            :isActive="image.id === activeImageId"
+                            :isSelected="
+                              pageListStore.selectedImages.includes(image.id)
+                            "
+                            :selectMode="pageListStore.selectMode"
+                            :viewMode="pageListStore.viewMode"
+                            :flags="{
+                              needsAttention: pageListStore.needsAttention(
+                                image.id,
+                              ),
+                              hasLowConfidence:
+                                pageListStore.hasLowConfidenceDetections(
+                                  image.id,
+                                ),
+                              hasMediumConfidence:
+                                pageListStore.hasMediumConfidenceDetections(
+                                  image.id,
+                                ),
+                              hasUnverifiedDetections:
+                                pageListStore.hasUnverifiedDetections(image.id),
+                            }"
+                            :verificationStatus="{
+                              color: pageListStore.getVerificationStatusColor(
+                                image.id,
+                              ),
+                              tooltip: pageListStore.getVerificationTooltip(
+                                image.id,
+                              ),
+                            }"
+                            :confidenceThresholds="{
+                              low: pageListStore.LOW_CONFIDENCE_THRESHOLD,
+                              medium: pageListStore.MEDIUM_CONFIDENCE_THRESHOLD,
+                            }"
+                            @click="navigateToImage"
+                            @select="
+                              (id, shiftKey) =>
+                                pageListStore.toggleImageSelection(id, shiftKey)
+                            "
+                            :ref="
+                              image.id === activeImageId
+                                ? setActiveThumbnailRef
+                                : undefined
+                            "
+                          />
+                        </template>
+                      </div>
+                    </template>
+                  </div>
+                </q-slide-transition>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom spacer to ensure content doesn't get hidden under the fixed toolbar -->
+          <div class="bottom-spacer"></div>
+        </q-scroll-area>
+      </div>
+    </div>
+
+    <!-- Bulk action toolbar - outside the scroll area to stay fixed at the bottom -->
+    <div class="page-list-footer" v-if="enableBulkActions">
+      <BulkActions
+        :selectMode="pageListStore.selectMode"
+        :selectedImages="pageListStore.selectedImages"
+        @toggleSelectMode="pageListStore.toggleSelectMode"
+        @selectAll="pageListStore.selectAll"
+        @deselectAll="pageListStore.deselectAll"
+        @markSelectedAsVerified="pageListStore.markSelectedAsVerified"
+        @downloadSelected="pageListStore.downloadSelected"
+        :layoutMode="props.layout"
+        class="bulk-actions"
+      >
+        <template v-slot:page-count>
+          {{ pageListStore.filteredImages.length }} of
+          {{ currentCollection.collection?.images?.length || 0 }}
+          pages
+        </template>
+      </BulkActions>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
-// Define CSS variables for easy theming
-:root {
-  --page-list-border-color: rgba(0, 0, 0, 0.12);
-  --page-list-shadow-color: rgba(0, 0, 0, 0.05);
-  --page-list-bg-light: #f8f8f8;
-  --page-list-bg-white: white;
-  --page-list-spacing-sm: 8px;
-  --page-list-spacing-md: 16px;
-  --page-list-spacing-lg: 24px;
-}
-
-.page-list {
+/* Main page list wrapper */
+.page-list-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
-  // Use CSS containment for better performance
-  contain: layout style;
-
-  &.layout-sidebar {
-    border-right: 1px solid var(--page-list-border-color);
-    width: 100%;
-  }
-
-  &.layout-full-width {
-    max-width: 100%;
-    padding: 0;
-    border: none;
-    background-color: var(--page-list-bg-light);
-
-    .header-fullscreen {
-      padding: 8px var(--page-list-spacing-md);
-      background: var(--page-list-bg-white);
-      border-bottom: 1px solid var(--page-list-border-color);
-      box-shadow: 0 2px 4px var(--page-list-shadow-color);
-    }
-
-    .stats-fullscreen {
-      padding: 6px var(--page-list-spacing-md);
-      background: var(--page-list-bg-light);
-      border-bottom: 1px solid var(--page-list-border-color);
-    }
-
-    .actions-fullscreen {
-      padding: 6px var(--page-list-spacing-md);
-      background: var(--page-list-bg-white);
-      border-top: 1px solid var(--page-list-border-color);
-      box-shadow: 0 -2px 4px var(--page-list-shadow-color);
-    }
-
-    .image-container {
-      &.view-grid {
-        padding: var(--page-list-spacing-md);
-        gap: var(--page-list-spacing-md);
-      }
-
-      &.view-list-small,
-      &.view-list-large {
-        padding: var(--page-list-spacing-md);
-      }
-    }
-  }
-}
-
-.page-list-content {
-  flex-grow: 1;
   position: relative;
   overflow: hidden;
-  // Use contain to optimize performance
-  contain: content;
+
+  /* Sidebar layout styles */
+  &.layout-sidebar {
+    border-right: 1px solid rgba(0, 0, 0, 0.12);
+    padding: 12px;
+  }
+
+  /* Full width layout styles */
+  &.layout-full-width {
+    border: none;
+    background-color: #f8f8f8;
+  }
 }
 
+/* Header section */
+.page-list-header {
+  flex-shrink: 0;
+  z-index: 20;
+  background-color: white;
+
+  .layout-full-width & {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  }
+}
+
+/* Stats section */
+.page-list-stats {
+  flex-shrink: 0;
+  z-index: 15;
+  background-color: white;
+
+  .layout-full-width & {
+    background-color: #f8f8f8;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* Main content area */
+.page-list-content {
+  flex: 1;
+  min-height: 0; /* Important for flexbox to allow proper scrolling */
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  .empty-collection {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+/* Scroll container */
+.page-list-scroll-container {
+  flex: 1;
+  min-height: 0; /* Important for flexbox to allow proper scrolling */
+  position: relative;
+  width: 100%;
+}
+
+/* Scroll area */
 .page-list-scroll {
   height: 100%;
   width: 100%;
-  // Optimize scroll performance
-  will-change: scroll-position;
-  overscroll-behavior: contain;
 }
 
+/* Footer with bulk actions */
+.page-list-footer {
+  position: relative;
+  flex-shrink: 0;
+  z-index: 100;
+
+  .bulk-actions {
+    width: 100%;
+  }
+}
+
+/* Hierarchical container */
+.hierarchical-container {
+  padding: 8px;
+  width: 100%;
+}
+
+/* Section controls */
+.section-controls {
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+/* Meta element sections */
+.meta-element-section {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+
+  .section-header {
+    background-color: #f5f5f5;
+    transition: background-color 0.2s ease;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+
+    &:hover {
+      background-color: #e0e0e0;
+    }
+  }
+
+  .section-content {
+    background-color: white;
+    overflow: visible; /* Allow content to be fully visible */
+  }
+}
+
+/* Image container */
 .image-container {
-  padding: var(--page-list-spacing-sm);
-  // Use CSS containment for better performance
-  contain: layout style;
+  width: 100%;
+
+  &.view-grid {
+    display: grid;
+    gap: 16px;
+    padding: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
 
   &.view-list-small,
   &.view-list-large {
     display: flex;
     flex-direction: column;
-    gap: var(--page-list-spacing-sm);
-  }
-
-  &.view-grid {
-    display: grid;
-    gap: 16px;
-
-    // Dynamic grid columns based on the gridColumns prop
-    @for $i from 1 through 12 {
-      &.grid-cols-#{$i} {
-        grid-template-columns: repeat($i, 1fr);
-      }
-    }
+    gap: 8px;
+    padding: 8px;
   }
 }
 
+/* Bottom spacer */
+.bottom-spacer {
+  height: 120px; /* Increased height to provide more space for the fixed BulkActions bar */
+  width: 100%;
+}
+
+/* Empty state styling */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -546,12 +970,18 @@ onMounted(() => {
   justify-content: center;
   height: 200px;
   background-color: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
+  border-radius: 8px;
   margin: 16px;
 }
 
-.empty-collection {
-  flex-grow: 1;
-  text-align: center;
+/* Empty section styling */
+.empty-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.01);
+  border-radius: 4px;
 }
 </style>

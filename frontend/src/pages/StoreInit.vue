@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useCollections, useImageStore } from 'src/stores';
-import { useCollectionDataAccess, useDataAccess } from 'stores/data-access';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { useStateManager } from 'src/stores/app/stateManager';
@@ -17,6 +16,8 @@ defineOptions({
 const loadingState = useLoadingState();
 const stateManager = useStateManager();
 const collectionsStore = useCollections();
+const imageStore = useImageStore();
+const currentCollection = useCurrentCollectionState();
 const $q = useQuasar();
 
 // State for connection status
