@@ -37,3 +37,4 @@ export * from './collection';
 export * from './meta-role-store/metaRoleStore';
 export * from './app';
 export * from './image';
+export * from './data';

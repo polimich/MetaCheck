@@ -1,28 +1,29 @@
 <script setup lang="ts">
 import { QTableProps } from 'quasar';
-import { CollectionAddDto } from 'src/stores/collection/types';
-import { useCollectionDataAccess } from 'src/stores/data-access';
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'vue-router';
-import { CollectionType } from 'src/types';
+import { CollectionNewType, CollectionType } from 'src/types';
 import { TableSkeleton } from 'src/components';
+import { useCollections } from 'src/stores';
+import { storeToRefs } from 'pinia';
 
 defineOptions({
   name: 'CollectionsPage',
 });
 
 const router = useRouter();
-const collectionDA = useCollectionDataAccess();
+const collectionsStore = useCollections();
 
-// Load collections when component mounts
-onMounted(async () => {
-  await collectionDA.loadCollections();
+async function loadDataAccess() {
+  await collectionsStore.loadCollections();
+}
+
+onMounted(() => {
+  loadDataAccess();
 });
 
-// Use computed properties to reactively get data from the store
-const collections = computed(() => collectionDA.collections);
-const loading = computed(() => collectionDA.loading);
+const { collectionsGetter, loading } = storeToRefs(collectionsStore);
 
 const columns: QTableProps['columns'] = [
   {
@@ -63,7 +64,7 @@ const columns: QTableProps['columns'] = [
 const visibleColumns = ['name', 'description', 'info', 'actions'];
 const isAddOpen = ref(false);
 const isImportOpen = ref(false);
-const collectionToAdd = ref<CollectionAddDto>({
+const collectionToAdd = ref<CollectionNewType>({
   description: '',
   id: uuidv4(),
   info: '',
@@ -72,7 +73,7 @@ const collectionToAdd = ref<CollectionAddDto>({
 const collectionToImport = ref<File | null>(null);
 
 const handleCreate = async () => {
-  await collectionDA.addCollection(collectionToAdd.value);
+  await collectionsStore.addCollection(collectionToAdd.value);
 };
 
 const handleResetAdd = () => {
@@ -83,7 +84,7 @@ const handleResetAdd = () => {
 
 const handleImport = async () => {
   if (collectionToImport.value) {
-    await collectionDA.importCollection(collectionToImport.value);
+    await collectionsStore.importCollection(collectionToImport.value);
   }
 };
 
@@ -107,7 +108,7 @@ const onRowClick = (_evt: Event, row: CollectionType) => {
     <!-- Show table when loaded -->
     <q-table
       v-else
-      :rows="collections"
+      :rows="collectionsGetter"
       :columns="columns"
       :visible-columns="visibleColumns"
       row-key="id"

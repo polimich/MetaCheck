@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useImageStore } from 'src/stores';
+import { useCollections, useImageStore } from 'src/stores';
 import { useCollectionDataAccess, useDataAccess } from 'stores/data-access';
 import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useLoadingState } from 'src/stores/app/loadingState';
@@ -16,10 +16,7 @@ defineOptions({
 // Initialize stores
 const loadingState = useLoadingState();
 const stateManager = useStateManager();
-const imageStore = useImageStore();
-const collectionDA = useCollectionDataAccess();
-const currentCollection = useCurrentCollectionState();
-const dataAccess = useDataAccess();
+const collectionsStore = useCollections();
 const $q = useQuasar();
 
 // State for connection status
@@ -89,12 +86,7 @@ const initApplication = async () => {
     initProgress.value = 40;
 
     // Initialize all stores without loading data yet
-    await Promise.all([
-      collectionDA.init(),
-      currentCollection.init(),
-      imageStore.init(),
-      dataAccess.init(),
-    ]);
+    await Promise.all([collectionsStore.init()]);
 
     initProgress.value = 50;
     console.log('All stores initialized');
