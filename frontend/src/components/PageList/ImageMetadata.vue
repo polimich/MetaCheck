@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-
-const props = defineProps({
+// Define props directly without assigning to a variable
+defineProps({
   image: {
     type: Object,
     required: true,
@@ -28,14 +27,18 @@ const props = defineProps({
   },
 });
 
+// Add emit for expansion state change
+const emit = defineEmits(['expansion-change']);
+
+// Handle expansion change
+function handleExpansionChange(expanded: boolean) {
+  emit('expansion-change', expanded);
+}
+
 // Helper functions for page information
 const formatConfidence = (confidence: number) => {
   return confidence ? `${Math.round(confidence * 100)}%` : '';
 };
-
-const hasPageInfo = computed(() => {
-  return props.image.page_index || props.image.page_type;
-});
 
 const getConfidenceColor = (confidence: number) => {
   if (confidence >= 0.8) return 'green-8';
@@ -87,14 +90,25 @@ const getConfidenceColor = (confidence: number) => {
             >
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- Page Info Section (outside accordion) -->
-        <div v-if="hasPageInfo" class="page-info-section q-mt-sm" @click.stop>
+    <!-- Expandable details section -->
+    <q-expansion-item
+      switch-toggle-side
+      dense
+      class="q-mt-xs details-expansion"
+      header-class="text-caption"
+      @update:model-value="handleExpansionChange"
+      @click.stop
+    >
+      <template v-slot:header>
+        <q-item-section>
           <!-- Page index badge if available -->
           <q-badge
             v-if="image.page_index"
             color="grey-9"
-            class="page-info-badge q-mr-xs"
+            class="page-info-badge"
           >
             <q-icon name="format_list_numbered" size="xs" class="q-mr-xs" />
             Page {{ image.page_index }}
@@ -106,38 +120,6 @@ const getConfidenceColor = (confidence: number) => {
               {{ formatConfidence(image.page_index_confidence) }}
             </q-badge>
           </q-badge>
-
-          <!-- Page type badge if available -->
-          <q-badge
-            v-if="image.page_type"
-            color="grey-8"
-            class="page-info-badge"
-          >
-            <q-icon name="category" size="xs" class="q-mr-xs" />
-            {{ image.page_type }}
-            <q-badge
-              v-if="image.page_type_confidence"
-              class="mini-badge q-ml-xs"
-              :color="getConfidenceColor(image.page_type_confidence)"
-            >
-              {{ formatConfidence(image.page_type_confidence) }}
-            </q-badge>
-          </q-badge>
-        </div>
-      </div>
-    </div>
-
-    <!-- Expandable details section -->
-    <q-expansion-item
-      switch-toggle-side
-      dense
-      class="q-mt-xs details-expansion"
-      header-class="text-caption"
-      @click.stop
-    >
-      <template v-slot:header>
-        <q-item-section>
-          <q-item-label class="text-caption">Details</q-item-label>
         </q-item-section>
       </template>
       <!-- Wrapper div to stop propagation on all expansion content -->
@@ -152,6 +134,20 @@ const getConfidenceColor = (confidence: number) => {
               />
               <span class="text-weight-medium">Name: </span>
               <span class="q-ml-xs">{{ image.name }}</span>
+            </div>
+
+            <!-- Page type badge if available -->
+            <div class="row q-mb-xs" v-if="image.page_type">
+              <q-icon name="category" size="xs" class="q-mr-xs" />
+              <span class="text-weight-medium">Page Type: </span>
+              <span class="q-ml-xs">{{ image.page_type }}</span>
+              <q-badge
+                v-if="image.page_type_confidence"
+                class="mini-badge q-ml-xs"
+                :color="getConfidenceColor(image.page_type_confidence)"
+              >
+                {{ formatConfidence(image.page_type_confidence) }}
+              </q-badge>
             </div>
 
             <div class="row q-mb-xs">

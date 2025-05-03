@@ -14,58 +14,46 @@ defineProps({
 <template>
   <div
     v-if="hasLowConfidence"
-    class="confidence-indicator low-confidence-indicator"
+    class="confidence-indicator low-confidence"
   ></div>
   <div
     v-else-if="hasMediumConfidence"
-    class="confidence-indicator medium-confidence-indicator"
+    class="confidence-indicator medium-confidence"
   ></div>
 </template>
 
 <style lang="scss" scoped>
-/* Confidence indicators with pulsating effects */
 .confidence-indicator {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0; /* Shorthand for top, right, bottom, left: 0 */
   pointer-events: none;
   z-index: 1;
-  border: 3px solid transparent;
+  border: 5px solid transparent;
+  box-sizing: border-box;
+  border-radius: inherit;
 }
 
-.low-confidence-indicator {
-  border-color: rgba(244, 67, 54, 0.7);
-  animation: pulsate-red 2s infinite;
+.low-confidence {
+  border-color: rgba(244, 67, 54, 0.8);
+  animation: pulsate 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  --pulse-color: rgba(244, 67, 54, 0.5);
 }
 
-.medium-confidence-indicator {
-  border-color: rgba(255, 152, 0, 0.7);
-  animation: pulsate-orange 3s infinite;
+.medium-confidence {
+  border-color: rgba(255, 152, 0, 0.8);
+  animation: pulsate 3s infinite cubic-bezier(0.4, 0, 0.6, 1);
+  --pulse-color: rgba(255, 152, 0, 0.5);
 }
 
-@keyframes pulsate-red {
+@keyframes pulsate {
   0% {
-    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
+    box-shadow: 0 0 0 0 var(--pulse-color);
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
+    box-shadow: 0 0 0 12px rgba(0, 0, 0, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
-  }
-}
-
-@keyframes pulsate-orange {
-  0% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(255, 152, 0, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 152, 0, 0);
+    box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
   }
 }
 </style>

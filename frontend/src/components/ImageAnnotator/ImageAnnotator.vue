@@ -14,10 +14,10 @@ import { Layer } from 'konva/lib/Layer';
 import { onClickOutside as useClickOutside } from '@vueuse/core';
 
 // --- Stores --- //
-import { useImageStore } from 'src/stores';
-import { useCurrentCollectionState } from 'src/stores/frontend-state';
+import { useImageStore } from 'src/stores/data/useImage';
 import { useMetaRoleStore } from 'src/stores/meta-role-store';
 import { useNotificationStore } from 'src/stores/app/notificationService';
+// Import the type from the local composable for annotations
 import { DetectionState } from 'src/types';
 
 // --- Composables --- //
@@ -34,13 +34,40 @@ import MetadataInputPanel from './MetadataInputPanel.vue';
 // --- Utils & Types --- //
 import { getRasterImage } from 'utils';
 
+// Define props
+const props = defineProps({
+  imageId: {
+    type: String,
+    required: true,
+  },
+  collectionId: {
+    type: String,
+    required: true,
+  },
+});
+
+// Helper functions from the image store - need them here too
+const objectToBbox = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): string => {
+  return `${x},${y},${width},${height}`;
+};
+
+// Also provide the inverse function to convert bbox to coordinates
+const bboxToObject = (bbox: string) => {
+  const [x, y, width, height] = bbox.split(',').map((v) => parseFloat(v));
+  return { x, y, width, height };
+};
+
 // ==========================================================================
 // Setup: Stores, Refs, State
 // ==========================================================================
 
 // --- Store Instances --- //
 const imageStore = useImageStore();
-const currentCollection = useCurrentCollectionState();
 const metaRoleStore = useMetaRoleStore();
 const notificationStore = useNotificationStore();
 
@@ -152,7 +179,7 @@ const isSaving = ref(false); // Track saving state
 // ==========================================================================
 
 // --- Global State Accessors --- //
-const currentImageId = computed(() => currentCollection.selectedImageId);
+const currentImageId = computed(() => props.imageId);
 
 // Konva Stage Configuration
 const stageConfig = computed(() => ({
@@ -345,19 +372,28 @@ function handleConfirmMeta(metaRole: string | null, value: string) {
       confirmedAnnotation.computed_color = '#ff0000';
     }
 
-    // Add to image store
-    const existingIndex = imageStore.detections.findIndex(
-      (d) => d.id === confirmedAnnotation.id,
-    );
+    // Prepare payload for store - ensure bbox is included from coordinates
     const storePayload = {
       ...confirmedAnnotation,
+      bbox: objectToBbox(
+        confirmedAnnotation.x,
+        confirmedAnnotation.y,
+        confirmedAnnotation.width,
+        confirmedAnnotation.height,
+      ),
       created_date:
         confirmedAnnotation.created_date || new Date().toISOString(),
       last_change: new Date().toISOString(),
       last_access: new Date().toISOString(),
       edited: true,
       loadingMetaRoles: false,
+      deleted: false, // Required by DetectionType
     };
+
+    // Add to image store
+    const existingIndex = imageStore.detections.findIndex(
+      (d) => d.id === confirmedAnnotation.id,
+    );
 
     if (existingIndex === -1) {
       // Add to detections array (for local rendering)
@@ -370,7 +406,7 @@ function handleConfirmMeta(metaRole: string | null, value: string) {
       ) {
         imageStore.detectionsToAdd.push({
           ...storePayload,
-          image_id: currentImageId.value ?? '',
+          image_id: props.imageId ?? '',
         });
         console.log(
           `[Annotator] Added new annotation ${confirmedAnnotation.id} to image store`,
@@ -386,7 +422,7 @@ function handleConfirmMeta(metaRole: string | null, value: string) {
         if (index !== -1) {
           imageStore.detectionsToAdd[index] = {
             ...storePayload,
-            image_id: currentImageId.value ?? '',
+            image_id: props.imageId ?? '',
           };
         }
       }
@@ -431,24 +467,43 @@ async function loadImageData() {
   }
 
   // Get the current image from the store directly
-  if (!imageStore.image.id) {
+  if (!imageStore.image || !props.imageId) {
     console.error('[Annotator DEBUG] No image data in store');
     loadingState.value = LoadingState.ERROR;
     return;
   }
 
   try {
-    console.log('[Annotator DEBUG] Loading image:', imageStore.image.id);
+    console.log('[Annotator DEBUG] Loading image:', props.imageId);
 
-    // Construct URL using the ID from store
-    const imageUrl = getRasterImage(imageStore.image.id) + `?t=${Date.now()}`;
+    // Construct URL using the ID from props
+    const imageUrl = getRasterImage(props.imageId) + `?t=${Date.now()}`;
     await imageCanvas.loadImage(imageUrl);
     console.log('[Annotator DEBUG] Image loaded into canvas successfully');
 
     loadingState.value = LoadingState.LOADING_ANNOTATIONS;
 
-    // Load annotations from store
-    annotations.loadAnnotations(imageStore.detections || []);
+    // Load annotations from store - use the UI-ready detections from the store
+    // These already have x, y, width, height properties extracted from bbox
+    const detectionsForUI = imageStore.detections.map((detection) => {
+      // Convert from DetectionWithUI (in the store) to DetectionState (for annotations)
+      return {
+        id: detection.id,
+        x: detection.x,
+        y: detection.y,
+        width: detection.width,
+        height: detection.height,
+        value: detection.value,
+        edited: detection.edited ?? false,
+        image_id: detection.image_id,
+        annotated: detection.annotated,
+        computed_type: detection.computed_type,
+        computed_color: detection.computed_color,
+        computed_display_type: detection.computed_display_type,
+      } as DetectionState;
+    });
+
+    annotations.loadAnnotations(detectionsForUI);
     console.log(
       '[Annotator DEBUG] Loaded annotations:',
       imageStore.detections.length,
@@ -480,56 +535,43 @@ async function save() {
   isSaving.value = true;
 
   try {
-    // Get the current image from the store - it should be up-to-date
-    const currentImage = imageStore.image;
+    // Verify we have a valid image
+    if (!imageStore.image || !props.imageId) {
+      notificationStore.error('Cannot save: No image loaded');
+      console.error('[Annotator] Cannot save: No image loaded');
+      isSaving.value = false;
+      return;
+    }
 
-    if (currentImage && currentImage.id === currentImageId.value) {
-      // The store now handles the lists of detections to add/update/delete
-      // We only need to tell the store to save changes.
-
-      // Mark image as edited if there were pending changes
-      if (
-        imageStore.detectionsToAdd.length > 0 ||
-        imageStore.detectionsToDelete.length > 0 ||
-        imageStore.detections.some((d) => d.edited)
-      ) {
-        // We might need a way to mark the image itself as edited in the store
-        // For now, we rely on the detection flags.
-        console.log(
-          '[Annotator] Save initiated with pending changes:',
-          imageStore.detectionsToAdd.length,
-          'to add,',
-          imageStore.detectionsToDelete.length,
-          'to delete,',
-          imageStore.detections.filter((d) => d.edited).length,
-          'edited',
-        );
-
-        notificationStore.info('Saving changes...');
-      } else {
-        notificationStore.info('No changes to save.');
-        isSaving.value = false; // Reset saving state
-        return; // Nothing to save
-      }
-
-      // Save all changes (create new, update existing, delete marked)
-      const saveResult = await imageStore.saveAllChanges();
-
-      if (!saveResult || !saveResult.success) {
-        notificationStore.error(
-          `Failed to save changes: ${saveResult?.error || 'Unknown error'}`,
-        );
-        console.error('[Annotator] Error saving changes:', saveResult?.error);
-      } else {
-        notificationStore.success('Annotations saved successfully');
-        // No need to clear local deleted annotations list anymore
-        // The store handles clearing its detectionsToDelete list after successful save
-      }
-    } else {
-      notificationStore.error('Cannot save: Image not found or ID mismatch');
-      console.error(
-        `[Annotator] Cannot save: Current image not found or ID mismatch. Store: ${imageStore.image?.id}, Expected: ${currentImageId.value}`,
+    // Check if we have any changes to save
+    if (imageStore.hasChanges) {
+      console.log(
+        '[Annotator] Save initiated with pending changes:',
+        imageStore.detectionsToAdd.length,
+        'to add,',
+        imageStore.detectionsToDelete.length,
+        'to delete,',
+        imageStore.detections.filter((d) => d.edited).length,
+        'edited',
       );
+
+      notificationStore.info('Saving changes...');
+    } else {
+      notificationStore.info('No changes to save.');
+      isSaving.value = false; // Reset saving state
+      return; // Nothing to save
+    }
+
+    // Save all changes (create new, update existing, delete marked)
+    const saveResult = await imageStore.saveAllChanges();
+
+    if (!saveResult || !saveResult.success) {
+      notificationStore.error(
+        `Failed to save changes: ${saveResult?.error || 'Unknown error'}`,
+      );
+      console.error('[Annotator] Error saving changes:', saveResult?.error);
+    } else {
+      notificationStore.success('Annotations saved successfully');
     }
   } catch (error) {
     notificationStore.error(
@@ -552,7 +594,14 @@ function resetStagePosition() {
 }
 
 // Function to zoom to a specific annotation
-function scrollToAnnotation(detection: DetectionState) {
+function scrollToAnnotation(detection: {
+  id: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  bbox?: string;
+}) {
   console.log('[Annotator] Scrolling to annotation:', detection.id);
 
   if (!konvaStage.value || !konvaLayer.value) {
@@ -575,10 +624,86 @@ function scrollToAnnotation(detection: DetectionState) {
       return;
     }
 
+    // Extract coordinates from detection - handle both formats
+    let x = 0,
+      y = 0,
+      width = 0,
+      height = 0;
+
+    if (
+      detection.x !== undefined &&
+      detection.y !== undefined &&
+      detection.width !== undefined &&
+      detection.height !== undefined
+    ) {
+      // Already has coordinate properties
+      x = detection.x;
+      y = detection.y;
+      width = detection.width;
+      height = detection.height;
+    } else if (detection.bbox) {
+      // Has bbox string - convert to coordinates
+      const coords = bboxToObject(detection.bbox);
+      x = coords.x;
+      y = coords.y;
+      width = coords.width;
+      height = coords.height;
+    } else {
+      // Try to find it in the annotations array
+      const annotationObj = annotations.annotations.value.find(
+        (a) => a.id === detection.id,
+      );
+      if (annotationObj) {
+        x = annotationObj.x;
+        y = annotationObj.y;
+        width = annotationObj.width;
+        height = annotationObj.height;
+      } else {
+        // Last resort - try to find it in the store
+        const storeDetection = imageStore.detections.find(
+          (d) => d.id === detection.id,
+        );
+        if (storeDetection) {
+          // Convert bbox to coordinates
+          if (storeDetection.bbox) {
+            const coords = bboxToObject(storeDetection.bbox);
+            x = coords.x;
+            y = coords.y;
+            width = coords.width;
+            height = coords.height;
+          } else if (storeDetection.x !== undefined) {
+            // Already has coordinates
+            x = storeDetection.x;
+            y = storeDetection.y;
+            width = storeDetection.width;
+            height = storeDetection.height;
+          } else {
+            console.error(
+              `[Annotator] Cannot determine coordinates for annotation ${detection.id}`,
+            );
+            notificationStore.warning(
+              'Cannot zoom to annotation: no coordinates found',
+            );
+            return;
+          }
+        } else {
+          console.error(
+            `[Annotator] Cannot find annotation data for ${detection.id}`,
+          );
+          notificationStore.warning('Cannot zoom to annotation: no data found');
+          return;
+        }
+      }
+    }
+
+    // Ensure we have valid dimensions to prevent errors
+    width = Math.max(width, 10); // Minimum 10px width
+    height = Math.max(height, 10); // Minimum 10px height
+
     // Get center point of the annotation in image coordinates
     const annotationCenter = {
-      x: detection.x + detection.width / 2,
-      y: detection.y + detection.height / 2,
+      x: x + width / 2,
+      y: y + height / 2,
     };
 
     console.log('[Annotator] Annotation center:', annotationCenter);
@@ -594,8 +719,8 @@ function scrollToAnnotation(detection: DetectionState) {
     const targetHeight = containerHeight / 3;
 
     // Calculate scales required to fit the annotation at desired size
-    const scaleX = targetWidth / detection.width;
-    const scaleY = targetHeight / detection.height;
+    const scaleX = targetWidth / width;
+    const scaleY = targetHeight / height;
 
     // Use the smaller scale to ensure annotation fits
     const newScale = Math.min(scaleX, scaleY);
@@ -729,25 +854,19 @@ async function initializeKonvaObjects() {
     console.log('[Annotator DEBUG] Konva successfully initialized');
 
     // If we have a current image ID, load it
-    if (currentImageId.value) {
+    if (props.imageId) {
       console.log(
         '[Annotator DEBUG] Loading initial image data after Konva init',
       );
       // Make sure the store has image data
-      if (
-        !imageStore.image.id ||
-        imageStore.image.id !== currentImageId.value
-      ) {
+      if (!imageStore.image?.id || imageStore.image.id !== props.imageId) {
         loadingState.value = LoadingState.LOADING_IMAGE;
         try {
           console.log(
             '[Annotator DEBUG] Loading image from store:',
-            currentImageId.value,
+            props.imageId,
           );
-          await imageStore.loadImage(
-            currentImageId.value,
-            currentCollection.id,
-          );
+          await imageStore.loadImage(props.imageId);
         } catch (error) {
           console.error(
             '[Annotator DEBUG] Error loading image from store:',
@@ -762,7 +881,7 @@ async function initializeKonvaObjects() {
       await loadImageData();
     } else {
       console.log(
-        '[Annotator DEBUG] No current image ID, skipping data loading',
+        '[Annotator DEBUG] No image ID in props, skipping data loading',
       );
       loadingState.value = LoadingState.IDLE;
     }
@@ -950,58 +1069,61 @@ watch(
   { immediate: true },
 );
 
-// Update watch for image ID changes to use state machine
-watch(currentImageId, async (newImageId, oldImageId) => {
-  debugState.value = 'watchImageId';
-  console.log(
-    '[Annotator DEBUG] currentImageId changed:',
-    oldImageId,
-    '->',
-    newImageId,
-  );
-
-  if (!isMounted.value) {
+// Update watch for image ID changes to use state machine and props
+watch(
+  () => props.imageId,
+  async (newImageId, oldImageId) => {
+    debugState.value = 'watchImageId';
     console.log(
-      '[Annotator DEBUG] Component not mounted yet, deferring image load',
+      '[Annotator DEBUG] imageId prop changed:',
+      oldImageId,
+      '->',
+      newImageId,
     );
-    return;
-  }
 
-  if (!newImageId) {
-    console.log('[Annotator DEBUG] New image ID is empty, clearing state');
-    loadingState.value = LoadingState.IDLE;
-    annotations.loadAnnotations([]);
-    return;
-  }
-
-  if (newImageId === oldImageId) {
-    console.log('[Annotator DEBUG] Image ID unchanged, skipping load');
-    return;
-  }
-
-  loadingState.value = LoadingState.LOADING_IMAGE;
-
-  try {
-    console.log('[Annotator DEBUG] Loading image from store:', newImageId);
-    await imageStore.loadImage(newImageId, currentCollection.id);
-
-    // Check if Konva is initialized
-    if (!konvaStage.value) {
-      console.warn(
-        '[Annotator DEBUG] Konva not initialized yet, waiting for stage initialization',
+    if (!isMounted.value) {
+      console.log(
+        '[Annotator DEBUG] Component not mounted yet, deferring image load',
       );
-      // Don't try to force initialization here - let the stage watcher handle it
-      loadingState.value = LoadingState.ERROR;
       return;
     }
 
-    await loadImageData();
-  } catch (error) {
-    console.error('[Annotator DEBUG] Error in imageId watcher:', error);
-    notificationStore.error('Failed to load image');
-    loadingState.value = LoadingState.ERROR;
-  }
-});
+    if (!newImageId) {
+      console.log('[Annotator DEBUG] New image ID is empty, clearing state');
+      loadingState.value = LoadingState.IDLE;
+      annotations.loadAnnotations([]);
+      return;
+    }
+
+    if (newImageId === oldImageId) {
+      console.log('[Annotator DEBUG] Image ID unchanged, skipping load');
+      return;
+    }
+
+    loadingState.value = LoadingState.LOADING_IMAGE;
+
+    try {
+      console.log('[Annotator DEBUG] Loading image from store:', newImageId);
+      await imageStore.loadImage(newImageId);
+
+      // Check if Konva is initialized
+      if (!konvaStage.value) {
+        console.warn(
+          '[Annotator DEBUG] Konva not initialized yet, waiting for stage initialization',
+        );
+        // Don't try to force initialization here - let the stage watcher handle it
+        loadingState.value = LoadingState.ERROR;
+        return;
+      }
+
+      await loadImageData();
+    } catch (error) {
+      console.error('[Annotator DEBUG] Error in imageId watcher:', error);
+      notificationStore.error('Failed to load image');
+      loadingState.value = LoadingState.ERROR;
+    }
+  },
+);
 
 // Watch for external selection changes to sync local state
 watch(
@@ -1058,7 +1180,7 @@ async function retryLoading() {
   }
 
   // If we have image data, try loading it
-  if (imageStore.image.id && konvaStage.value) {
+  if (imageStore.image?.id && konvaStage.value) {
     try {
       await loadImageData();
     } catch (e) {
@@ -1066,9 +1188,9 @@ async function retryLoading() {
       loadingState.value = LoadingState.ERROR;
       notificationStore.error('Retry failed. Please refresh the page.');
     }
-  } else if (currentImageId.value) {
+  } else if (props.imageId) {
     try {
-      await imageStore.loadImage(currentImageId.value, currentCollection.id);
+      await imageStore.loadImage(props.imageId);
       if (konvaStage.value) {
         await loadImageData();
       }

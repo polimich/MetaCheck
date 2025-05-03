@@ -39,7 +39,10 @@ const currentCollection = useCurrentCollectionState();
 const synchronization = useSynchronization();
 
 // Computed properties
-const detections = computed(() => imageStore.detectionsGetter);
+const detections = computed(() => {
+  // Use the detections directly from the store
+  return imageStore.detections || [];
+});
 const loadingMessage = computed(() => loadingState.currentLoadingMessage);
 
 // Component ID for loading state
@@ -371,7 +374,7 @@ const handleSelectImage = async (selectedImageId: string) => {
                 `annotationList_${currentCollection.selectedImageId}`,
               )
             "
-            :image="imageStore.image"
+            :image="imageStore.image || null"
             @[ANNOTATION_EVENTS.SCROLL_TO]="
               synchronization.handleScrollToAnnotation
             "
