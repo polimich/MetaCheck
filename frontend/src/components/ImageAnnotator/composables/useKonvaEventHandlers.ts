@@ -5,7 +5,7 @@ import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { useNavigationMode } from './useNavigationMode';
 import { useAnnotations } from './useAnnotations';
 import { useImageCanvas } from './useImageCanvas';
-import { useImageStore } from 'src/stores/image/storeImages';
+import { useImageStore } from 'src/stores/data/useImage';
 
 /**
  * Composable for managing Konva event handlers for the annotator
@@ -237,7 +237,7 @@ export function useKonvaEventHandlers(
     event.cancelBubble = true;
   }
 
-  // End rect transform
+  // Update the handleTransformEnd function
   function handleTransformEnd(event: KonvaPointerEvent) {
     const node = event.target;
     const id = node.id();
@@ -262,32 +262,18 @@ export function useKonvaEventHandlers(
     );
 
     // Update annotation with new dimensions
+    // This now also updates the store through the useAnnotations composable
     annotations.updateAnnotationDimensions(id, newAttrs);
 
     // Reset scale on the node itself after transform
     node.scaleX(1);
     node.scaleY(1);
 
-    // Update the store's copy of the detection to ensure it's marked for saving
-    const annotation = annotations.annotations.value.find((a) => a.id === id);
-    if (annotation) {
-      const storeIndex = imageStore.detections.findIndex((d) => d.id === id);
-      if (storeIndex !== -1) {
-        // Update store copy with new dimensions and mark as edited
-        Object.assign(imageStore.detections[storeIndex], newAttrs, {
-          edited: true,
-          last_change: new Date().toISOString(),
-        });
-        console.log(
-          `[useKonvaEventHandlers] Updated detection ${id} in store after transform`,
-        );
-      }
-    }
-
-    // Transformer update is handled by the watcher
+    // The store update is now handled inside updateAnnotationDimensions
+    // so we don't need to update it here
   }
 
-  // New handler for rectangle drag end
+  // Update the handleRectDragEnd function
   function handleRectDragEnd(event: KonvaPointerEvent) {
     // Only handle if in add mode (when rects are draggable)
     if (navigationMode.mode.value !== 'add') return;
@@ -315,25 +301,11 @@ export function useKonvaEventHandlers(
     );
 
     // Update annotation state and trigger saveState
+    // This now also updates the store through the useAnnotations composable
     annotations.updateAnnotationDimensions(id, finalAttrs);
 
-    // Update the store's copy of the detection to ensure it's marked for saving
-    const annotation = annotations.annotations.value.find((a) => a.id === id);
-    if (annotation) {
-      const storeIndex = imageStore.detections.findIndex((d) => d.id === id);
-      if (storeIndex !== -1) {
-        // Update store copy with new position and mark as edited
-        Object.assign(imageStore.detections[storeIndex], finalAttrs, {
-          edited: true,
-          last_change: new Date().toISOString(),
-        });
-        console.log(
-          `[useKonvaEventHandlers] Updated detection ${id} in store after drag`,
-        );
-      }
-    }
-
-    // Transformer update is handled by the watcher
+    // The store update is now handled inside updateAnnotationDimensions
+    // so we don't need to update it here
   }
 
   // Prevent default drag behavior on rects to avoid conflicts

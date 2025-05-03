@@ -113,6 +113,11 @@ const initApplication = async () => {
         // 2. Load Image (only if collection loaded and we have an image ID)
         if (state.lastImageId) {
           console.log(`Restoring image ${state.lastImageId}`);
+
+          // First, make sure the image ID is selected in the collection
+          currentCollection.selectImage(state.lastImageId);
+
+          // Then load the image with explicit collection ID
           await imageStore.loadImage(state.lastImageId, state.lastCollectionId);
           initProgress.value = 85;
 
@@ -136,6 +141,11 @@ const initApplication = async () => {
             initProgress.value = 95;
             // Update state manager only after successful image+detection load
             stateManager.updateState(state.lastCollectionId, state.lastImageId);
+
+            // Ensure image and collection IDs are preserved in the state
+            console.log(
+              'State restoration complete, preserving IDs in state manager',
+            );
           }
         }
       } catch (error: unknown) {

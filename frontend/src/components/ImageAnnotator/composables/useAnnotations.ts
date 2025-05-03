@@ -3,7 +3,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 import { useImageCanvas } from './useImageCanvas';
-import { useImageStore } from 'src/stores';
+import { useImageStore } from 'src/stores/data/useImage';
+
+// Helper function to convert coordinates to bbox string
+function objectToBbox(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): string {
+  return `${x},${y},${width},${height}`;
+}
 
 // --- History Management (Helper Composable) --- //
 /**
@@ -134,6 +144,17 @@ function useHistoryManagement(
           imageStore.detectionsToAdd.push({
             ...annotation,
             image_id: annotation.image_id,
+            bbox: objectToBbox(
+              annotation.x,
+              annotation.y,
+              annotation.width,
+              annotation.height,
+            ),
+            created_date: annotation.created_date || new Date().toISOString(),
+            last_change: new Date().toISOString(),
+            last_access: new Date().toISOString(),
+            deleted: false,
+            loadingMetaRoles: false,
           });
         }
 
@@ -146,6 +167,17 @@ function useHistoryManagement(
           imageStore.detections.push({
             ...annotation,
             image_id: annotation.image_id,
+            bbox: objectToBbox(
+              annotation.x,
+              annotation.y,
+              annotation.width,
+              annotation.height,
+            ),
+            created_date: annotation.created_date || new Date().toISOString(),
+            last_change: new Date().toISOString(),
+            last_access: new Date().toISOString(),
+            deleted: false,
+            loadingMetaRoles: false,
           });
         }
       });
@@ -438,6 +470,24 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     annotation.edited = true;
     const normalized = normalizeAnnotation(annotation);
     Object.assign(annotation, normalized);
+
+    // Update the corresponding detection in the store if it exists
+    const imageStore = useImageStore();
+    const storeIndex = imageStore.detections.findIndex((d) => d.id === id);
+    if (storeIndex !== -1) {
+      // Update with normalized dimensions and ensure bbox is updated
+      const { x, y, width, height } = normalized;
+      Object.assign(imageStore.detections[storeIndex], {
+        x,
+        y,
+        width,
+        height,
+        edited: true,
+        bbox: objectToBbox(x, y, width, height),
+        last_change: new Date().toISOString(),
+      });
+    }
+
     console.log(`[Annotations] Updated dimensions for annotation ${id}`);
   }
 
@@ -458,7 +508,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     const idsToDelete = new Set(selectedIds.value);
     annotations.value = annotations.value.filter((a) => !idsToDelete.has(a.id));
     idsToDelete.forEach((id) => {
-      imageStore.deleteDetectionLocally(id);
+      imageStore.deleteDetection(id);
     });
     selectedIds.value.clear();
     console.log('[Annotations] Deleted locally and queued in store.');

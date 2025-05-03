@@ -32,6 +32,7 @@ interface ImageData {
   detection_count?: number;
   annotated_detection_count?: number;
   // Use any to maintain compatibility with HierarchicalImage
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // Allow other properties
 }
 

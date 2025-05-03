@@ -285,15 +285,24 @@ export const useImageStore = defineStore('image', () => {
   const prepareDetectionForAPI = (
     detection: DetectionWithUI,
   ): DetectionNewType => {
-    return {
-      id: detection.id,
-      image_id: detection.image_id,
-      bbox: objectToBbox(
+    // Ensure bbox exists, generate it if missing
+    let bbox = detection.bbox;
+    if (!bbox) {
+      console.log(
+        `[useImage] Generating missing bbox for detection ${detection.id}`,
+      );
+      bbox = objectToBbox(
         detection.x,
         detection.y,
         detection.width,
         detection.height,
-      ),
+      );
+    }
+
+    return {
+      id: detection.id,
+      image_id: detection.image_id,
+      bbox: bbox,
       value: detection.value,
       confidence: detection.confidence,
     };
