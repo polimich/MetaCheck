@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { DetectionState } from 'src/types/frontend-state';
 import { ref, computed, watch } from 'vue';
-import { useImageStore } from 'src/stores/image/storeImages';
+import { useImage } from 'src/stores';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { useNotificationStore } from 'src/stores/app/notificationService';
-import { updateDetectionWithMetaRole } from 'src/api/detectionApiService';
 import { ANNOTATION_EVENTS } from 'src/constants/events';
 
 const props = defineProps<{
@@ -19,7 +18,7 @@ const emit = defineEmits([
 ]);
 
 // Stores
-const imageStore = useImageStore();
+const imageStore = useImage();
 const loadingState = useLoadingState();
 const notificationStore = useNotificationStore();
 
@@ -78,7 +77,7 @@ const attentionLevel = computed(() => {
 
 // Use availableMetaRoles from detection
 const optionsValue = computed(() => {
-  return imageStore.availableMetaRolesOptions;
+  return imageStore.metaRolesOptions;
 });
 
 // Computed property for loading state
@@ -130,24 +129,26 @@ const saveDetection = async () => {
   try {
     console.log(`Saving changes for detection ${detection.value.id}`);
 
-    // Call the API to update the detection's meta role and value
-    const { success, error } = await updateDetectionWithMetaRole(
+    // Call the store's updateDetectionWithMetaRole method
+    const result = await imageStore.updateDetectionWithMetaRole(
       detection.value.id,
-      selectValue.value.id, // meta role ID
-      detection.value.value, // current value
+      selectValue.value.id,
+      detection.value.value,
     );
 
-    if (success) {
+    if (result.success) {
       console.log(`Detection ${detection.value.id} saved successfully`);
       // Mark as no longer edited after save
       detection.value.edited = false;
       // Show success notification
       notificationStore.success('Annotation saved successfully');
     } else {
-      console.error(`Error saving detection ${detection.value.id}: ${error}`);
+      console.error(
+        `Error saving detection ${detection.value.id}: ${result.error}`,
+      );
       // Show error notification
-      notificationStore.error(`Failed to save annotation: ${error}`);
-      throw new Error(error);
+      notificationStore.error(`Failed to save annotation: ${result.error}`);
+      throw new Error(result.error);
     }
   } catch (error) {
     console.error(

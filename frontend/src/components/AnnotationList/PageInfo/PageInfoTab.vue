@@ -2,9 +2,7 @@
 import { computed } from 'vue';
 import { ImageState } from 'src/types/frontend-state';
 import PageInfoItem from './PageInfoItem.vue';
-import { useImageStore } from 'src/stores/image/storeImages';
-import { getImageById } from 'src/api/imageApiService';
-import { ImageDAtoState } from 'src/types/mapper';
+import { useImage } from 'src/stores';
 
 const props = defineProps<{
   image: ImageState;
@@ -12,7 +10,7 @@ const props = defineProps<{
 }>();
 
 // Image store for updating page metadata
-const imageStore = useImageStore();
+const imageStore = useImage();
 
 // Check if we have page info to display
 const hasPageInfo = computed(() => {
@@ -20,7 +18,7 @@ const hasPageInfo = computed(() => {
 });
 
 // Handle page info updates
-const handlePageInfoUpdate = ({
+const handlePageInfoUpdate = async ({
   type,
   value,
   confidence,
@@ -32,38 +30,35 @@ const handlePageInfoUpdate = ({
   console.log(`Updating ${type} to: ${value} with confidence: ${confidence}`);
 
   // Update the image in the store
-  if (type === 'page_index') {
-    imageStore.image.page_index = value;
-    imageStore.image.page_index_confidence = confidence;
-  } else if (type === 'page_type') {
-    imageStore.image.page_type = value;
-    imageStore.image.page_type_confidence = confidence;
+  if (imageStore.image) {
+    if (type === 'page_index') {
+      imageStore.image.page_index = value;
+      imageStore.image.page_index_confidence = confidence;
+    } else if (type === 'page_type') {
+      imageStore.image.page_type = value;
+      imageStore.image.page_type_confidence = confidence;
+    }
+
+    // Save the image using the new saveImage function
+    const result = await imageStore.saveImage();
+    if (result.success) {
+      console.log(`Successfully saved ${type} update`);
+    } else {
+      console.error(`Error saving ${type} update: ${result.error}`);
+    }
   }
-
-  // Mark the image as edited
-  imageStore.image.edited = true;
-
-  // Save the changes
-  imageStore.saveImage();
 };
 
-// Handle refreshing the image after saving changes
+// Handle refreshing the image
 const handleRefresh = async (imageId: string) => {
   console.log(`Refreshing image data for ${imageId}`);
+  // Use loadImage from the store to refresh the image data
+  const result = await imageStore.loadImage(imageId);
 
-  // Fetch the updated image data
-  const response = await getImageById(imageId);
-
-  if (response.error) {
-    console.error(`Error refreshing image: ${response.error}`);
-    return;
-  }
-
-  if (response.data) {
-    // Update the image data in the store
-    const updatedImage = ImageDAtoState(response.data);
-    Object.assign(imageStore.image, updatedImage);
+  if (result.success) {
     console.log('Image refreshed successfully');
+  } else {
+    console.error(`Error refreshing image: ${result.error}`);
   }
 };
 </script>

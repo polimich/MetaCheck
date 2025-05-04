@@ -5,7 +5,7 @@ import { KonvaPointerEvent } from 'konva/lib/PointerEvents';
 import { useNavigationMode } from './useNavigationMode';
 import { useAnnotations } from './useAnnotations';
 import { useImageCanvas } from './useImageCanvas';
-import { useImageStore } from 'src/stores/data/useImage';
+import { useImage } from 'src/stores';
 
 /**
  * Composable for managing Konva event handlers for the annotator
@@ -18,7 +18,7 @@ export function useKonvaEventHandlers(
   imageCanvas: ReturnType<typeof useImageCanvas>,
 ) {
   // Get the image store for updating selected detection
-  const imageStore = useImageStore();
+  const imageStore = useImage();
 
   // Track mouse state for drag detection
   const isDragging = { value: false };

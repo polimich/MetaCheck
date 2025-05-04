@@ -2,7 +2,7 @@
 import { AnnotationList, PageList, ImageAnnotator } from 'components';
 import { useRoute, useRouter } from 'vue-router';
 import { ref, onMounted, watch, computed } from 'vue';
-import { useImageStore } from 'src/stores/data/useImage';
+import { useImage } from 'src/stores/data/useImage';
 import { useCollection } from 'src/stores/data/useCollection';
 import { useMetaRoleStore } from 'src/stores/meta-role-store';
 import {
@@ -28,7 +28,7 @@ defineOptions({
 const route = useRoute();
 const router = useRouter();
 const collectionId = ref(route.params.collectionId as string);
-const imageStore = useImageStore();
+const imageStore = useImage();
 const collectionStore = useCollection();
 const metaRoleStore = useMetaRoleStore();
 const loadingState = useLoadingState();
@@ -129,14 +129,31 @@ const loadCollectionData = async (collectionId: string) => {
     return;
   }
 
+  // If collection is already loaded and ready, no need to load it again
+  if (collectionStore.isCollectionReady(collectionId)) {
+    console.log(
+      `Collection ${collectionId} is already loaded and ready, skipping redundant load`,
+    );
+    return;
+  }
+
   isCollectionLoading.value = true;
   const loadingKey = `collection_${collectionId}`;
   loadingState.setComponentLoading(loadingKey, true);
 
   try {
-    console.log(`Loading collection ${collectionId}`);
-    await collectionStore.loadCollection(collectionId);
-    console.log('Collection loaded successfully');
+    console.log(`Loading collection ${collectionId} from ImageDetailPage`);
+
+    // Use the new waitForCollectionReady method
+    const isReady = await collectionStore.waitForCollectionReady(collectionId);
+
+    if (!isReady) {
+      console.warn(
+        `Collection ${collectionId} failed to be fully ready within the timeout period`,
+      );
+    } else {
+      console.log('Collection loaded successfully and is fully ready');
+    }
   } catch (error) {
     console.error('Error loading collection:', error);
     notificationStore.error('Error loading collection data');
@@ -149,7 +166,9 @@ const loadCollectionData = async (collectionId: string) => {
 // Load image and detections when component mounts
 onMounted(async () => {
   if (collectionId.value) {
-    console.log(`Component mounted, loading collection ${collectionId.value}`);
+    console.log(
+      `ImageDetailPage mounted, validating collection ${collectionId.value}`,
+    );
 
     // Validate collection ID
     if (!stateManager.validateIds({ lastCollectionId: collectionId.value })) {
@@ -157,35 +176,40 @@ onMounted(async () => {
       return;
     }
 
-    // First load the collection (optimized)
-    await loadCollectionData(collectionId.value);
-
-    // If imageId is provided in route, select that image
+    // Check if data is already loaded by StoreInit
     const routeImageId = route.params.imageId as string;
-    if (routeImageId) {
-      console.log(`Route has image ID ${routeImageId}, loading it`);
 
+    // If collection is not ready, wait for it (StoreInit might be loading it)
+    if (!collectionStore.isCollectionReady(collectionId.value)) {
+      console.log(
+        'Collection not ready, waiting for it to be loaded by StoreInit or loading it directly',
+      );
+      await loadCollectionData(collectionId.value);
+    } else {
+      console.log('Collection already ready, no need to load it again');
+    }
+
+    // Check if image is already loaded by StoreInit
+    if (routeImageId && imageStore.currentImageId !== routeImageId) {
+      console.log(`Image ${routeImageId} not loaded yet, loading it now`);
       // Set loading state to indicate work in progress
       loadingState.setComponentLoading(`annotator_${routeImageId}`, true);
 
       try {
-        // Load image directly using the new store
-        const result = await imageStore.loadImage(routeImageId);
-
-        if (!result.success) {
-          throw new Error(result.error || 'Error loading image');
-        }
-
-        // Update state manager
-        stateManager.updateState(collectionId.value, routeImageId);
-
-        console.log(`Successfully loaded image ${routeImageId} on page mount`);
+        // Load image if not already loaded
+        await loadImageData(routeImageId);
       } catch (error) {
         console.error('Error loading image data on mount:', error);
         notificationStore.error('Error loading image data');
       } finally {
         loadingState.setComponentLoading(`annotator_${routeImageId}`, false);
       }
+    } else if (routeImageId) {
+      console.log(
+        `Image ${routeImageId} already loaded by StoreInit, skipping redundant load`,
+      );
+      // Just update the UI state to reflect the current image
+      imageId.value = routeImageId;
     }
   } else {
     notificationStore.error('Missing required parameters');
@@ -193,31 +217,34 @@ onMounted(async () => {
   }
 });
 
-// Watch for route changes
+// Replace the route parameter watchers with a more efficient approach
+// that works alongside StoreInit instead of duplicating its work
 watch(
-  () => route.params.imageId,
-  async (newImageId) => {
-    if (newImageId && newImageId !== imageId.value) {
-      console.log(`Route image ID changed to ${newImageId}`);
-      await loadImageData(newImageId as string);
-    }
-  },
-);
-
-watch(
-  () => route.params.collectionId,
-  async (newCollectionId) => {
+  () => [route.params.collectionId, route.params.imageId],
+  async ([newCollectionId, newImageId]) => {
+    // Update local state to match route parameters
     if (newCollectionId && newCollectionId !== collectionId.value) {
-      console.log(`Collection ID changed to ${newCollectionId}`);
+      console.log(
+        `Collection ID changed to ${newCollectionId}, updating local state`,
+      );
       collectionId.value = newCollectionId as string;
+    }
 
-      // Load the new collection with optimized approach
-      await loadCollectionData(collectionId.value);
+    // Check if image ID has changed and is not yet loaded
+    if (newImageId && newImageId !== imageId.value) {
+      console.log(`Image ID changed to ${newImageId}, updating local state`);
 
-      // If route has imageId, load that image
-      const routeImageId = route.params.imageId as string;
-      if (routeImageId) {
-        await loadImageData(routeImageId);
+      // Only load if StoreInit hasn't already loaded it
+      if (imageStore.currentImageId !== newImageId) {
+        console.log(
+          `Image ${newImageId} not loaded by StoreInit yet, loading it now`,
+        );
+        await loadImageData(newImageId as string);
+      } else {
+        console.log(
+          `Image ${newImageId} already loaded by StoreInit, just updating UI`,
+        );
+        imageId.value = newImageId as string;
       }
     }
   },
@@ -258,7 +285,10 @@ const loadImageData = async (imageIdToLoad?: string) => {
     );
 
     // Load the image using the new store
-    const result = await imageStore.loadImage(targetImageId);
+    const result = await imageStore.loadImage(
+      targetImageId,
+      collectionId.value,
+    );
 
     if (!result.success) {
       throw new Error(result.error || 'Error loading image');
@@ -303,9 +333,55 @@ const loadImageData = async (imageIdToLoad?: string) => {
 };
 
 // Handle image selection from PageList
-const handleSelectImage = async (selectedImageId: string) => {
+const handleSelectImage = async (
+  selectedImageId: string,
+  options = { isSelectionOnly: false, exists: false },
+) => {
   if (selectedImageId !== imageId.value) {
-    await loadImageData(selectedImageId);
+    console.log(`Image selection changed to ${selectedImageId}`, options);
+
+    // If this is just a selection change and the image exists in the collection
+    if (options.isSelectionOnly && options.exists) {
+      console.log('Handling as selection-only change (optimized path)');
+
+      // Update the route to reflect the new selection without triggering full reload
+      router.push({
+        name: route.name as string,
+        params: {
+          ...route.params,
+          imageId: selectedImageId,
+        },
+        // Use replace to avoid creating a new history entry for just selection changes
+        replace: true,
+      });
+
+      // Update local state without triggering a full reload
+      imageId.value = selectedImageId;
+
+      // Update state manager to track the selection
+      stateManager.updateState(collectionId.value, selectedImageId);
+
+      // If the image is already loaded in the store, we're done
+      if (imageStore.image?.id === selectedImageId) {
+        console.log('Image already loaded in store, no further loading needed');
+        return;
+      }
+
+      // Otherwise load just the image data without loading annotations or triggering full page reload
+      console.log('Loading minimal image data without full page reload');
+      loadingState.setComponentLoading(`annotator_${selectedImageId}`, true);
+      try {
+        await imageStore.loadImage(selectedImageId, collectionId.value);
+        loadingState.setComponentLoading(`annotator_${selectedImageId}`, false);
+      } catch (error) {
+        console.error('Error loading image data:', error);
+        loadingState.setComponentLoading(`annotator_${selectedImageId}`, false);
+      }
+    } else {
+      // If we need to actually load the image data, use the full loading process
+      console.log('Full image loading required');
+      await loadImageData(selectedImageId);
+    }
   }
 };
 
@@ -356,21 +432,24 @@ const saveDetections = async () => {
     </div>
 
     <div class="row items-stretch" style="min-height: inherit">
-      <!-- Page list column -->
-      <div class="col-3 flex justify-center">
-        <PageList
-          :collection-id="collectionId"
-          layout="sidebar"
-          show-header
-          show-statistics
-          show-view-mode-selector
-          enable-bulk-actions
-          @[IMAGE_EVENTS.SELECT]="handleSelectImage"
-        />
+      <!-- Left column with HierarchicalTree and PageList -->
+      <div class="col-3 flex flex-col">
+        <!-- Page list component -->
+        <div class="flex-grow">
+          <PageList
+            :collection-id="collectionId"
+            layout="sidebar"
+            show-header
+            show-statistics
+            show-view-mode-selector
+            enable-bulk-actions
+            @[IMAGE_EVENTS.SELECT]="handleSelectImage"
+          />
+        </div>
       </div>
 
       <!-- Image annotator column -->
-      <div class="col-6">
+      <div class="col-5">
         <div v-if="imageStore.currentImageId" class="fit position-relative">
           <ImageAnnotator
             :image-id="imageStore.currentImageId"
@@ -401,22 +480,25 @@ const saveDetections = async () => {
       </div>
 
       <!-- Annotation list column -->
-      <div class="col-3 justify-center overflow-hidden">
-        <q-scroll-area style="height: 100%; max-width: 100%">
-          <AnnotationList
-            :detections="detections"
-            :loading="
-              loadingState.isComponentLoading(
-                `annotationList_${imageStore.currentImageId}`,
-              )
-            "
-            :image="imageForAnnotationList"
-            @[ANNOTATION_EVENTS.SCROLL_TO]="
-              synchronization.handleScrollToAnnotation
-            "
-            @[ANNOTATION_EVENTS.SELECT]="synchronization.handleSelectAnnotation"
-          />
-        </q-scroll-area>
+      <div class="col-4 justify-center overflow-hidden">
+        <!-- HierarchicalTree component -->
+        <!-- <div class="row q-mb-md">
+          <HierarchicalTree :tree="hierarchicalTree.tree" />
+        </div> -->
+
+        <AnnotationList
+          :detections="detections"
+          :loading="
+            loadingState.isComponentLoading(
+              `annotationList_${imageStore.currentImageId}`,
+            )
+          "
+          :image="imageForAnnotationList"
+          @[ANNOTATION_EVENTS.SCROLL_TO]="
+            synchronization.handleScrollToAnnotation
+          "
+          @[ANNOTATION_EVENTS.SELECT]="synchronization.handleSelectAnnotation"
+        />
       </div>
     </div>
   </q-page>

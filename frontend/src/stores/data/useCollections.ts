@@ -12,6 +12,8 @@ import { CollectionType as CollectionTypeDA } from 'src/types/data-access';
 export const useCollections = defineStore('collections', () => {
   const collections = ref<CollectionType[]>([]);
   const loading = ref(false);
+  const error = ref('');
+  const loaded = ref(false);
 
   const collectionsGetter = computed(() => {
     return collections.value satisfies CollectionListType[];
@@ -21,15 +23,22 @@ export const useCollections = defineStore('collections', () => {
     loading.value = isLoading;
   };
 
-  const init = async () => {};
+  const init = async () => {
+    loaded.value = false;
+    error.value = '';
+    await loadCollections();
+  };
 
   const loadCollections = async (): Promise<DAResponse<CollectionType[]>> => {
     setLoading(true);
+    error.value = '';
+
     const requestPromise = new Promise<DAResponse<CollectionType[]>>(
       async (resolve) => {
         try {
           const response = await apiGetCollections();
           if (response.error) {
+            error.value = response.error;
             resolve({ error: response.error });
           } else {
             // Convert the received data to the expected type
@@ -76,10 +85,13 @@ export const useCollections = defineStore('collections', () => {
             );
 
             collections.value = convertedData;
+            loaded.value = true;
             resolve({ data: convertedData });
           }
-        } catch (error) {
-          resolve({ error: error as string });
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          error.value = errorMessage;
+          resolve({ error: errorMessage });
         } finally {
           setLoading(false);
         }
@@ -93,16 +105,20 @@ export const useCollections = defineStore('collections', () => {
     collection: CollectionNewType,
   ): Promise<DAResponse> => {
     setLoading(true);
+    error.value = '';
+
     try {
       const errorMsg = await apiAddCollection(collection);
       if (errorMsg) {
+        error.value = errorMsg;
         return { error: errorMsg };
       } else {
         await loadCollections();
         return { error: undefined, success: true };
       }
-    } catch (e) {
+    } catch (err) {
       const errorMsg = 'Failed to add collection';
+      error.value = errorMsg;
       return { error: errorMsg };
     } finally {
       setLoading(false);
@@ -111,27 +127,34 @@ export const useCollections = defineStore('collections', () => {
 
   const importCollection = async (file: File): Promise<DAResponse> => {
     setLoading(true);
+    error.value = '';
+
     try {
       const errorMsg = await apiImportCollection(file);
       if (errorMsg) {
+        error.value = errorMsg;
         return { error: errorMsg };
       } else {
         await loadCollections();
         return { error: undefined, success: true };
       }
-    } catch (e) {
+    } catch (err) {
       const errorMsg = 'Failed to import collection';
+      error.value = errorMsg;
       return { error: errorMsg };
     } finally {
       setLoading(false);
     }
   };
+
   return {
     collectionsGetter,
     loadCollections,
     addCollection,
     importCollection,
     loading,
+    error,
+    loaded,
     init,
   };
 });

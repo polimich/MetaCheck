@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useDataAccess, useHierarchicalTree } from 'src/stores';
+import { useHierarchicalTree } from 'src/stores';
 import { onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { HierarchicalTree } from 'src/components';
@@ -8,13 +8,11 @@ defineOptions({
 });
 
 const route = useRoute();
-const dataAccess = useDataAccess();
 const hierarchicalTree = useHierarchicalTree();
 
 async function loadDataAccess() {
   const collectionId = route.params.collectionId as string;
   if (collectionId) {
-    await dataAccess.loadCollection(collectionId);
   }
 }
 

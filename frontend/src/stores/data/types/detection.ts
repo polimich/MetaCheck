@@ -16,4 +16,7 @@ export type DetectionType = BaseType &
     computed_display_type: string;
   };
 
-export type DetectionUpdateType = Partial<DetectionNewType>;
+export type DetectionUpdateType = Partial<DetectionNewType> & {
+  id: string;
+  annotated?: boolean;
+};

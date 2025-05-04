@@ -121,3 +121,68 @@ export const updateImagePageType = async (
     return { success: false, error };
   }
 };
+
+/**
+ * Update an image
+ */
+export const updateImage = async (
+  image: ImageType,
+): Promise<{ data: ImageType | null; error: string }> => {
+  try {
+    const { data } = await axios.put<ImageType>(`/image/${image.id}`, image);
+    return { data, error: '' };
+  } catch (e) {
+    const error = axiosErrorHandler(e);
+    console.error(`Error updating image ${image.id}:`, e);
+    return { data: null, error };
+  }
+};
+
+/**
+ * Update a detection with a meta role
+ */
+export const updateDetectionWithMetaRole = async (
+  detectionId: string,
+  metaRoleId: string,
+  value: string,
+): Promise<{ success: boolean; error: string }> => {
+  try {
+    console.log(
+      `API: Updating detection ${detectionId} with meta role ${metaRoleId}`,
+    );
+
+    await axios.post(
+      `/detection/update_detection_meta_role/${detectionId}/${metaRoleId}/${value}`,
+    );
+
+    console.log(
+      `API: Successfully updated detection ${detectionId} with meta role`,
+    );
+    return { success: true, error: '' };
+  } catch (e) {
+    const error = axiosErrorHandler(e);
+    console.error(
+      `API Error in updateDetectionWithMetaRole for detection ${detectionId}, meta role ${metaRoleId}:`,
+      error,
+    );
+    return { success: false, error };
+  }
+};
+
+/**
+ * Get all detections for an image
+ */
+export const getDetectionsForImage = async (
+  imageId: string,
+): Promise<{ data: DetectionType[] | null; error: string }> => {
+  try {
+    const { data } = await axios.get<DetectionType[]>(
+      `/image/detections/${imageId}`,
+    );
+    return { data, error: '' };
+  } catch (e) {
+    const error = axiosErrorHandler(e);
+    console.error(`Error fetching detections for image ${imageId}:`, e);
+    return { data: null, error };
+  }
+};

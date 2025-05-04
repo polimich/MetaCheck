@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
-import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { PageList } from 'components';
 import { useCollection } from 'src/stores/data/useCollection';
@@ -15,7 +14,6 @@ defineOptions({
 
 const route = useRoute();
 const router = useRouter();
-const currentCollection = useCurrentCollectionState();
 const collectionStore = useCollection(); // Add the hierarchical collection store
 const loadingState = useLoadingState();
 const collectionId = ref(route.params.collectionId as string);
@@ -56,12 +54,10 @@ const loadCurrentCollection = async () => {
 
   try {
     // Load both the flat view collection data and the hierarchical collection data
-    const [standardResult, hierarchicalResult] = await Promise.all([
-      currentCollection.loadCollection(collectionId.value),
+    const [hierarchicalResult] = await Promise.all([
       collectionStore.loadCollection(collectionId.value),
     ]);
 
-    console.log('Loaded standard collection:', standardResult);
     console.log('Loaded hierarchical collection:', hierarchicalResult);
 
     // Log detailed information about the hierarchical structure
@@ -132,11 +128,17 @@ const handleViewModeChange = (newMode: string) => {
     <div class="collection-header q-pa-md">
       <div class="row items-center justify-between">
         <div class="col-auto">
-          <div class="text-h5">
-            {{ currentCollection.collection?.name || 'Collection' }}
+          <div v-if="collectionStore.loaded" class="text-h5">
+            {{ collectionStore.collection?.name }}
           </div>
-          <div class="text-caption text-grey-7">
-            {{ currentCollection.collection?.images?.length || 0 }} images
+          <div v-else class="text-h5">
+            {{ 'Collection' }}
+          </div>
+          <div v-if="collectionStore.loaded" class="text-caption text-grey-7">
+            {{ collectionStore.allImagesFlattened.length }} images
+          </div>
+          <div v-else class="text-caption text-grey-7">
+            {{ '0 images' }}
           </div>
         </div>
         <div class="col-auto">

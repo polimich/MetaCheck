@@ -1,6 +1,8 @@
 import { ref, computed } from 'vue';
-import { useCurrentCollectionState } from 'stores/frontend-state';
-import { ImageState } from 'src/types';
+import {
+  HierarchicalImage,
+  useCollection,
+} from 'src/stores/data/useCollection';
 
 // Types from original useFilters
 export type SortOption =
@@ -70,7 +72,7 @@ export function useFilters(
   hasMediumConfidence?: (id: string) => boolean,
 ) {
   // Get the store
-  const currentCollection = useCurrentCollectionState();
+  const collectionStore = useCollection();
 
   // Filter and sort refs - initialize from props if provided
   const sortBy = ref(initialSortBy || 'order');
@@ -135,15 +137,14 @@ export function useFilters(
 
   // Filtered images based on current filters
   const filteredImages = computed(() => {
-    if (!currentCollection.collection || !currentCollection.collection.images)
-      return [];
+    if (!collectionStore.allImagesFlattened) return [];
 
     if (!getVerificationStatus || !needsAttention) {
       // If filtering functions aren't provided, just return all images
-      return currentCollection.collection.images;
+      return collectionStore.allImagesFlattened;
     }
 
-    let images = [...currentCollection.collection.images];
+    let images = [...collectionStore.allImagesFlattened];
 
     // Apply search filter
     if (searchQuery.value) {
@@ -211,7 +212,7 @@ export function useFilters(
   });
 
   // Sort images based on the current sort option
-  function sortImages(images: ImageState[]): ImageState[] {
+  function sortImages(images: HierarchicalImage[]): HierarchicalImage[] {
     switch (sortBy.value) {
       case 'name_asc':
         return images.sort((a, b) => a.name.localeCompare(b.name));

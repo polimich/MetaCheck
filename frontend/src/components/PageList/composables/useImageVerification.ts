@@ -1,15 +1,15 @@
-import { useCurrentCollectionState } from 'stores/frontend-state';
+import { useCollection } from 'src/stores/data/useCollection';
 import { computed } from 'vue';
 
 export function useImageVerification() {
   // Get the store
-  const currentCollection = useCurrentCollectionState();
+  const collectionStore = useCollection();
 
   // Check if image has unverified detections
   function hasUnverifiedDetections(imageId: string): boolean {
     // Find the image in the collection
-    if (!currentCollection.collection?.images) return false;
-    const image = currentCollection.collection.images.find(
+    if (!collectionStore.allImagesFlattened) return false;
+    const image = collectionStore.allImagesFlattened.find(
       (img) => img.id === imageId,
     );
     if (!image) return false;
@@ -25,8 +25,8 @@ export function useImageVerification() {
   // Get image verification status (based on detection matching)
   function getImageVerificationStatus(imageId: string): string {
     // Find the image in the collection
-    if (!currentCollection.collection?.images) return 'unverified';
-    const image = currentCollection.collection.images.find(
+    if (!collectionStore.allImagesFlattened) return 'unverified';
+    const image = collectionStore.allImagesFlattened.find(
       (img) => img.id === imageId,
     );
     if (!image) return 'unverified';
@@ -52,7 +52,7 @@ export function useImageVerification() {
 
   // Get statistics for the current collection
   const verificationStatistics = computed(() => {
-    if (!currentCollection.collection || !currentCollection.collection.images) {
+    if (!collectionStore.allImagesFlattened) {
       return {
         total: 0,
         verified: 0,
@@ -61,7 +61,7 @@ export function useImageVerification() {
       };
     }
 
-    const images = currentCollection.collection.images;
+    const images = collectionStore.allImagesFlattened;
     const verified = images.filter(
       (img) => getImageVerificationStatus(img.id) === 'verified',
     ).length;

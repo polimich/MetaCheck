@@ -1,19 +1,19 @@
-import { defineStore } from 'pinia';
-import { DetectionHierarchical } from 'src/types';
+import { defineStore, storeToRefs } from 'pinia';
 import { ref, computed, watchEffect } from 'vue';
-import { useDataAccess } from '../data-access/data-access';
-import { storeToRefs } from 'pinia';
+import { DetectionHierarchical } from 'src/types';
 import {
   CollectionHierarchical,
   MetaElementHierarchical,
 } from 'src/types/data-access';
+import { useCollection } from './useCollection';
 
 export const useHierarchicalTree = defineStore('hierarchicalTree', () => {
   const tree = ref<HierarchicalTree | undefined>(undefined);
 
   // Get data from the data-access store
-  const dataAccessStore = useDataAccess();
-  const { collection, loaded: collectionLoaded } = storeToRefs(dataAccessStore);
+  const collectionStore = useCollection();
+  const { collection, loaded: collectionLoaded } = storeToRefs(collectionStore);
+
   // Create a computed property that builds the hierarchical tree from collection data
   const hierarchicalTree = computed<HierarchicalTree | undefined>(() => {
     if (!collectionLoaded.value || !collection.value) return undefined;
@@ -31,6 +31,7 @@ export const useHierarchicalTree = defineStore('hierarchicalTree', () => {
 
     console.log('metaElementType', metaElementType);
     console.log('isPeriodical', isPeriodical);
+
     // Use switch statement to handle different types
     switch (true) {
       // Case 1: Volume type (Monograph)
@@ -226,7 +227,7 @@ export const useHierarchicalTree = defineStore('hierarchicalTree', () => {
 
   // Helper functions to process each type of hierarchical tree
   const processVolumeAttributes = (
-    volumeTree: HierarchialTreeMonograph,
+    volumeTree: HierarchialTreeVolumeType,
     collectionData: CollectionHierarchical,
   ) => {
     // Extract detections related to volume attributes
@@ -367,6 +368,7 @@ export function isMonograph(
 ): tree is HierarchialTreeMonograph {
   return tree?.type === 'volume' && !('volumes' in tree);
 }
+
 export function isPeriodical(
   tree?: HierarchicalTree,
 ): tree is HierarchialTreePeriodicalType {

@@ -13,7 +13,6 @@ import {
   onDeactivated,
   ComponentPublicInstance,
 } from 'vue';
-import { useCurrentCollectionState } from 'stores/frontend-state';
 import { QVirtualScroll } from 'quasar';
 import PageHeader from './PageHeader.vue';
 import PageStatistics from './PageStatistics.vue';
@@ -110,7 +109,11 @@ const props = withDefaults(defineProps<PageListProps>(), {
 });
 
 const emit = defineEmits<{
-  (e: 'select-image', imageId: string): void;
+  (
+    e: 'select-image',
+    imageId: string,
+    options: { isSelectionOnly: boolean; exists: boolean },
+  ): void;
   (e: 'layout-change', layout: string): void;
   (e: 'view-mode-change', viewMode: string): void;
 }>();
@@ -119,7 +122,6 @@ const emit = defineEmits<{
 const pageListStore = usePageListStore();
 
 // Use shallowRef for complex objects that don't need deep reactivity
-const currentCollection = shallowRef(useCurrentCollectionState());
 const collectionStore = shallowRef(useCollection());
 
 // Define the correct type for Vue component ref callback
@@ -134,7 +136,7 @@ const showStatistics = computed(() => props.showStatistics !== false);
 const enableBulkActions = computed(() => props.enableBulkActions !== false);
 
 // Current active image
-const activeImageId = computed(() => currentCollection.value.selectedImageId);
+const activeImageId = computed(() => collectionStore.value.selectedImageId);
 
 // Virtual scroll configuration
 const virtualScrollSize = ref(48); // Default item size (will be different based on view mode)
@@ -946,11 +948,22 @@ function navigateToImage(imageId: string, shiftKey = false) {
   if (pageListStore.selectMode) {
     pageListStore.toggleImageSelection(imageId, shiftKey);
   } else {
-    // Update selected image in the collection state
-    currentCollection.value.selectImage(imageId);
+    // Update selected image in the collection state first (optimized in useCollection now)
+    collectionStore.value.selectImage(imageId);
 
-    // Emit the selected image ID to parent component
-    emit('select-image', imageId);
+    // Check if image is already in the list to avoid unnecessary loads
+    const imageExists = collectionStore.value.allImagesFlattened.some(
+      (img) => img.id === imageId,
+    );
+
+    // Emit the selected image ID to parent component with a flag to indicate selection only
+    emit('select-image', imageId, {
+      isSelectionOnly: true,
+      exists: imageExists,
+    });
+
+    // ScrollToActiveImage will be triggered by the activeImageId watcher
+    // We don't need explicit scrolling here, as it's handled by the watcher
   }
 }
 
@@ -959,8 +972,6 @@ watch(
   () => props.collectionId,
   async () => {
     await loadCollection();
-    // Always load hierarchical collection data
-    await loadHierarchicalCollection();
 
     // Optimization: Reset cache when collection changes
     filteredImagesCache.clear();
@@ -979,62 +990,36 @@ async function loadCollection() {
   if (!props.collectionId) return;
 
   // More comprehensive cache check with logging
-  if (
-    currentCollection.value.loaded &&
-    currentCollection.value.id === props.collectionId
-  ) {
+  if (collectionStore.value.isCollectionReady(props.collectionId)) {
     console.log(
-      `PageList: Collection ${props.collectionId} already loaded, using cached data.`,
-    );
-    return;
-  }
-
-  if (currentCollection.value.loading) {
-    console.log(
-      `PageList: Collection ${props.collectionId} is currently loading, waiting...`,
-    );
-    return;
-  }
-
-  console.log(`PageList: Loading collection ${props.collectionId}`);
-  try {
-    await currentCollection.value.loadCollection(props.collectionId);
-  } catch (error) {
-    console.error(
-      `PageList: Error loading collection ${props.collectionId}:`,
-      error,
-    );
-  }
-}
-
-// Load hierarchical collection data
-async function loadHierarchicalCollection() {
-  if (!props.collectionId) return;
-
-  if (
-    collectionStore.value.loaded &&
-    collectionStore.value.collection?.id === props.collectionId
-  ) {
-    console.log(
-      `PageList: Hierarchical collection ${props.collectionId} already loaded, using cached data.`,
+      `PageList: Collection ${props.collectionId} already loaded and ready, using cached data.`,
     );
     return;
   }
 
   if (collectionStore.value.loading) {
     console.log(
-      `PageList: Hierarchical collection ${props.collectionId} is currently loading, waiting...`,
+      `PageList: Collection ${props.collectionId} is currently loading, waiting...`,
     );
+    // Wait for the collection to be ready instead of returning
+    await collectionStore.value.waitForCollectionReady(props.collectionId);
     return;
   }
 
-  console.log(
-    `PageList: Loading hierarchical collection ${props.collectionId}`,
-  );
+  console.log(`PageList: Loading collection ${props.collectionId}`);
   try {
-    await collectionStore.value.loadCollection(props.collectionId);
+    // Use the waitForCollectionReady that includes loading if needed
+    const ready = await collectionStore.value.waitForCollectionReady(
+      props.collectionId,
+    );
+    if (!ready) {
+      console.warn(
+        `PageList: Collection ${props.collectionId} failed to fully load within the timeout period`,
+      );
+    }
   } catch (error) {
     console.error(
+      `PageList: Error loading collection ${props.collectionId}:`,
       `PageList: Error loading hierarchical collection ${props.collectionId}:`,
       error,
     );
@@ -1086,7 +1071,7 @@ const handleDescriptionExpand = () => {
         :filterVerified="pageListStore.filterVerified"
         :searchQuery="pageListStore.searchQuery"
         :filteredImagesCount="pageListStore.filteredImages.length"
-        :totalImagesCount="currentCollection.collection?.images?.length || 0"
+        :totalImagesCount="collectionStore.allImagesFlattened.length"
         @resetFilters="pageListStore.resetFilters"
         :class="{ 'stats-fullscreen': props.layout === 'full-width' }"
         :layoutMode="props.layout"
@@ -1098,11 +1083,7 @@ const handleDescriptionExpand = () => {
     <div class="page-list-content">
       <!-- Empty Collection State -->
       <div
-        v-if="
-          isCollectionEmpty &&
-          !currentCollection.loading &&
-          !collectionStore.loading
-        "
+        v-if="isCollectionEmpty && !collectionStore.loading"
         class="empty-collection q-pa-xl flex flex-center column"
       >
         <q-icon name="image_not_supported" size="64px" color="grey-6" />
@@ -1119,10 +1100,7 @@ const handleDescriptionExpand = () => {
       </div>
 
       <!-- Loading state -->
-      <div
-        v-else-if="currentCollection.loading || collectionStore.loading"
-        class="flex flex-center q-pa-md"
-      >
+      <div v-else-if="collectionStore.loading" class="flex flex-center q-pa-md">
         <div class="column items-center">
           <q-spinner color="primary" size="40px" />
           <div class="text-subtitle1 q-mt-md">Loading images...</div>
@@ -1397,7 +1375,7 @@ const handleDescriptionExpand = () => {
       >
         <template v-slot:page-count>
           {{ pageListStore.filteredImages.length }} of
-          {{ currentCollection.collection?.images?.length || 0 }}
+          {{ collectionStore.allImagesFlattened.length }}
           pages
         </template>
       </BulkActions>

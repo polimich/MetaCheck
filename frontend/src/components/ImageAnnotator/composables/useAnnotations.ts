@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 import { useImageCanvas } from './useImageCanvas';
-import { useImageStore } from 'src/stores/data/useImage';
+import { useImage } from 'src/stores/data/useImage';
 
 // Helper function to convert coordinates to bbox string
 function objectToBbox(
@@ -63,7 +63,7 @@ function useHistoryManagement(
 
     // Check for newly created annotations that are being removed by this undo
     // and remove them from the imageStore
-    const imageStore = useImageStore();
+    const imageStore = useImage();
     const currentIds = new Set(currentAnnotations.map((a) => a.id));
     const prevIds = new Set(prevState.annotations.map((a) => a.id));
 
@@ -78,12 +78,12 @@ function useHistoryManagement(
 
       // Remove from detectionsToAdd array (backend persistence queue)
       imageStore.detectionsToAdd = imageStore.detectionsToAdd.filter(
-        (detection) => !removedIds.includes(detection.id),
+        (detection: DetectionState) => !removedIds.includes(detection.id),
       );
 
       // ALSO remove from the main detections array (UI state)
       imageStore.detections = imageStore.detections.filter(
-        (detection) => !removedIds.includes(detection.id),
+        (detection: DetectionState) => !removedIds.includes(detection.id),
       );
 
       console.log(
@@ -116,7 +116,7 @@ function useHistoryManagement(
     });
 
     // Check for annotations that will be added by this redo operation
-    const imageStore = useImageStore();
+    const imageStore = useImage();
     const currentIds = new Set(currentAnnotations.map((a) => a.id));
     const nextIds = new Set(nextState.annotations.map((a) => a.id));
 
@@ -247,7 +247,7 @@ function useAnnotationNormalization(
  */
 export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
   // --- Dependencies --- //
-  const imageStore = useImageStore();
+  const imageStore = useImage();
   const { normalizeAnnotation } = useAnnotationNormalization(imageCanvas);
 
   // --- State --- //
@@ -415,7 +415,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     annotations.value = annotations.value.filter((a) => a.id !== id);
 
     // Remove from both imageStore arrays if it exists there
-    const imageStore = useImageStore();
+    const imageStore = useImage();
 
     // Remove from detectionsToAdd (backend persistence queue)
     const detectionInToAdd = imageStore.detectionsToAdd.find(
@@ -472,7 +472,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     Object.assign(annotation, normalized);
 
     // Update the corresponding detection in the store if it exists
-    const imageStore = useImageStore();
+    const imageStore = useImage();
     const storeIndex = imageStore.detections.findIndex((d) => d.id === id);
     if (storeIndex !== -1) {
       // Update with normalized dimensions and ensure bbox is updated

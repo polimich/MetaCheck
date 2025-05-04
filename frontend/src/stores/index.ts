@@ -32,7 +32,6 @@ export default store((/* { ssrContext } */) => {
 });
 
 export * from './data-access';
-export * from './frontend-state';
 export * from './collection';
 export * from './meta-role-store/metaRoleStore';
 export * from './app';

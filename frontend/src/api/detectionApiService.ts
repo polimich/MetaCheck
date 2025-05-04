@@ -85,3 +85,28 @@ export const updateDetectionWithMetaRole = async (
     return { error: errorMessage, success: false };
   }
 };
+
+/**
+ * Confirm a detection by marking it as annotated and setting confidence to 1
+ * without changing its value or meta role
+ */
+export const confirmDetection = async (
+  detection: DetectionState,
+): Promise<{ error: string; success: boolean }> => {
+  try {
+    console.log(`API: Confirming detection ${detection.id}`);
+
+    // Send the update request
+    await axios.post(`detection/confirm/${detection.id}`);
+
+    console.log(`API: Successfully confirmed detection ${detection.id}`);
+    return { error: '', success: true };
+  } catch (error) {
+    const errorMessage = axiosErrorHandler(error);
+    console.error(
+      `API Error in confirmDetection for ${detection.id}:`,
+      errorMessage,
+    );
+    return { error: errorMessage, success: false };
+  }
+};

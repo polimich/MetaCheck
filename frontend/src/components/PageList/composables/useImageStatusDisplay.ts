@@ -1,5 +1,5 @@
+import { useCollection } from 'src/stores';
 import { computed } from 'vue';
-import { useCurrentCollectionState } from 'stores/frontend-state';
 
 export function useImageStatusDisplay(
   getConfidenceLevel: (imageId: string) => string,
@@ -9,8 +9,7 @@ export function useImageStatusDisplay(
   hasUnverifiedDetections: (imageId: string) => boolean,
 ) {
   // Get the store
-  const currentCollection = useCurrentCollectionState();
-
+  const collectionStore = useCollection();
   // Get color for verification status badge
   function getVerificationStatusColor(imageId: string): string {
     const status = getVerificationStatus(imageId);
@@ -51,7 +50,7 @@ export function useImageStatusDisplay(
 
   // Generate statistics for the current collection
   const statistics = computed(() => {
-    if (!currentCollection.collection || !currentCollection.collection.images) {
+    if (!collectionStore.allImagesFlattened) {
       return {
         total: 0,
         needsAttention: 0,
@@ -61,7 +60,7 @@ export function useImageStatusDisplay(
       };
     }
 
-    const images = currentCollection.collection.images;
+    const images = collectionStore.allImagesFlattened;
     const needsAttentionCount = images.filter(
       (img) =>
         hasLowConfidenceDetections(img.id) || hasUnverifiedDetections(img.id),

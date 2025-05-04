@@ -65,7 +65,11 @@ function useImageLoader() {
     imageUrl.value = url;
 
     try {
+      // Create a new image without replacing the current one yet
       const img = await createImage(url);
+
+      // Only update the image reference once it's fully loaded
+      // This allows for a smoother transition
       image.value = img;
       isLoading.value = false;
       return img;
@@ -368,6 +372,10 @@ export function useImageCanvas() {
   // Image loading wrapper - updates dimensions and scale
   async function loadImage(url: string): Promise<void> {
     try {
+      // We don't clear the existing image right away for a smoother transition
+      isLoading.value = true;
+
+      // Load the new image
       const img = await loadImageInternal(url);
 
       // Store original dimensions

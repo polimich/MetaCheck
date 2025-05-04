@@ -11,10 +11,10 @@ import {
 } from 'vue';
 import { Stage } from 'konva/lib/Stage';
 import { Layer } from 'konva/lib/Layer';
-import { onClickOutside as useClickOutside } from '@vueuse/core';
+import { onClickOutside } from '@vueuse/core';
 
 // --- Stores --- //
-import { useImageStore } from 'src/stores/data/useImage';
+import { useImage } from 'src/stores';
 import { useMetaRoleStore } from 'src/stores/meta-role-store';
 import { useNotificationStore } from 'src/stores/app/notificationService';
 // Import the type from the local composable for annotations
@@ -67,7 +67,7 @@ const bboxToObject = (bbox: string) => {
 // ==========================================================================
 
 // --- Store Instances --- //
-const imageStore = useImageStore();
+const imageStore = useImage();
 const metaRoleStore = useMetaRoleStore();
 const notificationStore = useNotificationStore();
 
@@ -106,11 +106,11 @@ const isLoading = computed(() => {
 const loadingMessage = computed(() => {
   switch (loadingState.value) {
     case LoadingState.INITIALIZING:
-      return 'Initializing annotator...';
+      return 'Initializing...';
     case LoadingState.LOADING_IMAGE:
-      return 'Loading image...';
+      return ''; // Remove text for image loading to prevent flashing
     case LoadingState.LOADING_ANNOTATIONS:
-      return 'Processing annotations...';
+      return ''; // Remove text for annotations loading to prevent flashing
     case LoadingState.ERROR:
       return 'Error loading content';
     default:
@@ -120,28 +120,6 @@ const loadingMessage = computed(() => {
 
 const loadingStartTime = ref<number>(Date.now());
 const isMounted = ref(false);
-const debugState = ref<string>('initial');
-
-// Add a reactive timer
-const currentTime = ref(Date.now());
-const elapsedTime = computed(() => {
-  return Math.floor((currentTime.value - loadingStartTime.value) / 1000);
-});
-
-// Add method to update time
-function updateTime() {
-  currentTime.value = Date.now();
-}
-
-// Add additional debug info for v-stage rendering
-const stageRenderingBlocked = computed(() => {
-  // Return the reason why v-stage isn't rendering
-  if (isLoading.value) return 'isLoading is true';
-  if (imageCanvas.loadError.value)
-    return `loadError: ${imageCanvas.loadError.value}`;
-  if (!isMounted.value) return 'component not mounted';
-  return 'none - should render';
-});
 
 // Fix the timeout for retry button
 const showRetryButton = computed(() => {
@@ -173,6 +151,16 @@ const konvaEventHandlers = useKonvaEventHandlers(
 
 // --- Local State --- //
 const isSaving = ref(false); // Track saving state
+
+// Add a fade transition state
+const isTransitioning = ref(false);
+const previousImageUrl = ref<string | null>(null);
+
+// Clear transition state immediately
+function clearTransition() {
+  isTransitioning.value = false;
+  previousImageUrl.value = null;
+}
 
 // ==========================================================================
 // Computed Properties
@@ -270,6 +258,15 @@ const metaInputPosition = computed<CSSProperties>(() => {
     console.error('[Annotator] Error calculating panel position:', error);
     return { display: 'none' };
   }
+});
+
+// Add this check to improve handling of empty detections
+const isCurrentImageValid = computed(() => {
+  return !!(
+    imageStore.image &&
+    props.imageId &&
+    imageStore.image.id === props.imageId
+  );
 });
 
 // ==========================================================================
@@ -450,43 +447,78 @@ function handleCancelMeta() {
 
 // --- Data Loading & Initialization --- //
 async function loadImageData() {
-  debugState.value = 'loadImageData';
-  console.log('[Annotator DEBUG] loadImageData called');
+  if (loadingState.value === LoadingState.READY) {
+    return;
+  }
 
-  // Set loading state and reset timer
+  // Start transition
+  isTransitioning.value = true;
+
+  if (imageCanvas.image.value && props.imageId) {
+    previousImageUrl.value = getRasterImage(props.imageId);
+  }
+
   loadingState.value = LoadingState.LOADING_IMAGE;
-  loadingStartTime.value = Date.now();
-
-  // Exit early if still initializing
-  if (!konvaStage.value || !konvaLayer.value) {
-    console.warn(
-      '[Annotator DEBUG] Attempted to load image before Konva initialization',
-    );
-    loadingState.value = LoadingState.ERROR;
-    return;
-  }
-
-  // Get the current image from the store directly
-  if (!imageStore.image || !props.imageId) {
-    console.error('[Annotator DEBUG] No image data in store');
-    loadingState.value = LoadingState.ERROR;
-    return;
-  }
 
   try {
-    console.log('[Annotator DEBUG] Loading image:', props.imageId);
+    // Try initializing Konva objects first if they're not available
+    if (stage.value && !konvaStage.value) {
+      try {
+        await initializeKonvaObjects();
+        if (!konvaStage.value || !konvaLayer.value) {
+          loadingState.value = LoadingState.ERROR;
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to initialize Konva:', error);
+        loadingState.value = LoadingState.ERROR;
+        return;
+      }
+    } else if (!konvaStage.value || !konvaLayer.value) {
+      console.error('Konva stage or layer is not initialized');
+      loadingState.value = LoadingState.ERROR;
+      return;
+    }
 
-    // Construct URL using the ID from props
+    // Get the current image from the store
+    if (!isCurrentImageValid.value) {
+      if (props.imageId) {
+        try {
+          await imageStore.loadImage(props.imageId, props.collectionId);
+          if (!isCurrentImageValid.value) {
+            console.error('Still no image data after loading from store');
+            loadingState.value = LoadingState.ERROR;
+            return;
+          }
+        } catch (error) {
+          console.error('Error loading image from store:', error);
+          loadingState.value = LoadingState.ERROR;
+          return;
+        }
+      } else {
+        loadingState.value = LoadingState.ERROR;
+        return;
+      }
+    }
+
+    // Clear annotations
+    annotations.loadAnnotations([]);
+
+    // Load the image with cache-busting
     const imageUrl = getRasterImage(props.imageId) + `?t=${Date.now()}`;
-    await imageCanvas.loadImage(imageUrl);
-    console.log('[Annotator DEBUG] Image loaded into canvas successfully');
+    try {
+      await imageCanvas.loadImage(imageUrl);
+    } catch (error) {
+      console.error('Image loading failed:', error);
+      imageCanvas.loadError.value = `Failed to load image content (${props.imageId}). Server may be unavailable or image doesn't exist.`;
+      loadingState.value = LoadingState.ERROR;
+      return;
+    }
 
     loadingState.value = LoadingState.LOADING_ANNOTATIONS;
 
-    // Load annotations from store - use the UI-ready detections from the store
-    // These already have x, y, width, height properties extracted from bbox
+    // Load annotations from store
     const detectionsForUI = imageStore.detections.map((detection) => {
-      // Convert from DetectionWithUI (in the store) to DetectionState (for annotations)
       return {
         id: detection.id,
         x: detection.x,
@@ -503,11 +535,12 @@ async function loadImageData() {
       } as DetectionState;
     });
 
+    // Update view based on detection count
+    if (detectionsForUI.length === 0) {
+      imageCanvas.resetView();
+    }
+
     annotations.loadAnnotations(detectionsForUI);
-    console.log(
-      '[Annotator DEBUG] Loaded annotations:',
-      imageStore.detections.length,
-    );
 
     // Reset view and refresh transformer
     imageCanvas.resetView();
@@ -515,15 +548,16 @@ async function loadImageData() {
     updateTransformer();
 
     // Mark as ready
-    debugState.value = 'ready';
     loadingState.value = LoadingState.READY;
-    console.log('[Annotator DEBUG] Image and annotations fully loaded');
   } catch (error) {
-    console.error('[Annotator DEBUG] Error in loadImageData:', error);
-    debugState.value = 'error';
+    console.error('Error in loadImageData:', error);
     loadingState.value = LoadingState.ERROR;
     notificationStore.error('Error loading image or annotations');
     annotations.loadAnnotations([]);
+  } finally {
+    // End transition immediately
+    isTransitioning.value = false;
+    previousImageUrl.value = null;
   }
 }
 
@@ -892,94 +926,8 @@ function resetViewWithRefresh() {
   }
 }
 
-// --- Konva Initialization --- //
-async function initializeKonvaObjects() {
-  debugState.value = 'initKonva';
-  console.log('[Annotator DEBUG] initializeKonvaObjects called');
-
-  if (!stage.value) {
-    console.error('[Annotator DEBUG] Stage ref not available');
-    loadingState.value = LoadingState.ERROR;
-    return;
-  }
-
-  if (!annotatorBox.value) {
-    console.error('[Annotator DEBUG] Container ref not available');
-    loadingState.value = LoadingState.ERROR;
-    return;
-  }
-
-  if (konvaStage.value) {
-    console.log('[Annotator DEBUG] Konva already initialized');
-    return;
-  }
-
-  try {
-    // IMPORTANT: Set the container FIRST before initializing Konva
-    // This ensures useImageCanvas doesn't attempt to create resize observers too early
-    console.log('[Annotator DEBUG] Setting container for imageCanvas');
-    imageCanvas.setContainer(annotatorBox.value);
-
-    console.log('[Annotator DEBUG] Getting Konva Stage from component ref');
-    konvaStage.value = stage.value.getStage();
-
-    if (!konvaStage.value) {
-      throw new Error('Failed to get Konva Stage object');
-    }
-
-    console.log('[Annotator DEBUG] Finding Konva Layer');
-    konvaLayer.value = konvaStage.value.findOne('Layer') as Layer | null;
-
-    if (!konvaLayer.value) {
-      throw new Error('Failed to find Layer in Stage');
-    }
-
-    debugState.value = 'konvaReady';
-    console.log('[Annotator DEBUG] Konva successfully initialized');
-
-    // If we have a current image ID, load it
-    if (props.imageId) {
-      console.log(
-        '[Annotator DEBUG] Loading initial image data after Konva init',
-      );
-      // Make sure the store has image data
-      if (!imageStore.image?.id || imageStore.image.id !== props.imageId) {
-        loadingState.value = LoadingState.LOADING_IMAGE;
-        try {
-          console.log(
-            '[Annotator DEBUG] Loading image from store:',
-            props.imageId,
-          );
-          await imageStore.loadImage(props.imageId);
-        } catch (error) {
-          console.error(
-            '[Annotator DEBUG] Error loading image from store:',
-            error,
-          );
-          loadingState.value = LoadingState.ERROR;
-          return;
-        }
-      }
-
-      // Now load the image into the canvas
-      await loadImageData();
-    } else {
-      console.log(
-        '[Annotator DEBUG] No image ID in props, skipping data loading',
-      );
-      loadingState.value = LoadingState.IDLE;
-    }
-  } catch (error) {
-    console.error('[Annotator DEBUG] Konva initialization error:', error);
-    debugState.value = 'error';
-    notificationStore.error('Failed to initialize annotation canvas');
-    loadingState.value = LoadingState.ERROR;
-  }
-}
-
 // Create a manual method to reinitialize the image canvas if needed
 function reinitializeCanvas() {
-  console.log('[Annotator DEBUG] Reinitializing canvas manually');
   if (annotatorBox.value && !konvaStage.value) {
     imageCanvas.setContainer(annotatorBox.value);
     if (stage.value) {
@@ -988,237 +936,99 @@ function reinitializeCanvas() {
   }
 }
 
-// ==========================================================================
-// Lifecycle Hooks & Watchers
-// ==========================================================================
-
-onMounted(() => {
-  console.log('[Annotator DEBUG] Component mounted');
-  debugState.value = 'mounted';
-  isMounted.value = true; // Allow conditional rendering
-
-  // Add a delayed initialization to ensure DOM is fully rendered
-  setTimeout(() => {
-    if (annotatorBox.value && !konvaStage.value) {
-      console.log('[Annotator DEBUG] Running delayed initialization');
-      imageCanvas.setContainer(annotatorBox.value);
-    }
-  }, 100);
-
-  // Start timer update interval
-  const timerInterval = setInterval(updateTime, 1000);
-
-  // Add a check for visible annotations to force-hide loading
-  const visibilityCheck = setInterval(() => {
-    // If we're still loading but annotations are present in the DOM, force hide
-    if (
-      loadingState.value !== LoadingState.READY &&
-      loadingState.value !== LoadingState.IDLE &&
-      annotations.annotations.value.length > 0 &&
-      konvaStage.value &&
-      elapsedTime.value > 2
-    ) {
-      console.log(
-        '[Annotator DEBUG] Annotations visible but loading still active - forcing hide',
-      );
-      forceHideLoadingOverlay();
-    }
-  }, 1000);
-
-  // Clean up intervals on unmount
-  onBeforeUnmount(() => {
-    clearInterval(timerInterval);
-    clearInterval(visibilityCheck);
-  });
-});
-
-onBeforeUnmount(() => {
-  // Cleanup if necessary (e.g., remove event listeners manually added)
-  console.log('[Annotator] Component unmounting.');
-});
-
-// --- Watchers --- //
-
-// Watch for the v-stage component ref to become available
-watch(stage, (newStage) => {
-  console.log('[Annotator DEBUG] Stage ref changed:', !!newStage);
-  if (newStage) {
-    // Use setTimeout for a slight delay, ensuring Vue DOM updates are complete
-    setTimeout(() => {
-      initializeKonvaObjects();
-    }, 50);
+// --- Konva Initialization --- //
+async function initializeKonvaObjects() {
+  if (!stage.value) {
+    console.error('Stage ref not available');
+    loadingState.value = LoadingState.ERROR;
+    return;
   }
-});
 
-// Watch for metadata panel visibility to setup click outside handling
-watch(
-  () => annotations.pendingMetaAnnotationId.value,
-  (newValue) => {
-    console.log(
-      '[Annotator DEBUG] Metadata panel visibility changed:',
-      !!newValue,
-    );
-    if (newValue) {
-      // Panel is becoming visible - setup click outside after a small delay to ensure DOM updates
-      setTimeout(() => {
-        if (metaInputPanelRef.value) {
-          console.log(
-            '[Annotator DEBUG] Setting up click outside for metadata panel',
-          );
-          useClickOutside(
-            metaInputPanelRef,
-            (event) => {
-              // Check if the click was on a q-menu (dropdown) or other Quasar UI elements
-              const target = event.target as HTMLElement;
+  if (!annotatorBox.value) {
+    console.error('Container ref not available');
+    loadingState.value = LoadingState.ERROR;
+    return;
+  }
 
-              // Check for Quasar UI components that should be ignored
-              if (
-                document.querySelector('.q-menu') || // Any active dropdown
-                target.closest('.q-menu') ||
-                target.closest('.q-dialog') ||
-                target.closest('.q-select__dropdown') ||
-                target.closest('.q-popup-edit') ||
-                target.closest('.q-date') ||
-                target.closest('.q-time')
-              ) {
-                console.log(
-                  '[Annotator DEBUG] Click on or during active Quasar UI component, ignoring',
-                );
-                return; // Ignore clicks on Quasar UI components
-              }
+  if (konvaStage.value) {
+    return;
+  }
 
-              // Check if the click target is a child of the metadata panel
-              if (metaInputPanelRef.value?.contains(target)) {
-                console.log(
-                  '[Annotator DEBUG] Click inside metadata panel, ignoring',
-                );
-                return; // Ignore clicks inside the panel
-              }
+  try {
+    // IMPORTANT: Set the container FIRST before initializing Konva
+    // This ensures useImageCanvas doesn't attempt to create resize observers too early
+    imageCanvas.setContainer(annotatorBox.value);
 
-              // If we got here, it's a genuine outside click
-              console.log(
-                '[Annotator DEBUG] Genuine outside click detected, handling...',
-              );
-              handleClickOutside();
-            },
-            {
-              capture: true, // Use capture phase to get the events first
-              detectIframe: false, // Don't handle iframe events
-            },
-          );
-        } else {
-          console.log(
-            '[Annotator DEBUG] Cannot setup click outside - metaInputPanelRef not available',
-          );
-        }
-      }, 200); // Longer delay to ensure full DOM updates
+    konvaStage.value = stage.value.getStage();
+
+    if (!konvaStage.value) {
+      throw new Error('Failed to get Konva Stage object');
     }
-  },
-);
 
-// Watch for changes in the selected image ID
-watch(
-  () => loadingState.value,
-  (newState) => {
-    // Auto-timeout if we stay in a loading state too long
-    if (
-      newState !== LoadingState.READY &&
-      newState !== LoadingState.ERROR &&
-      newState !== LoadingState.IDLE
-    ) {
-      const timeoutId = setTimeout(() => {
-        if (loadingState.value === newState) {
-          console.log(
-            `[Annotator DEBUG] Loading state ${newState} timed out after 10s`,
-          );
-          // Update with mutation instead of assignment
+    konvaLayer.value = konvaStage.value.findOne('Layer') as Layer | null;
+
+    if (!konvaLayer.value) {
+      throw new Error('Failed to find Layer in Stage');
+    }
+
+    // If we have a current image ID, load it
+    if (props.imageId) {
+      // Make sure the store has image data
+      if (!imageStore.image?.id || imageStore.image.id !== props.imageId) {
+        loadingState.value = LoadingState.LOADING_IMAGE;
+        try {
+          await imageStore.loadImage(props.imageId, props.collectionId);
+        } catch (error) {
+          console.error('Error loading image from store:', error);
           loadingState.value = LoadingState.ERROR;
-          notificationStore.warning('Loading timed out. Please try again.');
+          return;
         }
-      }, 10000);
+      }
 
-      // Cleanup timeout if state changes
-      const stopWatch = watch(
-        () => loadingState.value,
-        (innerState) => {
-          if (innerState !== newState) {
-            clearTimeout(timeoutId);
-            stopWatch(); // Remove this watcher when done
-          }
-        },
-        { immediate: true },
-      );
+      // Now load the image into the canvas
+      await loadImageData();
+    } else {
+      loadingState.value = LoadingState.IDLE;
     }
-  },
-  { immediate: true },
-);
+  } catch (error) {
+    console.error('Konva initialization error:', error);
+    loadingState.value = LoadingState.ERROR;
+    notificationStore.error('Failed to initialize annotation canvas');
+  }
+}
 
 // Add a watcher for props.imageId that has immediate execution
-// This ensures we attempt to load the image as soon as props are available
 watch(
   () => props.imageId,
   async (newImageId, oldImageId) => {
     // Skip if no image ID or unchanged
     if (!newImageId || newImageId === oldImageId) return;
 
-    console.log(
-      `[Annotator DEBUG] imageId prop changed on immediate watch: ${oldImageId} -> ${newImageId}`,
-    );
+    // Start transition before clearing anything
+    isTransitioning.value = true;
 
-    // If stage is ready, try to load the image
-    if (konvaStage.value && konvaLayer.value) {
-      try {
-        console.log(
-          '[Annotator DEBUG] Stage is ready, attempting immediate image load',
-        );
-        // Check if we need to load the image in the store first
-        if (!imageStore.image || imageStore.image.id !== newImageId) {
-          console.log('[Annotator DEBUG] Loading image from store first');
-          await imageStore.loadImage(newImageId);
-        }
-        await loadImageData();
-      } catch (error) {
-        console.error(
-          '[Annotator DEBUG] Error in immediate imageId watcher:',
-          error,
-        );
-      }
+    if (imageCanvas.image.value && oldImageId) {
+      previousImageUrl.value = getRasterImage(oldImageId);
+    }
+
+    // Use simplified approach for normal image switches
+    if (props.collectionId && !loadingState.value.includes('error')) {
+      await forceImageRefresh();
     } else {
-      console.log(
-        '[Annotator DEBUG] Stage not ready yet, deferring image load',
-      );
-      // Setup a retry mechanism for when props are available but stage isn't yet
-      let retries = 0;
-      const maxRetries = 5;
-      const retryInterval = setInterval(async () => {
-        if (konvaStage.value && konvaLayer.value) {
-          clearInterval(retryInterval);
-          console.log(
-            '[Annotator DEBUG] Stage now ready, loading image on retry',
-          );
-          try {
-            // Check if we need to load the image in the store first
-            if (!imageStore.image || imageStore.image.id !== newImageId) {
-              await imageStore.loadImage(newImageId);
-            }
-            await loadImageData();
-          } catch (error) {
-            console.error(
-              '[Annotator DEBUG] Error in retry image load:',
-              error,
-            );
-          }
-        } else if (++retries >= maxRetries) {
-          clearInterval(retryInterval);
-          console.error(
-            '[Annotator DEBUG] Max retries reached, stage still not ready',
-          );
-          loadingState.value = LoadingState.ERROR;
-        }
-      }, 500);
+      // For initial loading or error recovery, use full loading state
+      loadingState.value = LoadingState.INITIALIZING;
+      loadingStartTime.value = Date.now();
+
+      // Clear any previous errors
+      imageCanvas.loadError.value = null;
+
+      // Clear current annotations to prevent stale data display
+      annotations.loadAnnotations([]);
+
+      await forceImageRefresh();
     }
   },
-  { immediate: true }, // This makes it run once immediately when component is created
+  { immediate: true },
 );
 
 // Watch for external selection changes to sync local state
@@ -1243,119 +1053,239 @@ const handleClickOutside = () => {
 
 // Update retryLoading function to use the new state machine
 async function retryLoading() {
-  console.log('[Annotator DEBUG] Manual retry triggered');
-  loadingStartTime.value = Date.now();
-  debugState.value = 'retry';
-
-  // Set loading state to initializing
-  loadingState.value = LoadingState.INITIALIZING;
-
-  // Clear any error state
-  imageCanvas.loadError.value = null;
-
-  // Wait for next tick to ensure Vue updates DOM
-  await nextTick();
-
   // Attempt to get stage if not available
   if (!konvaStage.value && stage.value) {
     try {
-      console.log('[Annotator DEBUG] Getting stage in retry');
       konvaStage.value = stage.value.getStage();
       if (konvaStage.value) {
-        console.log('[Annotator DEBUG] Konva stage obtained in retry');
         konvaLayer.value = konvaStage.value.findOne('Layer') as Layer | null;
       }
     } catch (e) {
-      console.error('[Annotator DEBUG] Error getting stage in retry:', e);
+      console.error('Error getting stage in retry:', e);
     }
   }
 
   // If still no stage, try reinitializing
   if (!konvaStage.value) {
     reinitializeCanvas();
+
+    // Wait a bit for canvas to initialize
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
-  // If we have image data, try loading it
-  if (imageStore.image?.id && konvaStage.value) {
-    try {
-      await loadImageData();
-    } catch (e) {
-      console.error('[Annotator DEBUG] Retry loading failed:', e);
-      loadingState.value = LoadingState.ERROR;
-      notificationStore.error('Retry failed. Please refresh the page.');
+  // Use our force refresh function for a complete reload
+  await forceImageRefresh();
+}
+
+// Modify the forceImageRefresh function for immediate transitions
+async function forceImageRefresh() {
+  try {
+    // Start transition with delay (only shows if loading takes too long)
+    isTransitioning.value = true;
+    // Set loading state but keep it minimal
+    if (!loadingState.value.includes('error')) {
+      loadingState.value = LoadingState.LOADING_IMAGE;
     }
-  } else if (props.imageId) {
-    try {
-      await imageStore.loadImage(props.imageId);
-      if (konvaStage.value) {
-        await loadImageData();
+
+    // Clear annotations
+    annotations.loadAnnotations([]);
+
+    // Wait for UI to update
+    await nextTick();
+
+    // Force reload the image
+    if (isCurrentImageValid.value && props.imageId) {
+      try {
+        // Force reload from store first
+        await imageStore.loadImage(props.imageId, props.collectionId);
+
+        // Create URL with cache-busting timestamp
+        const imageUrl = getRasterImage(props.imageId) + `?t=${Date.now()}`;
+
+        // Load the new image
+        await imageCanvas.loadImage(imageUrl);
+
+        // Reset view and position
+        resetStagePosition();
+        imageCanvas.resetView();
+
+        // Load annotations
+        const detectionsForUI = imageStore.detections.map((detection) => {
+          return {
+            id: detection.id,
+            x: detection.x,
+            y: detection.y,
+            width: detection.width,
+            height: detection.height,
+            value: detection.value,
+            edited: detection.edited ?? false,
+            image_id: detection.image_id,
+            annotated: detection.annotated,
+            computed_type: detection.computed_type,
+            computed_color: detection.computed_color,
+            computed_display_type: detection.computed_display_type,
+          } as DetectionState;
+        });
+
+        annotations.loadAnnotations(detectionsForUI);
+
+        // Force redraw
+        if (konvaLayer.value) {
+          konvaLayer.value.batchDraw();
+        }
+        if (konvaStage.value) {
+          konvaStage.value.batchDraw();
+        }
+
+        loadingState.value = LoadingState.READY;
+      } catch (error) {
+        console.error('Error during image loading:', error);
+        loadingState.value = LoadingState.ERROR;
       }
-    } catch (e) {
-      console.error('[Annotator DEBUG] Retry image loading failed:', e);
-      loadingState.value = LoadingState.ERROR;
-      notificationStore.error('Retry failed. Please refresh the page.');
     }
+  } catch (error) {
+    console.error('Error during force refresh:', error);
+    loadingState.value = LoadingState.ERROR;
+  } finally {
+    // Clear transition immediately
+    clearTransition();
   }
 }
 
-// Update forceHideLoadingOverlay function to use the new state
-function forceHideLoadingOverlay() {
-  console.log('[Annotator DEBUG] FORCE HIDING LOADING OVERLAY');
-  // Set state to ready
-  loadingState.value = LoadingState.READY;
-  debugState.value = 'ready';
+// --- Lifecycle Hooks & Watchers --- //
 
-  // Try to access reactive property if it exists
-  if (imageCanvas.isLoading && typeof imageCanvas.isLoading === 'object') {
-    imageCanvas.isLoading.value = false;
-  }
+onMounted(() => {
+  isMounted.value = true; // Allow conditional rendering
 
-  // Force update the view if image is loaded
-  if (imageCanvas.image.value && konvaStage.value) {
-    try {
-      imageCanvas.resetView();
-      updateTransformer();
-    } catch (e) {
-      console.error(
-        '[Annotator DEBUG] Error updating view during force hide:',
-        e,
-      );
-    }
-  }
+  // Add a delayed initialization to ensure DOM is fully rendered
+  setTimeout(() => {
+    if (annotatorBox.value && !konvaStage.value) {
+      imageCanvas.setContainer(annotatorBox.value);
 
-  // Notify user the loading has been manually hidden
-  notificationStore.info('Loading overlay manually hidden');
-}
-
-// Add a watch for image loaded events to update loading state
-watch(
-  () => imageCanvas.image.value,
-  (newImage) => {
-    if (newImage && isLoading.value) {
-      console.log('[Annotator DEBUG] Image loaded in canvas, updating view...');
-      // Give a small delay to ensure the canvas has time to render
-      setTimeout(() => {
-        try {
-          if (konvaStage.value && konvaLayer.value) {
-            imageCanvas.resetView();
-            updateTransformer();
-            console.log('[Annotator DEBUG] View reset after image load');
+      // If we have a valid image ID in props, make sure it's loaded
+      if (
+        props.imageId &&
+        (!imageStore.image || imageStore.image.id !== props.imageId)
+      ) {
+        // First make sure the store has the image data
+        imageStore.loadImage(props.imageId, props.collectionId).then(() => {
+          // Then initialize Konva and load the image
+          if (stage.value && !konvaStage.value) {
+            initializeKonvaObjects().then(() => {
+              if (konvaStage.value && konvaLayer.value) {
+                loadImageData();
+              }
+            });
           }
-        } catch (e) {
-          console.error('[Annotator DEBUG] Error updating view:', e);
-        }
+        });
+      }
+    }
+  }, 100);
+});
 
-        // If the image is loaded but we're still in loading state, force update
-        if (
-          debugState.value === 'loadingAnnotations' &&
-          elapsedTime.value > 5
-        ) {
-          console.log('[Annotator DEBUG] Force completing load sequence');
-          forceHideLoadingOverlay();
+onBeforeUnmount(() => {
+  // Cleanup if necessary
+});
+
+// Watch for the v-stage component ref to become available
+watch(stage, (newStage) => {
+  if (newStage) {
+    // Use setTimeout for a slight delay, ensuring Vue DOM updates are complete
+    setTimeout(() => {
+      initializeKonvaObjects();
+    }, 50);
+  }
+});
+
+// Watch for metadata panel visibility to setup click outside handling
+watch(
+  () => annotations.pendingMetaAnnotationId.value,
+  (newValue) => {
+    if (newValue) {
+      // Panel is becoming visible - setup click outside
+      setTimeout(() => {
+        if (metaInputPanelRef.value) {
+          onClickOutside(
+            metaInputPanelRef,
+            (event) => {
+              // Check if the click was on a q-menu (dropdown) or other Quasar UI elements
+              const target = event.target as HTMLElement;
+
+              // Check for Quasar UI components that should be ignored
+              if (
+                document.querySelector('.q-menu') || // Any active dropdown
+                target.closest('.q-menu') ||
+                target.closest('.q-dialog') ||
+                target.closest('.q-select__dropdown') ||
+                target.closest('.q-popup-edit') ||
+                target.closest('.q-date') ||
+                target.closest('.q-time')
+              ) {
+                return; // Ignore clicks on Quasar UI components
+              }
+
+              // Check if the click target is a child of the metadata panel
+              if (metaInputPanelRef.value?.contains(target)) {
+                return; // Ignore clicks inside the panel
+              }
+
+              // If we got here, it's a genuine outside click
+              handleClickOutside();
+            },
+            {
+              capture: true, // Use capture phase to get the events first
+              detectIframe: false, // Don't handle iframe events
+            },
+          );
         }
-      }, 200);
+      }, 200); // Longer delay to ensure full DOM updates
     }
   },
+);
+
+// Watch for external selection changes to sync local state
+watch(
+  () => imageStore.selectedDetectionId,
+  (newId) => {
+    if (isMounted.value) {
+      annotations.syncSelectionWithStore(newId); // Let the composable handle sync
+    }
+  },
+);
+
+// Watch for changes in the loading state to implement a timeout
+watch(
+  () => loadingState.value,
+  (newState) => {
+    // Auto-timeout if we stay in a loading state too long
+    if (
+      newState !== LoadingState.READY &&
+      newState !== LoadingState.ERROR &&
+      newState !== LoadingState.IDLE
+    ) {
+      // Set a timeout to prevent infinite loading states
+      const timeoutId = setTimeout(() => {
+        if (loadingState.value === newState) {
+          // If still in the same loading state after timeout, show error
+          loadingState.value = LoadingState.ERROR;
+          notificationStore.warning('Loading timed out. Please try again.');
+        }
+      }, 10000);
+
+      // Cleanup timeout if state changes
+      const stopWatch = watch(
+        () => loadingState.value,
+        (innerState) => {
+          if (innerState !== newState) {
+            clearTimeout(timeoutId);
+            stopWatch(); // Remove this watcher when done
+          }
+        },
+        { immediate: true },
+      );
+    }
+  },
+  { immediate: true },
 );
 </script>
 
@@ -1388,16 +1318,27 @@ watch(
         @delete-selected="annotations.deleteSelected"
       />
 
+      <!-- Transition Overlay - Appears during image transitions -->
+      <div v-if="isTransitioning" class="transition-overlay">
+        <q-spinner-dots color="primary" size="3em" />
+      </div>
+
       <!-- Loading/Error Overlay -->
       <div
         v-if="
           loadingState !== LoadingState.READY &&
-          loadingState !== LoadingState.IDLE
+          loadingState !== LoadingState.IDLE &&
+          !isTransitioning
         "
         class="loading-overlay"
+        :class="{
+          'transparent-overlay':
+            loadingState === LoadingState.LOADING_IMAGE ||
+            loadingState === LoadingState.LOADING_ANNOTATIONS,
+        }"
       >
         <q-spinner color="primary" size="3em" />
-        <p>{{ loadingMessage }}</p>
+        <p v-if="loadingMessage">{{ loadingMessage }}</p>
         <div class="overlay-buttons">
           <q-btn
             v-if="showRetryButton || !stage"
@@ -1405,30 +1346,10 @@ watch(
             label="Retry"
             @click="retryLoading"
           />
-          <q-btn
-            color="warning"
-            label="Force Hide Loading"
-            @click="forceHideLoadingOverlay"
-          />
         </div>
         <p v-if="showRetryButton || !stage" class="help-text">
           Loading is taking longer than expected
         </p>
-
-        <!-- Debug info for developers -->
-        <div class="debug-info">
-          <p>Current state: {{ debugState }}</p>
-          <p>Stage ready: {{ stage !== null }}</p>
-          <p>Konva stage: {{ konvaStage !== null }}</p>
-          <p>Container: {{ annotatorBox !== null }}</p>
-          <p>Image loaded: {{ imageCanvas.image.value !== null }}</p>
-          <p>isLoading: {{ isLoading }}</p>
-          <p>imageCanvas loading: {{ imageCanvas.isLoading }}</p>
-          <p>Rendering blocked: {{ stageRenderingBlocked }}</p>
-          <p>Image error: {{ imageCanvas.loadError.value }}</p>
-          <p>Time since start: {{ elapsedTime }}s</p>
-          <p>Loading state: {{ loadingState }}</p>
-        </div>
       </div>
       <div
         v-else-if="imageCanvas.loadError.value"
@@ -1437,6 +1358,9 @@ watch(
         <q-icon name="error" color="negative" size="3em" />
         <p>Error loading image: {{ imageCanvas.loadError.value }}</p>
         <p v-if="!currentImageId">Please select an image.</p>
+        <div class="overlay-buttons">
+          <q-btn color="primary" label="Retry" @click="retryLoading" />
+        </div>
       </div>
 
       <!-- Konva Canvas Stage -->
@@ -1497,42 +1421,6 @@ watch(
         @cancel="handleCancelMeta"
         class="metadata-input-panel"
       />
-
-      <!-- Move debug info outside the loading overlay so it's always visible -->
-      <div
-        v-if="
-          loadingState === LoadingState.READY ||
-          loadingState === LoadingState.IDLE
-        "
-        class="debug-info floating"
-      >
-        <p>Current state: {{ debugState }}</p>
-        <p>Loading state: {{ loadingState }}</p>
-        <p>Stage ready: {{ stage !== null }}</p>
-        <p>Konva stage: {{ konvaStage !== null }}</p>
-        <p>Container: {{ annotatorBox !== null }}</p>
-        <p>Time: {{ elapsedTime }}s</p>
-        <div class="debug-buttons">
-          <q-btn color="primary" label="Force Retry" @click="retryLoading" />
-          <q-btn
-            color="warning"
-            label="Hide Loading"
-            @click="forceHideLoadingOverlay"
-          />
-        </div>
-      </div>
-
-      <!-- Add a direct button to immediately hide the loading overlay in the main interface -->
-      <button
-        v-if="
-          loadingState !== LoadingState.READY &&
-          loadingState !== LoadingState.IDLE
-        "
-        class="emergency-hide-button"
-        @click="forceHideLoadingOverlay"
-      >
-        × FORCE HIDE LOADING
-      </button>
     </div>
   </div>
 </template>
@@ -1578,11 +1466,16 @@ watch(
   background-color: rgba(255, 255, 255, 0.8);
   z-index: 10;
   text-align: center;
+  transition: background-color 0.3s ease;
+}
 
-  &.error p {
-    color: var(--q-negative);
-    margin-top: 1em;
-  }
+.loading-overlay.transparent-overlay {
+  background-color: rgba(255, 255, 255, 0.5); /* Completely transparent */
+}
+
+.loading-overlay.error p {
+  color: var(--q-negative);
+  margin-top: 1em;
 }
 
 /* Style for the MetadataInputPanel (optional base styles) */
@@ -1602,36 +1495,6 @@ watch(
   margin-top: 0.5em;
 }
 
-/* Add styles for debug info */
-.debug-info {
-  margin-top: 1rem;
-  padding: 0.5rem;
-  background-color: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.75rem;
-  text-align: left;
-  max-width: 300px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.debug-info p {
-  margin: 2px 0;
-}
-
-/* Add style for floating debug info */
-.debug-info.floating {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(255, 255, 255, 0.8);
-  z-index: 100;
-  padding: 8px;
-  border-radius: 4px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
 /* Add style for button container */
 .overlay-buttons {
   display: flex;
@@ -1639,25 +1502,30 @@ watch(
   margin-bottom: 10px;
 }
 
-.debug-buttons {
+.transition-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.9); /* Completely transparent */
+  z-index: 5;
+  pointer-events: none; /* Allow clicks to pass through */
+  animation: pulseSpinner 1.5s infinite ease-in-out;
 }
 
-/* Add styling for the emergency button */
-.emergency-hide-button {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  background-color: #f44336;
-  color: white;
-  border: none;
-  padding: 10px 15px;
-  border-radius: 4px;
-  font-weight: bold;
-  cursor: pointer;
-  z-index: 10000;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+@keyframes pulseSpinner {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0.3;
+  }
 }
 </style>

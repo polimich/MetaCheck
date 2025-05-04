@@ -4,7 +4,6 @@ import {
   CollectionNewType,
   CollectionUpdateDA,
   ImageDA,
-  CollectionHierarchical,
 } from 'src/types/data-access';
 import {
   CollectionListSchema,
@@ -15,7 +14,6 @@ import {
 } from 'src/types/validation';
 import { z } from 'zod';
 import { normalizeBbox } from 'src/utils/bboxUtils';
-import { DAResponse } from 'src/stores/data-access/types';
 
 /**
  * Handle Zod validation errors
@@ -234,21 +232,5 @@ export const importCollection = async (file: File): Promise<string> => {
     return '';
   } catch (error) {
     return axiosErrorHandler(error);
-  }
-};
-
-/**
- * Get a collection with its hierarchial structure
- */
-export const apiGetCollectionHierarchical = async (
-  collectionId: string,
-): Promise<DAResponse<CollectionHierarchical>> => {
-  try {
-    const { data } = await axios.get<CollectionHierarchical>(
-      `/collection/${collectionId}/hierarchical`,
-    );
-    return { data, error: '' };
-  } catch (error) {
-    return { data: undefined, error: axiosErrorHandler(error) };
   }
 };

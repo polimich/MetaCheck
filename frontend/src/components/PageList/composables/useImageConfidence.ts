@@ -1,8 +1,8 @@
-import { useCurrentCollectionState } from 'stores/frontend-state';
+import { useCollection } from 'src/stores/data/useCollection';
 
 export function useImageConfidence() {
   // Get the store
-  const currentCollection = useCurrentCollectionState();
+  const collectionStore = useCollection();
 
   // Constants for confidence thresholds
   const LOW_CONFIDENCE_THRESHOLD = 0.7; // 70% confidence
@@ -11,8 +11,8 @@ export function useImageConfidence() {
   // Check if image has low confidence detections
   function hasLowConfidenceDetections(imageId: string): boolean {
     // Find the image in the collection
-    if (!currentCollection.collection?.images) return false;
-    const image = currentCollection.collection.images.find(
+    if (!collectionStore.allImagesFlattened) return false;
+    const image = collectionStore.allImagesFlattened.find(
       (img) => img.id === imageId,
     );
     if (!image) return false;
@@ -29,8 +29,8 @@ export function useImageConfidence() {
   // Check if image has medium confidence detections
   function hasMediumConfidenceDetections(imageId: string): boolean {
     // Find the image in the collection
-    if (!currentCollection.collection?.images) return false;
-    const image = currentCollection.collection.images.find(
+    if (!collectionStore.allImagesFlattened) return false;
+    const image = collectionStore.allImagesFlattened.find(
       (img) => img.id === imageId,
     );
     if (!image) return false;
@@ -82,8 +82,8 @@ export function useImageConfidence() {
     hasUnverifiedDetections: (id: string) => boolean,
   ): number {
     // Find the image in the collection
-    if (!currentCollection.collection?.images) return 0;
-    const image = currentCollection.collection.images.find(
+    if (!collectionStore.allImagesFlattened) return 0;
+    const image = collectionStore.allImagesFlattened.find(
       (img) => img.id === imageId,
     );
     if (!image) return 0;

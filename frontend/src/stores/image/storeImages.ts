@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { DetectionState, ImageState, newImageState } from 'src/types';
-import { useCurrentCollectionState } from 'stores/frontend-state';
+import { useCollection } from 'src/stores/data/useCollection';
 import { useStateManager } from 'src/stores/app/stateManager';
 import { useCollectionDataAccess } from 'stores/data-access';
 import { useNotificationStore } from 'src/stores/app/notificationService';
@@ -39,9 +39,9 @@ export const useImageStore = defineStore('images', () => {
 
   const availableMetaRolesOptions = computed(() => {
     try {
-      const currentCollectionState = useCurrentCollectionState();
-      if (currentCollectionState.availableMetaRoles.length > 0) {
-        return currentCollectionState.availableMetaRoles.map((role) => ({
+      const collectionStore = useCollection();
+      if (collectionStore.collectionMetaRoles.length > 0) {
+        return collectionStore.collectionMetaRoles.map((role) => ({
           id: role.id,
           label: role.computed_display_name || role.id,
           value: role.computed_name || role.id,
@@ -520,10 +520,10 @@ export const useImageStore = defineStore('images', () => {
   };
 
   const ensureMetaRolesLoaded = async (collectionId: string) => {
-    const currentCollectionState = useCurrentCollectionState();
-    if (currentCollectionState.availableMetaRoles.length === 0) {
+    const collectionStore = useCollection();
+    if (collectionStore.collectionMetaRoles.length === 0) {
       console.log('Meta roles not loaded, loading from collection state...');
-      await currentCollectionState.loadCollection(collectionId);
+      await collectionStore.loadCollection(collectionId);
     }
     return availableMetaRolesOptions.value.length > 0;
   };

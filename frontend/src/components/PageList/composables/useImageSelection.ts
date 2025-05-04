@@ -1,10 +1,8 @@
 import { ref } from 'vue';
-import { useCurrentCollectionState } from 'stores/frontend-state';
 import { useCollection } from 'src/stores/data/useCollection';
 
 export function useImageSelection() {
   // Get the stores
-  const currentCollection = useCurrentCollectionState();
   const collectionStore = useCollection();
 
   // Selection state
@@ -56,24 +54,7 @@ export function useImageSelection() {
 
   // Helper function to get all images from hierarchical data structure
   function getAllImagesFromHierarchy() {
-    const allImages: { id: string }[] = [];
-
-    if (
-      collectionStore.metaElementSections &&
-      collectionStore.metaElementSections.length > 0
-    ) {
-      // Use hierarchical data
-      collectionStore.metaElementSections.forEach((section) => {
-        if (section.images && Array.isArray(section.images)) {
-          allImages.push(...section.images);
-        }
-      });
-    } else if (currentCollection.collection?.images) {
-      // Fallback to flat data if hierarchical is not available
-      allImages.push(...currentCollection.collection.images);
-    }
-
-    return allImages;
+    return collectionStore.allImagesFlattened;
   }
 
   function toggleSelectMode() {

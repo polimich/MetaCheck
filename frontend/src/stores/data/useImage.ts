@@ -7,6 +7,7 @@ import {
   createDetection,
   updateDetection as apiUpdateDetection,
   deleteDetection as apiDeleteDetection,
+  updateImage as apiUpdateImage,
 } from 'src/api/imageApiNew';
 
 // Helper function to convert between bbox string and object format
@@ -38,7 +39,7 @@ type DetectionWithUI = DetectionType & {
   loadingMetaRoles: boolean;
 };
 
-export const useImageStore = defineStore('image', () => {
+export const useImage = defineStore('image', () => {
   // Dependencies
   const collectionStore = useCollection();
 
@@ -49,6 +50,22 @@ export const useImageStore = defineStore('image', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const currentImageId = ref<string | null>(null);
+  const currentCollectionId = ref<string | null>(null);
+
+  // Image statistics
+  const annotatedDetectionCount = computed(
+    () => detections.value.filter((d) => d.annotated).length,
+  );
+
+  const totalDetectionCount = computed(() => detections.value.length);
+
+  const verificationStatus = computed(() => {
+    if (totalDetectionCount.value === 0) return 'unverified';
+    if (annotatedDetectionCount.value === totalDetectionCount.value)
+      return 'verified';
+    if (annotatedDetectionCount.value > 0) return 'partial';
+    return 'unverified';
+  });
 
   // Tracking changes for backend synchronization
   const detectionsToAdd = ref<DetectionWithUI[]>([]);
@@ -80,7 +97,58 @@ export const useImageStore = defineStore('image', () => {
     isLoading.value = false;
     error.value = null;
     currentImageId.value = null;
+    currentCollectionId.value = null;
   };
+
+  // Meta roles options getter for UI components
+  const metaRolesOptions = computed(() => {
+    return collectionStore.collectionMetaRoles.map((role) => ({
+      label: role.computed_display_name || role.id,
+      value: role.computed_name || role.id,
+      color: role.color || '#cccccc',
+      id: role.id,
+    }));
+  });
+
+  // Check if image has low confidence detections
+  const hasLowConfidenceDetections = computed(() => {
+    if (!image.value) return false;
+
+    // Define low confidence threshold
+    const LOW_CONFIDENCE_THRESHOLD = 0.7;
+
+    return !!detections.value.find(
+      (d) =>
+        d.confidence !== undefined && d.confidence < LOW_CONFIDENCE_THRESHOLD,
+    );
+  });
+
+  // Check if image has medium confidence detections
+  const hasMediumConfidenceDetections = computed(() => {
+    if (!image.value) return false;
+
+    // Define confidence thresholds
+    const LOW_CONFIDENCE_THRESHOLD = 0.7;
+    const MEDIUM_CONFIDENCE_THRESHOLD = 0.9;
+
+    // If any detection has low confidence, we don't consider the image to have "medium" confidence
+    if (hasLowConfidenceDetections.value) return false;
+
+    return !!detections.value.find(
+      (d) =>
+        d.confidence !== undefined &&
+        d.confidence >= LOW_CONFIDENCE_THRESHOLD &&
+        d.confidence < MEDIUM_CONFIDENCE_THRESHOLD,
+    );
+  });
+
+  // Determine if image needs attention
+  const needsAttention = computed(() => {
+    return (
+      hasLowConfidenceDetections.value ||
+      verificationStatus.value !== 'verified'
+    );
+  });
 
   // Convert detections from API format to UI format
   const convertDetectionsForUI = (
@@ -101,7 +169,7 @@ export const useImageStore = defineStore('image', () => {
   };
 
   // Load image data from API
-  const loadImage = async (imageId: string) => {
+  const loadImage = async (imageId: string, collectionId?: string) => {
     if (!imageId) {
       console.error('[useImage] No image ID provided');
       return { success: false, error: 'No image ID provided' };
@@ -111,14 +179,85 @@ export const useImageStore = defineStore('image', () => {
     error.value = null;
 
     try {
+      // Store the collection ID
+      if (collectionId) {
+        currentCollectionId.value = collectionId;
+
+        // Ensure collection is loaded to get meta roles and image data
+        console.log(
+          '[useImage] Ensuring collection data is ready before loading image',
+        );
+        const isReady =
+          await collectionStore.waitForCollectionReady(collectionId);
+
+        if (!isReady) {
+          error.value = 'Failed to fully load collection data';
+          isLoading.value = false;
+          return {
+            success: false,
+            error: 'Failed to fully load collection data',
+          };
+        }
+      } else if (currentCollectionId.value) {
+        // Use stored collection ID if not provided
+        collectionId = currentCollectionId.value;
+        console.log(`[useImage] Using stored collection ID: ${collectionId}`);
+
+        // Ensure the stored collection is ready
+        await collectionStore.waitForCollectionReady(collectionId);
+      } else {
+        // Try to extract collection ID from image ID (often formatted as "collectionId_imageId")
+        const possibleCollectionId = imageId.split('_')[0];
+        if (possibleCollectionId) {
+          console.log(
+            `[useImage] Extracted possible collection ID: ${possibleCollectionId} from image ID`,
+          );
+          collectionId = possibleCollectionId;
+          currentCollectionId.value = possibleCollectionId;
+
+          // Ensure the extracted collection is ready
+          const isReady =
+            await collectionStore.waitForCollectionReady(possibleCollectionId);
+          if (!isReady) {
+            console.warn(
+              '[useImage] Collection not fully ready, but proceeding with image load',
+            );
+          }
+        } else {
+          error.value = 'No collection ID provided or stored';
+          isLoading.value = false;
+          return {
+            success: false,
+            error: 'No collection ID provided or stored',
+          };
+        }
+      }
+
+      // Check if the collection store is ready to use
+      if (
+        !collectionStore.allImagesFlattened ||
+        collectionStore.allImagesFlattened.length === 0
+      ) {
+        console.log(
+          '[useImage] Waiting for collection images to be available...',
+        );
+        // Wait a short time for the collection data to be processed
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
       // First check if the image exists in the collection store
-      const imageInCollection = collectionStore.getImageById(imageId);
+      const imageInCollection = collectionStore.allImagesFlattened.find(
+        (img) => img.id === imageId,
+      );
 
       if (!imageInCollection) {
-        console.error(`[useImage] Image ${imageId} not found in collection`);
-        error.value = 'Image not found in collection';
-        isLoading.value = false;
-        return { success: false, error: 'Image not found in collection' };
+        console.warn(
+          `[useImage] Image ${imageId} not found in collection store's flattened images`,
+        );
+        // The image might not be in allImagesFlattened yet, proceed anyway
+        console.log(
+          '[useImage] Proceeding with image load without collection verification',
+        );
       }
 
       // Get full image data from the API
@@ -141,6 +280,11 @@ export const useImageStore = defineStore('image', () => {
       // Update the store with the image data
       image.value = response.data;
       currentImageId.value = imageId;
+
+      // Set the selected image in the collection store as well
+      if (collectionId && collectionStore.selectImage) {
+        collectionStore.selectImage(imageId);
+      }
 
       // Convert detections to UI format
       detections.value = convertDetectionsForUI(response.data.detections);
@@ -477,6 +621,152 @@ export const useImageStore = defineStore('image', () => {
     }));
   });
 
+  // Save just the image reference to the database
+  const saveImage = async () => {
+    if (!image.value || !image.value.id) {
+      console.error('[useImage] No image data to save');
+      return { success: false, error: 'No image data to save' };
+    }
+
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const response = await apiUpdateImage(image.value);
+
+      if (response.error) {
+        console.error(`[useImage] Error saving image: ${response.error}`);
+        error.value = `Error saving image: ${response.error}`;
+        isLoading.value = false;
+        return { success: false, error: response.error };
+      }
+
+      // Update local image with data from API if needed
+      if (response.data) {
+        image.value = response.data;
+      }
+
+      console.log('[useImage] Image saved successfully');
+
+      isLoading.value = false;
+      return { success: true };
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error saving image';
+      console.error(`[useImage] Error saving image: ${errorMessage}`);
+      error.value = errorMessage;
+      isLoading.value = false;
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  // Update a detection with meta role information
+  const updateDetectionWithMetaRole = async (
+    detectionId: string,
+    metaRoleId: string,
+    value: string,
+  ) => {
+    try {
+      isLoading.value = true;
+      error.value = null;
+
+      // Find the detection in our local state
+      const detection = detections.value.find((d) => d.id === detectionId);
+      if (!detection) {
+        console.error(
+          `[useImage] Cannot find detection ${detectionId} to update meta role`,
+        );
+        error.value = 'Detection not found';
+        isLoading.value = false;
+        return { success: false, error: 'Detection not found' };
+      }
+
+      // Mark the detection as loading
+      detection.loadingMetaRoles = true;
+
+      // Call the collection store's implementation which interfaces with the API
+      const result = await collectionStore.updateDetectionWithMetaRole(
+        detectionId,
+        metaRoleId,
+        value,
+      );
+
+      if (!result.success) {
+        console.error(
+          `[useImage] Error updating detection with meta role: ${result.error}`,
+        );
+        error.value = result.error;
+        detection.loadingMetaRoles = false;
+        isLoading.value = false;
+        return result;
+      }
+
+      // If successful, update our local detection object
+      // Mark the detection as annotated, update the type and value
+      detection.annotated = true;
+      detection.computed_type = metaRoleId;
+      detection.value = value;
+      detection.confidence = 1.0; // Set to full confidence as it's manually verified
+      detection.edited = true;
+      detection.last_change = new Date().toISOString();
+
+      // Find appropriate meta role to get display name and color
+      const metaRole = collectionStore.collectionMetaRoles.find(
+        (role) => role.id === metaRoleId,
+      );
+      if (metaRole) {
+        detection.computed_display_type =
+          metaRole.computed_display_name || metaRoleId;
+        detection.computed_color = metaRole.color || '#cccccc';
+      }
+
+      // Update API with our local changes
+      const apiDetection = prepareDetectionForAPI(detection);
+      const updatePayload = {
+        ...apiDetection,
+        annotated: detection.annotated,
+        created_date: detection.created_date,
+        last_change: detection.last_change,
+        last_access: detection.last_access,
+        deleted: detection.deleted,
+        computed_color: detection.computed_color,
+        computed_type: detection.computed_type,
+        computed_display_type: detection.computed_display_type,
+      };
+
+      // Use the apiUpdateDetection function with our payload to update detection
+      await apiUpdateDetection(updatePayload);
+
+      // Update local store's stats
+      detection.loadingMetaRoles = false;
+      detection.edited = false;
+
+      console.log(
+        `[useImage] Successfully updated detection ${detectionId} with meta role ${metaRoleId}`,
+      );
+      isLoading.value = false;
+
+      // Return success
+      return { success: true, error: '' };
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error updating detection';
+      console.error(
+        `[useImage] Error in updateDetectionWithMetaRole: ${errorMessage}`,
+      );
+      error.value = errorMessage;
+      isLoading.value = false;
+
+      // Reset loading state for the detection if it exists
+      const detection = detections.value.find((d) => d.id === detectionId);
+      if (detection) {
+        detection.loadingMetaRoles = false;
+      }
+
+      return { success: false, error: errorMessage };
+    }
+  };
+
   return {
     // State
     image,
@@ -485,6 +775,7 @@ export const useImageStore = defineStore('image', () => {
     isLoading,
     error,
     currentImageId,
+    currentCollectionId,
     detectionsToAdd,
     detectionsToDelete,
 
@@ -492,6 +783,13 @@ export const useImageStore = defineStore('image', () => {
     selectedDetection,
     hasChanges,
     detectionsForUI,
+    metaRolesOptions,
+    verificationStatus,
+    annotatedDetectionCount,
+    totalDetectionCount,
+    hasLowConfidenceDetections,
+    hasMediumConfidenceDetections,
+    needsAttention,
 
     // Methods
     resetState,
@@ -502,5 +800,7 @@ export const useImageStore = defineStore('image', () => {
     deleteDetection,
     saveAllChanges,
     updateCollectionStore,
+    saveImage,
+    updateDetectionWithMetaRole,
   };
 });
