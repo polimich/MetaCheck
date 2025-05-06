@@ -68,16 +68,20 @@ class DetectionHierarchical(Detection, BaseEntity):
 
     meta_element_detections: "MetaElementDetection"
 
+class ImageHierarchical(Image, BaseEntity):
+    """Schema for an image with hierarchical structure including detections."""
+    
+    detections: List["DetectionHierarchical"] = []
+
 class MetaElementHierarchical(MetaElement, BaseEntity):
     """Schema for a meta element with hierarchical structure."""
 
-    detections: List["DetectionHierarchical"] = []
     children: List["MetaElementHierarchical"] = []
-    images: List["Image"] = []
+    images: List["ImageHierarchical"] = []
+    meta_detections: List["DetectionHierarchical"] = []
 
 class CollectionHierarchical(CollectionNew, BaseEntity):
     """Schema for a collection with hierarchical structure."""
 
     global_structure: Optional[MetaElementHierarchical] = None
     root_meta_element_id: Optional[UUID] = None
-    

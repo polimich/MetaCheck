@@ -21,7 +21,7 @@ from db import model
 from metacheck.constants import META_ELEMENT_TYPE_IDS, ElementTypeEnum
 from metacheck.database import DBError
 from metacheck.schemas import base_objects
-from metacheck.schemas.base_objects.collection import CollectionHierarchical, DetectionHierarchical, MetaElementHierarchical
+from metacheck.schemas.base_objects.collection import CollectionHierarchical, DetectionHierarchical, MetaElementHierarchical, ImageHierarchical
 from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
@@ -351,6 +351,9 @@ async def import_yolo_collection(file: UploadFile, db: AsyncSession):
 async def invalidate_collection_cache(db: AsyncSession, collection_id: UUID):
     """Invalidate the hierarchical structure cache for a collection"""
     try:
+        # Log that we're invalidating the cache
+        logger.info(f"Invalidating hierarchical structure cache for collection {collection_id}")
+        
         # Check if transaction is already in progress
         is_transaction_active = db.in_transaction()
         
@@ -370,19 +373,40 @@ async def invalidate_collection_cache(db: AsyncSession, collection_id: UUID):
                     .values(hierarchical_structure=None)
                 )
         
-        logger.info(f"Invalidated hierarchical structure cache for collection {collection_id}")
+        logger.info(f"Successfully invalidated hierarchical structure cache for collection {collection_id}")
     except exc.SQLAlchemyError as e:
         # Just log the error but don't raise an exception
         # This is a non-critical operation
         logger.warning(f"Failed to invalidate cache for collection {collection_id}: {str(e)}")
 
 
-async def get_collection_hierarchical(db: AsyncSession, collection_id: UUID, use_cache: bool = True):
+async def get_collection_hierarchical(db: AsyncSession, collection_id: UUID, use_cache: bool = True, force_rebuild: bool = False):
     """Get a collection with all its images and meta_elements explicitly loaded in a hierarchical structure"""
     start_time = datetime.now()
     logger.info(f"[CACHE] Starting hierarchy fetch for collection {collection_id}")
     
     try:
+        # If force_rebuild is set, invalidate the cache first
+        if force_rebuild:
+            logger.info(f"[CACHE] Force rebuild requested, invalidating cache")
+            # Use a separate transaction for cache invalidation
+            if db.in_transaction():
+                # If already in transaction, just execute the update
+                await db.execute(
+                    update(model.Collection)
+                    .where(model.Collection.id == collection_id)
+                    .values(hierarchical_structure=None)
+                )
+            else:
+                # Otherwise start a new transaction
+                async with db.begin():
+                    await db.execute(
+                        update(model.Collection)
+                        .where(model.Collection.id == collection_id)
+                        .values(hierarchical_structure=None)
+                    )
+            use_cache = False  # Don't check for cache if we're forcing a rebuild
+        
         # Check for cached structure first
         if use_cache:
             logger.info(f"[CACHE] Cache enabled, checking for existing cache")
@@ -398,6 +422,18 @@ async def get_collection_hierarchical(db: AsyncSession, collection_id: UUID, use
             if db_collection and db_collection.hierarchical_structure:
                 cache_time = datetime.now() - start_time
                 logger.info(f"[CACHE] ✅ Cache hit for collection {collection_id} | Retrieved in {cache_time.total_seconds():.4f}s")
+                
+                # Debug check for meta_detections in the cache
+                try:
+                    if "global_structure" in db_collection.hierarchical_structure:
+                        global_structure = db_collection.hierarchical_structure["global_structure"]
+                        if global_structure and "meta_detections" in global_structure:
+                            logger.info(f"[CACHE] Root element in cache has meta_detections field with {len(global_structure['meta_detections'])} items")
+                        else:
+                            logger.warning(f"[CACHE] Root element in cache is missing meta_detections field or is empty")
+                except Exception as e:
+                    logger.warning(f"[CACHE] Error checking meta_detections in cache: {str(e)}")
+                    
                 return CollectionHierarchical(**db_collection.hierarchical_structure)
             else:
                 logger.info(f"[CACHE] ❌ Cache miss for collection {collection_id}")
@@ -481,6 +517,10 @@ async def get_collection_hierarchical(db: AsyncSession, collection_id: UUID, use
                 # Convert to a JSON-serializable dict with UUIDs as strings and datetimes as ISO format
                 def convert_to_json_safe(obj):
                     if isinstance(obj, dict):
+                        # Debug check for meta_detections key
+                        if "meta_detections" in obj:
+                            logger.debug(f"[CACHE] Found meta_detections with {len(obj['meta_detections'])} items")
+                        
                         return {k: convert_to_json_safe(v) for k, v in obj.items()}
                     elif isinstance(obj, list):
                         return [convert_to_json_safe(i) for i in obj]
@@ -610,7 +650,7 @@ async def build_meta_element_hierarchy_optimized(db: AsyncSession, meta_element_
             meta_element_dict = model.orm2dict(element)
             meta_element_dict["children"] = []
             meta_element_dict["images"] = []
-            meta_element_dict["detections"] = []
+            meta_element_dict["meta_detections"] = []  # Initialize meta_detections list
             
             # Add meta_element_type if available
             if element.meta_element_type:
@@ -647,20 +687,39 @@ async def build_meta_element_hierarchy_optimized(db: AsyncSession, meta_element_
         
         logger.info(f"[PROGRESS] (4/5) Loaded {len(images)} images")
         
+        # Create a mapping of image IDs to their parent meta elements for detection assignment later
+        image_to_meta_element = {}
+        image_ids = []
+        
+        # Create dictionary to store images
+        images_dict = {}
+        
         # Assign images to their parent meta elements
         image_count = 0
         for image in images:
             if image.parent_meta_element_id and str(image.parent_meta_element_id) in meta_elements_dict:
                 image_dict = model.orm2dict(image)
-                meta_elements_dict[str(image.parent_meta_element_id)].images.append(
-                    base_objects.Image(**image_dict)
-                )
+                image_dict["detections"] = []  # Initialize empty detections list
+                
+                # Create ImageHierarchical object
+                image_hierarchical = ImageHierarchical(**image_dict)
+                
+                # Add to meta element images
+                meta_elements_dict[str(image.parent_meta_element_id)].images.append(image_hierarchical)
+                
+                # Store mapping for detection assignment later
+                image_to_meta_element[str(image.id)] = str(image.parent_meta_element_id)
+                image_ids.append(str(image.id))
+                
+                # Store image object for detection assignment later
+                images_dict[str(image.id)] = image_hierarchical
+                
                 image_count += 1
         
         logger.info(f"[PROGRESS] (4/5) Assigned {image_count} images to meta elements")
         
         # Progress tracking: 5/5 - Loading detections
-        logger.info(f"[PROGRESS] (5/5) Loading detections for meta elements...")
+        logger.info(f"[PROGRESS] (5/5) Loading detections for meta elements and images...")
         
         # Get all meta element detections and their meta roles in one query
         if meta_element_ids:  # Only query if we have meta element IDs
@@ -684,44 +743,87 @@ async def build_meta_element_hierarchy_optimized(db: AsyncSession, meta_element_
             # Get all detections in one query
             if detection_ids:  # Only query if we have detection IDs
                 logger.info(f"[PROGRESS] (5/5) Loading {len(detection_ids)} detections...")
-                detections_query = await db.execute(
-                    select(model.Detection)
-                    .where(model.Detection.id.in_(detection_ids))
-                )
-                detections = {
-                    str(d.id): d
-                    for d in detections_query.scalars().all()
-                }
                 
-                logger.info(f"[PROGRESS] (5/5) Loaded {len(detections)} detections")
-                
-                # Assign detections to their meta elements
-                detection_count = 0
-                for meta_element_id_str, meds in med_by_meta_element.items():
-                    if meta_element_id_str in meta_elements_dict:
-                        meta_element = meta_elements_dict[meta_element_id_str]
-                        
-                        for med in meds:
-                            detection_id_str = str(med.detection_id)
-                            if detection_id_str in detections:
-                                detection = detections[detection_id_str]
-                                detection_dict = model.orm2dict(detection)
-                                
-                                # Create meta element detection with meta role
-                                med_dict = model.orm2dict(med)
-                                if med.meta_role:
-                                    med_dict["meta_role"] = base_objects.MetaRole(**model.orm2dict(med.meta_role))
-                                
-                                med_obj = base_objects.MetaElementDetection(**med_dict)
-                                
-                                # Create detection with meta element detection
-                                detection_dict["meta_element_detections"] = med_obj
-                                detection_obj = DetectionHierarchical(**detection_dict)
-                                
-                                meta_element.detections.append(detection_obj)
-                                detection_count += 1
-                
-                logger.info(f"[PROGRESS] (5/5) Assigned {detection_count} detections to meta elements")
+                # Make sure we're executing the query properly
+                try:
+                    detections_query = await db.execute(
+                        select(model.Detection)
+                        .where(model.Detection.id.in_(detection_ids))
+                    )
+                    detections = {
+                        str(d.id): d
+                        for d in detections_query.scalars().all()
+                    }
+                    
+                    logger.info(f"[PROGRESS] (5/5) Loaded {len(detections)} detections")
+                    
+                    # Process detections and assign to appropriate images
+                    detection_count = 0
+                    images_with_detections = set()
+                    
+                    for meta_element_id_str, meds in med_by_meta_element.items():
+                        if meta_element_id_str in meta_elements_dict:
+                            meta_element = meta_elements_dict[meta_element_id_str]
+                            
+                            for med in meds:
+                                detection_id_str = str(med.detection_id)
+                                if detection_id_str in detections:
+                                    detection = detections[detection_id_str]
+                                    
+                                    # Get the image ID from the detection
+                                    detection_image_id = str(detection.image_id)
+                                    
+                                    # Create detection object with meta element detection
+                                    detection_dict = model.orm2dict(detection)
+                                    
+                                    # Create meta element detection with meta role
+                                    med_dict = model.orm2dict(med)
+                                    if med.meta_role:
+                                        med_dict["meta_role"] = base_objects.MetaRole(**model.orm2dict(med.meta_role))
+                                    
+                                    med_obj = base_objects.MetaElementDetection(**med_dict)
+                                    
+                                    # Add meta_element_detections to detection
+                                    detection_dict["meta_element_detections"] = med_obj
+                                    
+                                    # Create hierarchical detection
+                                    detection_obj = DetectionHierarchical(**detection_dict)
+                                    
+                                    # Add detection to the image if it exists in our processed set
+                                    if detection_image_id in images_dict:
+                                        images_dict[detection_image_id].detections.append(detection_obj)
+                                        images_with_detections.add(detection_image_id)
+                                    
+                                    # Also add the detection to the meta_detections list of the meta element
+                                    meta_element.meta_detections.append(detection_obj)
+                                    
+                                    detection_count += 1
+                    
+                    logger.info(f"[PROGRESS] (5/5) Assigned {detection_count} detections to {len(images_with_detections)} images")
+                    
+                    # Debug log for meta_detections
+                    meta_elements_with_detections = sum(1 for me_id, me in meta_elements_dict.items() if me.meta_detections)
+                    total_meta_detections = sum(len(me.meta_detections) for me_id, me in meta_elements_dict.items())
+                    logger.info(f"[PROGRESS] (5/5) Added {total_meta_detections} meta_detections to {meta_elements_with_detections} meta elements")
+                    
+                    # Debug check for root element's meta_detections
+                    root = meta_elements_dict.get(str(meta_element_id))
+                    if root and root.meta_detections:
+                        logger.info(f"[PROGRESS] (5/5) Root element has {len(root.meta_detections)} meta_detections")
+                    
+                    # Debug log to check some specific images and their detections
+                    sample_size = min(5, len(images_dict))
+                    if sample_size > 0:
+                        logger.info(f"[DEBUG] Checking detections in a sample of {sample_size} images:")
+                        sample_images = list(images_dict.values())[:sample_size]
+                        for i, img in enumerate(sample_images):
+                            logger.info(f"[DEBUG] Image {i+1}/{sample_size} (ID: {img.id}): Has {len(img.detections)} detections")
+                            if img.detections:
+                                logger.info(f"[DEBUG] First detection in image {i+1}: {img.detections[0].id}")
+                except Exception as e:
+                    # Log but continue with the process - having no detections is better than failing completely
+                    logger.error(f"[PROGRESS] (5/5) Error loading detections: {str(e)}")
+                    logger.exception("Detection loading error details")
             else:
                 logger.info(f"[PROGRESS] (5/5) No detections to load")
         else:
@@ -729,6 +831,33 @@ async def build_meta_element_hierarchy_optimized(db: AsyncSession, meta_element_
         
         # Progress tracking: completed
         logger.info(f"[PROGRESS] Hierarchy build completed successfully!")
+        
+        # Additional verification for the root element
+        root = meta_elements_dict.get(str(meta_element_id))
+        if root:
+            # Count total images and detections in the hierarchy
+            total_images = 0
+            total_images_with_detections = 0
+            total_detections = 0
+            
+            def count_hierarchy(element):
+                nonlocal total_images, total_images_with_detections, total_detections
+                if element.images:
+                    total_images += len(element.images)
+                    for img in element.images:
+                        if img.detections:
+                            total_images_with_detections += 1
+                            total_detections += len(img.detections)
+                
+                # Also count meta_detections
+                if hasattr(element, 'meta_detections') and element.meta_detections:
+                    total_detections += len(element.meta_detections)
+                
+                for child in element.children:
+                    count_hierarchy(child)
+            
+            count_hierarchy(root)
+            logger.info(f"[VERIFY] Hierarchy contains {total_images} images, {total_images_with_detections} images with detections, and {total_detections} total detections")
         
         # Return the root element
         return meta_elements_dict.get(str(meta_element_id))
@@ -764,7 +893,6 @@ async def get_meta_element_children(
             child_dict = model.orm2dict(child)
             child_dict["children"] = [] 
             child_dict["images"] = []
-            child_dict["detections"] = []
             
             # Add meta_element_type
             if child.meta_element_type:
@@ -804,7 +932,8 @@ async def get_meta_element_images(
         images = []
         for image in db_images:
             image_dict = model.orm2dict(image)
-            images.append(base_objects.Image(**image_dict))
+            image_dict["detections"] = []  # Initialize with empty detections list
+            images.append(ImageHierarchical(**image_dict))
             
         return images
     
@@ -820,52 +949,85 @@ async def get_meta_element_detections(
     limit: int = 20,
     offset: int = 0
 ):
-    """Get detections for a specific meta element with pagination"""
+    """Get detections for a specific meta element with pagination.
+    
+    This function returns two objects:
+    1. A dictionary mapping image IDs to lists of detections
+    2. A list of all detections associated with this meta element
+    """
     try:
         # Load meta roles for the operation
         meta_roles_query = await db.execute(select(model.MetaRole))
         db_meta_roles = meta_roles_query.unique().scalars().all()
         meta_roles_by_id = {str(mr.id): base_objects.MetaRole(**model.orm2dict(mr)) for mr in db_meta_roles}
         
-        # Get detections with pagination using JOIN
-        joined_query = await db.execute(
-            select(
-                model.MetaElementDetection, 
-                model.Detection
-            )
-            .join(
-                model.Detection, 
-                model.MetaElementDetection.detection_id == model.Detection.id
-            )
+        # First, get all images for this meta element
+        images_query = await db.execute(
+            select(model.Image)
+            .where(model.Image.parent_meta_element_id == meta_element_id)
+        )
+        images = images_query.unique().scalars().all()
+        image_ids = [image.id for image in images]
+        
+        # Get meta_element_detections for this meta_element
+        meds_query = await db.execute(
+            select(model.MetaElementDetection)
             .where(model.MetaElementDetection.meta_element_id == meta_element_id)
-            .order_by(model.Detection.id)
             .offset(offset)
             .limit(limit)
         )
-        results = joined_query.unique().all()
+        meta_element_detections = meds_query.scalars().all()
         
-        # Create result objects
-        detections = []
-        for med, detection in results:
-            # Create detection dictionary
-            detection_dict = model.orm2dict(detection)
-            
-            # Create meta_element_detection with meta_role
-            med_dict = model.orm2dict(med)
-            if med.meta_role_id:
-                meta_role_id_str = str(med.meta_role_id)
-                if meta_role_id_str in meta_roles_by_id:
-                    med_dict["meta_role"] = meta_roles_by_id[meta_role_id_str]
-            
-            # Create detection object with meta_element_detection
-            detection_dict["meta_element_detections"] = base_objects.MetaElementDetection(**med_dict)
-            detection_obj = DetectionHierarchical(**detection_dict)
-            
-            # Add to element
-            element.detections.append(detection_obj)
-            
-        return detections
-    
+        if not meta_element_detections:
+            return {"by_image": {}, "direct": []}
+        
+        # Get all detection IDs from meta_element_detections
+        detection_ids = [med.detection_id for med in meta_element_detections]
+        
+        # Get all detections at once
+        detections_query = await db.execute(
+            select(model.Detection)
+            .where(model.Detection.id.in_(detection_ids))
+        )
+        all_detections = {
+            str(d.id): d
+            for d in detections_query.scalars().all()
+        }
+        
+        # Create a dictionary mapping image IDs to lists of detections
+        result_by_image = {}
+        result_direct = []
+        
+        # Group detections by image_id and also collect them directly
+        for med in meta_element_detections:
+            if str(med.detection_id) in all_detections:
+                detection = all_detections[str(med.detection_id)]
+                image_id = str(detection.image_id)
+                
+                # Create detection object with meta_element_detection
+                detection_dict = model.orm2dict(detection)
+                
+                # Create meta_element_detection with meta_role
+                med_dict = model.orm2dict(med)
+                if med.meta_role_id:
+                    meta_role_id_str = str(med.meta_role_id)
+                    if meta_role_id_str in meta_roles_by_id:
+                        med_dict["meta_role"] = meta_roles_by_id[meta_role_id_str]
+                
+                detection_dict["meta_element_detections"] = base_objects.MetaElementDetection(**med_dict)
+                detection_obj = DetectionHierarchical(**detection_dict)
+                
+                # Add to result_by_image dictionary
+                if image_id not in result_by_image:
+                    result_by_image[image_id] = []
+                
+                result_by_image[image_id].append(detection_obj)
+                
+                # Also add to direct list
+                result_direct.append(detection_obj)
+        
+        return {"by_image": result_by_image, "direct": result_direct}
+        
     except exc.SQLAlchemyError as e:
         logger.exception(f"Failed reading meta element detections from database")
         raise DBError(f"Failed reading meta element detections from database") from e
@@ -909,7 +1071,7 @@ async def build_meta_element_hierarchy(db: AsyncSession, meta_element_id: UUID, 
     meta_element_dict = model.orm2dict(meta_element)
     meta_element_dict["children"] = []
     meta_element_dict["images"] = []
-    meta_element_dict["detections"] = []
+    meta_element_dict["meta_detections"] = []  # Initialize meta_detections list
     
     # Add meta_element_type if available
     if meta_element.meta_element_type:
@@ -941,9 +1103,22 @@ async def build_meta_element_hierarchy(db: AsyncSession, meta_element_id: UUID, 
     )
     images = images_query.unique().scalars().all()
     
+    # Dictionary to store images by ID for later detection assignment
+    images_dict = {}
+    
+    # Add images to the element
     for image in images:
         image_dict = model.orm2dict(image)
-        element.images.append(base_objects.Image(**image_dict))
+        image_dict["detections"] = []  # Initialize empty detections list
+        
+        # Create image hierarchical object
+        image_hierarchical = ImageHierarchical(**image_dict)
+        
+        # Add to meta element
+        element.images.append(image_hierarchical)
+        
+        # Store for detection assignment
+        images_dict[str(image.id)] = image_hierarchical
     
     # Get detections for this meta element
     meta_element_detections_query = await db.execute(
@@ -953,7 +1128,7 @@ async def build_meta_element_hierarchy(db: AsyncSession, meta_element_id: UUID, 
     )
     meta_element_detections = meta_element_detections_query.unique().scalars().all()
     
-    # For each meta element detection, get the detection
+    # For each meta element detection, get the detection and assign to appropriate image
     for med in meta_element_detections:
         detection_query = await db.execute(
             select(model.Detection)
@@ -962,20 +1137,33 @@ async def build_meta_element_hierarchy(db: AsyncSession, meta_element_id: UUID, 
         detection = detection_query.unique().scalar_one_or_none()
         
         if detection:
-            detection_dict = model.orm2dict(detection)
+            # Get the image ID for this detection
+            detection_image_id = str(detection.image_id)
             
-            # Create meta element detection with meta_role
-            med_dict = model.orm2dict(med)
-            if med.meta_role:
-                med_dict["meta_role"] = base_objects.MetaRole(**model.orm2dict(med.meta_role))
+            # Only process if the image exists in our images dictionary
+            if detection_image_id in images_dict:
+                detection_dict = model.orm2dict(detection)
                 
-            med_obj = base_objects.MetaElementDetection(**med_dict)
-            
-            # Create detection with meta_element_detection
-            detection_dict["meta_element_detections"] = med_obj
-            detection_obj = DetectionHierarchical(**detection_dict)
-            
-            element.detections.append(detection_obj)
+                # Create meta element detection with meta_role
+                med_dict = model.orm2dict(med)
+                if med.meta_role:
+                    med_dict["meta_role"] = base_objects.MetaRole(**model.orm2dict(med.meta_role))
+                    
+                med_obj = base_objects.MetaElementDetection(**med_dict)
+                
+                # Create detection with meta_element_detection
+                detection_dict["meta_element_detections"] = med_obj
+                detection_obj = DetectionHierarchical(**detection_dict)
+                
+                # Add detection to the image
+                images_dict[detection_image_id].detections.append(detection_obj)
+                
+                # Also add the detection to the meta_detections list of the meta element
+                element.meta_detections.append(detection_obj)
+    
+    # Debug log for meta_detections in non-optimized version
+    if element.meta_detections:
+        logger.info(f"[DEBUG] Element {meta_element_id} has {len(element.meta_detections)} meta_detections")
     
     return element
 
@@ -1117,3 +1305,355 @@ async def check_hierarchical_cache_status(db: AsyncSession, collection_id: UUID)
     except Exception as e:
         logger.exception(f"[CACHE-CHECK] Error checking cache status: {str(e)}")
         return {"status": "error", "message": f"Error checking cache: {str(e)}"}
+
+
+async def invalidate_all_collection_caches(db: AsyncSession):
+    """Invalidate the hierarchical structure cache for all collections.
+    
+    This is useful when the structure of the cache has changed and all caches need to be rebuilt.
+    """
+    try:
+        logger.info("[CACHE] Invalidating hierarchical structure cache for all collections")
+        
+        # Check if transaction is already in progress
+        is_transaction_active = db.in_transaction()
+        
+        if is_transaction_active:
+            # If transaction is active, just run the query
+            result = await db.execute(
+                update(model.Collection)
+                .values(hierarchical_structure=None)
+            )
+            rows_affected = result.rowcount
+            logger.info(f"[CACHE] Successfully invalidated hierarchical structure for {rows_affected} collections")
+        else:
+            # If no transaction is active, start one
+            async with db.begin():
+                result = await db.execute(
+                    update(model.Collection)
+                    .values(hierarchical_structure=None)
+                )
+                rows_affected = result.rowcount
+                logger.info(f"[CACHE] Successfully invalidated hierarchical structure for {rows_affected} collections")
+        
+        return rows_affected
+    except exc.SQLAlchemyError as e:
+        # Just log the error but don't raise an exception
+        # This is a non-critical operation
+        logger.warning(f"[CACHE] Failed to invalidate cache for all collections: {str(e)}")
+        return 0
+
+
+def _extract_periodical_flag(meta_element):
+    """
+    Extract the periodical flag from a meta_element's attributes.
+    
+    Args:
+        meta_element: The meta element to extract the periodical flag from
+        
+    Returns:
+        The periodical flag value (True/False) or None if not found
+    """
+    if not hasattr(meta_element, 'attributes') or not meta_element.attributes:
+        return None
+        
+    # Check if it's a dict or a JSON string
+    attributes = meta_element.attributes
+    if isinstance(attributes, str):
+        try:
+            import json
+            attributes = json.loads(attributes)
+        except:
+            return None
+            
+    # Return the periodical flag if it exists
+    if isinstance(attributes, dict) and 'periodical' in attributes:
+        return attributes['periodical']
+        
+    return None
+
+
+async def get_collection_hierarchical_tree(db: AsyncSession, collection_id: UUID):
+    """
+    Get a collection's hierarchical structure organized as a tree with detections arranged by role.
+    
+    This provides a frontend-friendly structure where detections are organized by their roles
+    (title, author, etc.) rather than by the images they appear in.
+    
+    Returns:
+        A hierarchical tree object with the following structure:
+        {
+            "id": "uuid",
+            "periodical": true/false,  // Indicates if this is a periodical
+            "subTitle": detection,
+            "author": [detection1, detection2, ...],
+            ... other metadata fields ...
+            "volumes": [ // Only for multi-part monographs
+                {
+                    "id": "uuid",
+                    "periodical": true/false,
+                    ... volume metadata fields ...
+                    "issues": [ // For volumes that have issues
+                        {
+                            "id": "uuid",
+                            "periodical": true/false,
+                            ... issue metadata ...
+                        }
+                    ]
+                }
+            ]
+        }
+    """
+    logger.info(f"Building hierarchical tree for collection {collection_id}")
+    
+    try:
+        # Get the collection with its hierarchical structure
+        collection = await get_collection_hierarchical(db, collection_id)
+        if not collection or not collection.global_structure:
+            logger.warning(f"Collection {collection_id} not found or has no global structure")
+            return None
+            
+        # Build the hierarchical tree
+        root_element = collection.global_structure
+        element_type = root_element.meta_element_type.name if root_element.meta_element_type else "unknown"
+        
+        # Create the base tree structure - include ID and type
+        result = {
+            "id": str(root_element.id),
+            "type": element_type  # Include the type field
+        }
+        
+        # Add periodical flag if it exists
+        periodical_flag = _extract_periodical_flag(root_element)
+        if periodical_flag is not None:
+            result['periodical'] = periodical_flag
+            logger.debug(f"Added periodical={periodical_flag} flag to root element")
+        
+        # Process detections for the root element
+        await _process_detections_for_tree(result, root_element)
+        
+        # If this is a title, process its volume children
+        if element_type == "title":
+            result["volumes"] = []
+            volume_children = [
+                child for child in root_element.children 
+                if child.meta_element_type and child.meta_element_type.name == "volume"
+            ]
+            
+            for volume in volume_children:
+                # Create volume node with type field
+                volume_node = {
+                    "id": str(volume.id),
+                    "type": "volume"  # Include the type field
+                }
+                
+                # Add periodical flag if it exists
+                periodical_flag = _extract_periodical_flag(volume)
+                if periodical_flag is not None:
+                    volume_node['periodical'] = periodical_flag
+                    logger.debug(f"Added periodical={periodical_flag} flag to volume")
+                
+                # Process detections for this volume
+                await _process_detections_for_tree(volume_node, volume)
+                
+                # Process issues for this volume
+                issue_children = [
+                    child for child in volume.children 
+                    if child.meta_element_type and child.meta_element_type.name == "issue"
+                ]
+                
+                if issue_children:
+                    volume_node["issues"] = []
+                    
+                    for issue in issue_children:
+                        # Create issue node with type field
+                        issue_node = {
+                            "id": str(issue.id),
+                            "type": "issue"  # Include the type field
+                        }
+                        
+                        # Add periodical flag if it exists
+                        periodical_flag = _extract_periodical_flag(issue)
+                        if periodical_flag is not None:
+                            issue_node['periodical'] = periodical_flag
+                            logger.debug(f"Added periodical={periodical_flag} flag to issue")
+                        
+                        # Process detections for this issue
+                        await _process_detections_for_tree(issue_node, issue)
+                        volume_node["issues"].append(issue_node)
+                    
+                    logger.info(f"Volume {volume.id} has {len(issue_children)} issues")
+                
+                result["volumes"].append(volume_node)
+        
+        # For volumes that are the root element, check for issues too
+        elif element_type == "volume":
+            issue_children = [
+                child for child in root_element.children 
+                if child.meta_element_type and child.meta_element_type.name == "issue"
+            ]
+            
+            if issue_children:
+                result["issues"] = []
+                
+                for issue in issue_children:
+                    # Create issue node with type field
+                    issue_node = {
+                        "id": str(issue.id),
+                        "type": "issue"  # Include the type field
+                    }
+                    
+                    # Add periodical flag if it exists
+                    periodical_flag = _extract_periodical_flag(issue)
+                    if periodical_flag is not None:
+                        issue_node['periodical'] = periodical_flag
+                        logger.debug(f"Added periodical={periodical_flag} flag to issue")
+                    
+                    # Process detections for this issue
+                    await _process_detections_for_tree(issue_node, issue)
+                    result["issues"].append(issue_node)
+                
+                logger.info(f"Root volume {root_element.id} has {len(issue_children)} issues")
+        
+        logger.info(f"Hierarchical tree built successfully for collection {collection_id}")
+        return result
+            
+    except Exception as e:
+        logger.exception(f"Error building hierarchical tree for collection {collection_id}: {str(e)}")
+        raise DBError(f"Failed building hierarchical tree: {str(e)}") from e
+
+
+async def _process_detections_for_tree(tree_node, meta_element):
+    """
+    Process detections for a tree node, organizing them by their roles.
+    
+    Args:
+        tree_node: The tree node to populate with detections
+        meta_element: The MetaElementHierarchical containing detections
+    """
+    # Get meta_element type for logging
+    element_type = meta_element.meta_element_type.name if meta_element.meta_element_type else "unknown"
+    logger.debug(f"Processing detections for {element_type} element {meta_element.id}")
+    
+    # Get all detections from the meta element's images
+    all_detections = []
+    
+    # Collect from images
+    for image in meta_element.images:
+        if hasattr(image, 'detections') and image.detections:
+            all_detections.extend(image.detections)
+    
+    # Also collect from meta_detections if available
+    if hasattr(meta_element, 'meta_detections') and meta_element.meta_detections:
+        all_detections.extend(meta_element.meta_detections)
+    
+    logger.debug(f"Found {len(all_detections)} total detections for element {meta_element.id}")
+    
+    # Remove duplicates by detection ID
+    unique_detections = {}
+    for detection in all_detections:
+        unique_detections[str(detection.id)] = detection
+    
+    logger.debug(f"After deduplication: {len(unique_detections)} unique detections")
+    
+    # Determine single-value fields based on meta element type
+    single_value_fields = ["title", "subTitle", "partNumber", "partName", "dateIssued", 
+                          "edition", "placeTerm"]
+    
+    # Add issue-specific fields
+    if meta_element.meta_element_type and meta_element.meta_element_type.name == "issue":
+        single_value_fields.extend(["issueNumber", "issueDate", "issueSeason", "issueVolume"])
+    
+    # Process each detection
+    processed_roles = set()
+    
+    for detection in unique_detections.values():
+        if not hasattr(detection, 'meta_element_detections'):
+            logger.debug(f"Detection {detection.id} has no meta_element_detections")
+            continue
+            
+        # Get the role name (meta_role)
+        med = detection.meta_element_detections
+        if not med or not hasattr(med, 'meta_role') or not med.meta_role:
+            logger.debug(f"Detection {detection.id} has no meta_role")
+            continue
+            
+        # Use computed_name or computed_display_name, falling back to attribute type name if needed
+        role_name = None
+        meta_role = med.meta_role
+        
+        # Log available properties on meta_role for debugging
+        logger.debug(f"MetaRole properties: {dir(meta_role)}")
+        
+        if hasattr(meta_role, 'computed_name') and meta_role.computed_name:
+            # Split the computed_name and exclude the first part (e.g., "volume.title" -> "title")
+            full_name = meta_role.computed_name
+            parts = full_name.split('.')
+            if len(parts) > 1:
+                role_name = '.'.join(parts[1:])  # Join all parts after the first
+                logger.debug(f"Using split computed_name: '{full_name}' -> '{role_name}'")
+            else:
+                role_name = full_name
+                logger.debug(f"Using computed_name (no split needed): {role_name}")
+        elif hasattr(meta_role, 'computed_display_name') and meta_role.computed_display_name:
+            # Split the computed_display_name and exclude the first part
+            full_name = meta_role.computed_display_name
+            parts = full_name.split('.')
+            if len(parts) > 1:
+                role_name = '.'.join(parts[1:])  # Join all parts after the first
+                logger.debug(f"Using split computed_display_name: '{full_name}' -> '{role_name}'")
+            else:
+                role_name = full_name
+                logger.debug(f"Using computed_display_name (no split needed): {role_name}")
+        elif hasattr(meta_role, 'meta_element_detection_attribute_type') and meta_role.meta_element_detection_attribute_type:
+            attr_type = meta_role.meta_element_detection_attribute_type
+            # If attr_type is an object with a name property
+            if hasattr(attr_type, 'name'):
+                role_name = attr_type.name
+                logger.debug(f"Using attribute_type.name: {role_name}")
+            # If it's a string or another primitive type, use it directly
+            elif isinstance(attr_type, (str, int, float, bool)):
+                role_name = str(attr_type)
+                logger.debug(f"Using attribute_type as string: {role_name}")
+            else:
+                logger.debug(f"attribute_type has no name property: {dir(attr_type)}")
+        # Last resort: try to extract ID as a name
+        elif hasattr(meta_role, 'meta_element_detection_attribute_type_id') and meta_role.meta_element_detection_attribute_type_id:
+            role_name = f"attribute_{meta_role.meta_element_detection_attribute_type_id}"
+            logger.debug(f"Using attribute_type_id as name: {role_name}")
+        else:
+            logger.debug(f"No suitable name found in meta_role: {meta_role}")
+        
+        # Skip if we couldn't determine the role name
+        if not role_name:
+            logger.warning(f"Could not determine role name for detection {detection.id}")
+            continue
+            
+        # Check if computed_type exists, otherwise construct it
+        if not hasattr(detection, 'computed_type'):
+            # Format should be just the role_name since we're excluding the element type
+            detection.computed_type = role_name
+        
+        # Convert snake_case to camelCase
+        camel_role = _snake_to_camel(role_name)
+        processed_roles.add(camel_role)
+        
+        # Add to the appropriate field in the tree node
+        if camel_role in single_value_fields:
+            # Single-value fields
+            tree_node[camel_role] = detection
+            logger.debug(f"Added detection {detection.id} as single value for role {camel_role}")
+        else:
+            # Multi-value fields (arrays)
+            if camel_role not in tree_node:
+                tree_node[camel_role] = []
+            tree_node[camel_role].append(detection)
+            logger.debug(f"Added detection {detection.id} to array for role {camel_role}")
+    
+    logger.debug(f"Processed roles for element {meta_element.id}: {sorted(list(processed_roles))}")
+
+
+def _snake_to_camel(snake_str):
+    """Convert snake_case to camelCase"""
+    components = snake_str.split('_')
+    return components[0] + ''.join(x.title() for x in components[1:])

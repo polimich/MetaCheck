@@ -203,3 +203,43 @@ async def update_detection_meta_role(
             
 
 
+async def confirm_detection(
+    detection_id: UUID,
+    session: AsyncSession
+) -> bool:
+    """
+    Confirm a detection by setting its confidence to 1.0 and annotated to True.
+    
+    Args:
+        detection_id: ID of the detection to confirm
+        session: Database session
+        
+    Returns:
+        True if the confirmation was successful, False if the detection was not found
+        
+    Raises:
+        DBError: If there's an error during the confirmation
+    """
+    try:
+        # Find the detection
+        stmt = select(Detection).where(Detection.id == detection_id)
+        result = await session.execute(stmt)
+        detection = result.unique().scalar_one_or_none()
+        
+        if not detection:
+            logger.warning(f"No detection found with ID {detection_id}")
+            return False
+            
+        # Update detection confidence and set annotated to True
+        detection.confidence = 1.0
+        detection.annotated = True
+        detection.last_change = datetime.utcnow()
+        
+        await session.commit()
+        return True
+        
+    except Exception as e:
+        logger.exception(f"Error confirming detection {detection_id}: {str(e)}")
+        raise DBError(f"Failed to confirm detection: {str(e)}")
+
+
