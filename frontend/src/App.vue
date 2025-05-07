@@ -1,10 +1,12 @@
 <template>
   <StoreInit />
+  <GlobalLoadingOverlay />
   <router-view />
 </template>
 
 <script setup lang="ts">
 import StoreInit from 'pages/StoreInit.vue';
+import GlobalLoadingOverlay from 'src/components/GlobalLoadingOverlay.vue';
 
 defineOptions({
   name: 'App',

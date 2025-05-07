@@ -3,8 +3,20 @@ import {
   HierarchialTreeTitleType,
   HierarchialTreeVolumeType,
 } from 'src/stores';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import VolumeTree from './VolumeTree.vue';
+import { useRouter } from 'vue-router';
+import { useImage } from 'src/stores/data/useImage';
+import { useCollection } from 'src/stores/data/useCollection';
+import {
+  DetectionItem,
+  getDetectionValue,
+  getDetectionConfidence,
+  CONFIDENCE_THRESHOLD_LOW,
+  CONFIDENCE_THRESHOLD_MEDIUM,
+  navigateToDetection as navigateToDetectionUtil,
+} from './utils';
+import FieldGroup from './FieldGroup.vue';
 
 defineOptions({
   name: 'TitleTree',
@@ -14,9 +26,10 @@ const { tree } = defineProps<{
   tree: HierarchialTreeTitleType;
 }>();
 
-// Define confidence thresholds
-const CONFIDENCE_THRESHOLD_LOW = 0.7; // Below this is critical (red)
-const CONFIDENCE_THRESHOLD_MEDIUM = 0.85; // Below this is warning (orange), above is good (green)
+// Get router for navigation
+const router = useRouter();
+const imageStore = useImage();
+const collectionStore = useCollection();
 
 // Define field item type
 interface FieldItem {
@@ -110,43 +123,18 @@ const fieldGroups = computed<FieldGroup[]>(() => [
   },
 ]);
 
-// Helper function to safely get value from a detection
-const getDetectionValue = (detection: unknown): string => {
-  if (!detection) return '';
-  if (
-    typeof detection === 'object' &&
-    detection !== null &&
-    'value' in detection
-  ) {
-    return (detection as { value: string }).value || '';
-  }
-  return '';
-};
-
-// Helper function to get confidence from a detection
-const getDetectionConfidence = (detection: unknown): number => {
-  if (!detection) return 1;
-  if (
-    typeof detection === 'object' &&
-    detection !== null &&
-    'confidence' in detection
-  ) {
-    const conf = (detection as { confidence?: number }).confidence;
-    return conf !== undefined ? conf : 1;
-  }
-  return 1;
-};
-
-// Helper function to get confidence color
-const getConfidenceColor = (confidence: number): string => {
-  if (confidence < CONFIDENCE_THRESHOLD_LOW) return 'negative';
-  if (confidence < CONFIDENCE_THRESHOLD_MEDIUM) return 'warning';
-  return 'positive';
-};
-
-// Helper function to get field value
+// Helper function to get field value, supporting both camelCase and dot notation
 const getFieldValue = (field: FieldItem): string => {
-  const value = tree[field.key];
+  // Check camelCase version
+  const camelValue = tree[field.key];
+  // Check dot notation version (e.g., 'title.title' instead of 'title')
+  const dotKey =
+    `title.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeTitleType;
+  const dotValue = tree[dotKey];
+
+  // Use whichever version has a value
+  const value = camelValue || dotValue;
+
   if (!value) return '';
 
   if (field.isArray && Array.isArray(value)) {
@@ -156,9 +144,18 @@ const getFieldValue = (field: FieldItem): string => {
   return getDetectionValue(value);
 };
 
-// Helper function to check if field has a value
+// Helper function to check if field has a value, supporting both camelCase and dot notation
 const hasValue = (field: FieldItem): boolean => {
-  const value = tree[field.key];
+  // Check camelCase version
+  const camelValue = tree[field.key];
+  // Check dot notation version (e.g., 'title.title' instead of 'title')
+  const dotKey =
+    `title.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeTitleType;
+  const dotValue = tree[dotKey];
+
+  // Use whichever version has a value
+  const value = camelValue || dotValue;
+
   if (!value) return false;
 
   if (field.isArray && Array.isArray(value)) {
@@ -168,16 +165,18 @@ const hasValue = (field: FieldItem): boolean => {
   return !!getDetectionValue(value);
 };
 
-// Helper function to get items count for array fields
-const getItemsCount = (field: FieldItem): number => {
-  const value = tree[field.key];
-  if (!value || !Array.isArray(value)) return 0;
-  return value.length;
-};
-
-// Helper function to get average confidence for a field
+// Helper function to get average confidence for a field, supporting both camelCase and dot notation
 const getFieldConfidence = (field: FieldItem): number => {
-  const value = tree[field.key];
+  // Check camelCase version
+  const camelValue = tree[field.key];
+  // Check dot notation version (e.g., 'title.title' instead of 'title')
+  const dotKey =
+    `title.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeTitleType;
+  const dotValue = tree[dotKey];
+
+  // Use whichever version has a value
+  const value = camelValue || dotValue;
+
   if (!value) return 1;
 
   if (field.isArray && Array.isArray(value)) {
@@ -187,11 +186,6 @@ const getFieldConfidence = (field: FieldItem): number => {
   }
 
   return getDetectionConfidence(value);
-};
-
-// Helper function to format confidence as percentage
-const formatConfidence = (confidence: number): string => {
-  return `${Math.round(confidence * 100)}%`;
 };
 
 // Function to check if a field has critical confidence (red)
@@ -207,11 +201,6 @@ const hasLowConfidence = (field: FieldItem): boolean => {
 // Function to check if a group has any fields with values
 const hasGroupValues = (group: FieldGroup): boolean => {
   return group.fields.some((field) => hasValue(field));
-};
-
-// Function to get the count of fields with values in a group
-const getGroupValueCount = (group: FieldGroup): number => {
-  return group.fields.filter((field) => hasValue(field)).length;
 };
 
 // Function to get average group confidence
@@ -244,11 +233,18 @@ const hasGroupLowConfidence = (group: FieldGroup): boolean => {
   );
 };
 
-// Count groups with critical confidence
-const criticalGroupsCount = computed((): number => {
-  return fieldGroups.value.filter((group) => hasGroupCriticalConfidence(group))
-    .length;
-});
+// Function to navigate to detection with debug logs
+const navigateToDetection = (detection: DetectionItem) => {
+  console.log('[EVENT-DEBUG] TitleTree navigateToDetection called', {
+    detection,
+    hasRouter: !!router,
+    routerCurrentRoute: router?.currentRoute.value.fullPath,
+    hasCollectionStore: !!collectionStore,
+    hasImageStore: !!imageStore,
+  });
+
+  navigateToDetectionUtil(detection, router, collectionStore, imageStore);
+};
 
 // Count fields with critical confidence
 const criticalFieldsCount = computed((): number => {
@@ -310,7 +306,8 @@ const hasVolumeCriticalConfidence = (
     ] as unknown as Array<unknown>;
     if (
       arrayField?.some(
-        (item) => getDetectionConfidence(item) < CONFIDENCE_THRESHOLD_LOW,
+        (item: unknown) =>
+          getDetectionConfidence(item) < CONFIDENCE_THRESHOLD_LOW,
       )
     ) {
       return true;
@@ -369,45 +366,11 @@ const hasVolumeLowConfidence = (volume: HierarchialTreeVolumeType): boolean => {
     ] as unknown as Array<unknown>;
     if (
       arrayField?.some(
-        (item) => getDetectionConfidence(item) < CONFIDENCE_THRESHOLD_MEDIUM,
+        (item: unknown) =>
+          getDetectionConfidence(item) < CONFIDENCE_THRESHOLD_MEDIUM,
       )
     ) {
       return true;
-    }
-  }
-
-  // Check issues if present
-  if (volume.issues?.length) {
-    for (const issue of volume.issues) {
-      // Check basic issue fields
-      if (
-        issue.dateIssued &&
-        getDetectionConfidence(issue.dateIssued) < CONFIDENCE_THRESHOLD_MEDIUM
-      ) {
-        return true;
-      }
-      if (
-        issue.title &&
-        getDetectionConfidence(issue.title) < CONFIDENCE_THRESHOLD_MEDIUM
-      ) {
-        return true;
-      }
-
-      // Check issue array fields
-      if (
-        issue.publisher?.some(
-          (item) => getDetectionConfidence(item) < CONFIDENCE_THRESHOLD_MEDIUM,
-        )
-      ) {
-        return true;
-      }
-      if (
-        issue.redaktor?.some(
-          (item) => getDetectionConfidence(item) < CONFIDENCE_THRESHOLD_MEDIUM,
-        )
-      ) {
-        return true;
-      }
     }
   }
 
@@ -427,448 +390,239 @@ const volumesWithLowConfidence = computed((): number => {
   return tree.volumes.filter((volume) => hasVolumeLowConfidence(volume)).length;
 });
 
-// Expand/collapse all groups
-const expandAll = ref(false);
-
-const toggleExpandAll = () => {
-  expandAll.value = !expandAll.value;
-};
-
-// Get series title for display
-const seriesTitle = computed((): string => {
-  if (tree.title) {
-    return getDetectionValue(tree.title);
+// Computed property to check if any field has low confidence
+const hasAnyLowConfidence = computed(() => {
+  for (const group of fieldGroups.value) {
+    for (const field of group.fields) {
+      if (hasValue(field) && hasLowConfidence(field)) {
+        return true;
+      }
+    }
   }
-  return tree.periodical ? 'Periodical Series' : 'Multi-Part Monograph';
+  return volumesWithLowConfidence.value > 0;
 });
 
-// Compute publication years range
-const publicationYearsRange = computed((): string => {
-  if (!tree.volumes || tree.volumes.length === 0) return '';
+// Track volume critical counts separately for real-time updates from child components
+const volumeCriticalCounts = ref(new Map<string, number>());
 
-  const years = tree.volumes
-    .map((vol) => (vol.dateIssued ? getDetectionValue(vol.dateIssued) : ''))
-    .filter((date) => date)
-    .map((date) => {
-      // Extract year from date string (assuming format like YYYY or YYYY-MM-DD)
-      const yearMatch = date.match(/\b\d{4}\b/);
-      return yearMatch ? parseInt(yearMatch[0]) : null;
-    })
-    .filter((year): year is number => year !== null);
+// Update volume critical counts when children report changes
+const updateVolumeCriticalCounts = (volumeId: string, count: number) => {
+  volumeCriticalCounts.value.set(volumeId, count);
+};
 
-  if (years.length === 0) return '';
+// Add this after computed properties but before the navigateToDetection function
+onMounted(() => {
+  console.log('[EVENT-DEBUG] TitleTree component mounted');
 
-  const minYear = Math.min(...years);
-  const maxYear = Math.max(...years);
+  // Add debug info about volumes
+  console.log('[VOLUMES-DEBUG] TitleTree volumes:', {
+    hasVolumes: !!tree.volumes && tree.volumes.length > 0,
+    volumesCount: tree.volumes?.length || 0,
+    volumes: tree.volumes?.map((v) => ({
+      id: v.id,
+      title: v.title ? getDetectionValue(v.title) : 'Untitled',
+    })),
+  });
 
-  return minYear === maxYear ? `${minYear}` : `${minYear}–${maxYear}`;
+  // Add a direct click handler for detection items
+  const titleTree = document.querySelector('.title-tree');
+  if (titleTree) {
+    titleTree.addEventListener('click', (event) => {
+      // Find the closest clickable element
+      const target = event.target as HTMLElement;
+      const clickableItem = target.closest('.clickable-item');
+
+      if (clickableItem) {
+        console.log(
+          '[EVENT-DEBUG] TitleTree direct click on clickable item',
+          clickableItem,
+        );
+
+        // Try to extract detection info from data attributes
+        // This is a fallback approach when event bubbling fails
+        const detectionId = clickableItem.getAttribute('data-detection-id');
+        const imageId = clickableItem.getAttribute('data-image-id');
+
+        if (detectionId && imageId) {
+          console.log('[EVENT-DEBUG] Found detection data in DOM attributes', {
+            detectionId,
+            imageId,
+          });
+
+          const detection: DetectionItem = {
+            id: detectionId,
+            imageId: imageId,
+            value: clickableItem.textContent?.trim() || '',
+            confidence: 1, // Default confidence if not available
+          };
+
+          // Navigate using the detection
+          navigateToDetection(detection);
+        }
+      }
+    });
+  }
 });
 </script>
 
 <template>
-  <q-card flat bordered class="title-tree">
-    <!-- Title header -->
-    <q-card-section
-      :class="
-        criticalGroupsCount || volumesWithCriticalConfidence
-          ? 'bg-negative text-white'
-          : 'bg-primary text-white'
-      "
+  <div class="title-tree">
+    <!-- Title section with confidence indicators -->
+    <div
+      class="title-header q-mb-xs"
+      :class="{
+        'critical-header': criticalFieldsCount > 0,
+        'warning-header': criticalFieldsCount === 0 && hasAnyLowConfidence,
+      }"
     >
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-h6">{{ seriesTitle }}</div>
-          <div v-if="publicationYearsRange" class="text-subtitle2">
-            {{ publicationYearsRange }}
-          </div>
-          <div class="text-caption q-mt-xs">
-            <q-badge color="white" text-color="primary" outline>
-              <q-icon name="collections_bookmark" size="xs" class="q-mr-xs" />
-              {{ tree.volumes?.length || 0 }} volumes
-            </q-badge>
-            <q-badge
-              v-if="volumesWithCriticalConfidence"
-              color="white"
-              text-color="negative"
-              outline
-              class="q-ml-sm"
-            >
-              <q-icon name="error" size="xs" class="q-mr-xs" />
-              {{ volumesWithCriticalConfidence }} volumes critical
-            </q-badge>
-            <q-badge
-              v-if="volumesWithLowConfidence > volumesWithCriticalConfidence"
-              color="white"
-              text-color="warning"
-              outline
-              class="q-ml-sm"
-            >
-              <q-icon name="warning" size="xs" class="q-mr-xs" />
-              {{ volumesWithLowConfidence - volumesWithCriticalConfidence }}
-              volumes warning
-            </q-badge>
-            <q-badge
-              v-if="criticalFieldsCount"
-              color="white"
-              text-color="negative"
-              outline
-              class="q-ml-sm"
-            >
-              <q-icon name="priority_high" size="xs" class="q-mr-xs" />
-              {{ criticalFieldsCount }} fields need attention
-            </q-badge>
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-btn
-            flat
-            round
-            dense
-            :icon="expandAll ? 'unfold_less' : 'unfold_more'"
-            @click="toggleExpandAll"
+      <q-item dense class="q-pa-none">
+        <q-item-section avatar>
+          <q-icon name="book" size="xs" />
+        </q-item-section>
+        <q-item-section>
+          <q-item-label class="text-weight-medium text-body2">
+            {{ getFieldValue(fieldGroups[0].fields[0]) || 'Untitled' }}
+          </q-item-label>
+          <q-item-label caption v-if="hasValue(fieldGroups[0].fields[1])">
+            {{ getFieldValue(fieldGroups[0].fields[1]) }}
+          </q-item-label>
+        </q-item-section>
+
+        <!-- Badge showing number of critical issues -->
+        <q-item-section
+          side
+          v-if="criticalFieldsCount > 0 || volumesWithCriticalConfidence > 0"
+        >
+          <q-badge color="negative" text-color="white" size="sm">
+            {{ criticalFieldsCount + volumesWithCriticalConfidence }}
+          </q-badge>
+        </q-item-section>
+      </q-item>
+    </div>
+
+    <!-- Compact field groups -->
+    <FieldGroup
+      v-for="(group, index) in fieldGroups"
+      :key="index"
+      :group="group"
+      :tree-object="tree"
+      :has-critical="hasGroupCriticalConfidence(group)"
+      :has-warning="hasGroupLowConfidence(group)"
+      :has-values="hasGroupValues(group)"
+      :default-open="hasGroupCriticalConfidence(group)"
+      group-name="title-tree"
+      @detection-click="navigateToDetection"
+    />
+
+    <!-- Volumes -->
+    <div
+      v-if="tree.volumes && tree.volumes.length > 0"
+      class="volumes-section q-mt-xs"
+    >
+      <q-expansion-item
+        icon="inventory_2"
+        label="Volumes"
+        dense
+        :default-opened="volumesWithLowConfidence > 0"
+        group="title-tree"
+        :header-class="[
+          volumesWithCriticalConfidence > 0
+            ? 'text-negative'
+            : volumesWithLowConfidence > 0
+              ? 'text-warning'
+              : '',
+        ]"
+      >
+        <div class="volumes-container">
+          <VolumeTree
+            v-for="(volume, index) in tree.volumes"
+            :key="index"
+            :tree="volume"
+            class="volume-item"
+            @critical-count-changed="updateVolumeCriticalCounts"
           />
         </div>
-      </div>
-    </q-card-section>
-
-    <q-separator />
-
-    <!-- Tree structure with expandable groups -->
-    <q-list padding>
-      <!-- Series Metadata -->
-      <q-expansion-item
-        v-for="(group, groupIndex) in fieldGroups"
-        :key="groupIndex"
-        :icon="group.icon"
-        :label="group.label"
-        :caption="
-          hasGroupValues(group)
-            ? `${getGroupValueCount(group)} values found`
-            : 'No values'
-        "
-        :default-opened="expandAll || hasGroupLowConfidence(group)"
-        group="title-metadata"
-        :class="{
-          'critical-confidence': hasGroupCriticalConfidence(group),
-          'low-confidence':
-            hasGroupLowConfidence(group) && !hasGroupCriticalConfidence(group),
-        }"
-        :header-class="{
-          'text-primary':
-            hasGroupValues(group) && !hasGroupLowConfidence(group),
-          'text-grey-7': !hasGroupValues(group),
-          'bg-red-1': hasGroupCriticalConfidence(group),
-          'bg-orange-1':
-            hasGroupLowConfidence(group) && !hasGroupCriticalConfidence(group),
-        }"
-        :expand-icon-class="{
-          'text-primary': !hasGroupLowConfidence(group),
-          'text-negative': hasGroupCriticalConfidence(group),
-          'text-warning':
-            hasGroupLowConfidence(group) && !hasGroupCriticalConfidence(group),
-        }"
-      >
-        <template #header>
-          <q-item-section avatar>
-            <q-icon
-              :name="group.icon"
-              :color="
-                hasGroupCriticalConfidence(group)
-                  ? 'negative'
-                  : hasGroupLowConfidence(group)
-                    ? 'warning'
-                    : 'primary'
-              "
-            />
-          </q-item-section>
-
-          <q-item-section>
-            <q-item-label>{{ group.label }}</q-item-label>
-            <q-item-label caption>
-              {{
-                hasGroupValues(group)
-                  ? `${getGroupValueCount(group)} values found`
-                  : 'No values'
-              }}
-            </q-item-label>
-          </q-item-section>
-
-          <q-item-section side v-if="hasGroupLowConfidence(group)">
-            <q-chip
-              dense
-              :color="
-                hasGroupCriticalConfidence(group) ? 'negative' : 'warning'
-              "
-              text-color="white"
-              icon="warning"
-            >
-              {{ formatConfidence(getGroupConfidence(group)) }}
-            </q-chip>
-          </q-item-section>
-        </template>
-
-        <q-card>
-          <q-card-section>
-            <q-list dense padding>
-              <!-- Fields within each group -->
-              <q-expansion-item
-                v-for="field in group.fields"
-                :key="field.key.toString()"
-                :default-opened="expandAll || hasLowConfidence(field)"
-                :disable="!hasValue(field)"
-                :class="{
-                  'critical-confidence':
-                    hasCriticalConfidence(field) && hasValue(field),
-                  'low-confidence':
-                    hasLowConfidence(field) &&
-                    !hasCriticalConfidence(field) &&
-                    hasValue(field),
-                }"
-              >
-                <template #header>
-                  <q-item-section avatar>
-                    <q-icon
-                      :name="field.icon"
-                      :color="
-                        !hasValue(field)
-                          ? 'grey-7'
-                          : hasCriticalConfidence(field)
-                            ? 'negative'
-                            : hasLowConfidence(field)
-                              ? 'warning'
-                              : 'primary'
-                      "
-                    />
-                  </q-item-section>
-
-                  <q-item-section>
-                    <q-item-label>{{ field.label }}</q-item-label>
-                    <q-item-label caption>
-                      {{
-                        hasValue(field)
-                          ? field.isArray
-                            ? `${getItemsCount(field)} items`
-                            : getFieldValue(field)
-                          : 'Not specified'
-                      }}
-                    </q-item-label>
-                  </q-item-section>
-
-                  <q-item-section
-                    side
-                    v-if="hasValue(field) && hasLowConfidence(field)"
-                  >
-                    <q-badge
-                      :color="
-                        hasCriticalConfidence(field) ? 'negative' : 'warning'
-                      "
-                      outline
-                    >
-                      {{ formatConfidence(getFieldConfidence(field)) }}
-                    </q-badge>
-                  </q-item-section>
-                </template>
-
-                <!-- Array field content -->
-                <q-card v-if="field.isArray && hasValue(field)" flat bordered>
-                  <q-card-section>
-                    <div class="row items-start q-gutter-sm">
-                      <div
-                        v-for="(item, index) in tree[field.key]"
-                        :key="index"
-                        class="confidence-item"
-                      >
-                        <q-badge
-                          :color="
-                            getConfidenceColor(getDetectionConfidence(item))
-                          "
-                          :label="
-                            formatConfidence(getDetectionConfidence(item))
-                          "
-                          class="q-mb-xs confidence-badge"
-                        />
-                        <q-badge
-                          :color="
-                            getConfidenceColor(getDetectionConfidence(item))
-                          "
-                          :label="getDetectionValue(item)"
-                          outline
-                          class="confidence-value"
-                        />
-                      </div>
-                    </div>
-                  </q-card-section>
-                </q-card>
-
-                <!-- Single field content -->
-                <q-card v-else-if="hasValue(field)" flat bordered>
-                  <q-card-section>
-                    <div class="confidence-item">
-                      <q-badge
-                        :color="getConfidenceColor(getFieldConfidence(field))"
-                        :label="formatConfidence(getFieldConfidence(field))"
-                        class="q-mb-xs confidence-badge"
-                      />
-                      <q-badge
-                        :color="getConfidenceColor(getFieldConfidence(field))"
-                        :label="getFieldValue(field)"
-                        outline
-                        class="confidence-value"
-                      />
-                    </div>
-                  </q-card-section>
-                </q-card>
-              </q-expansion-item>
-            </q-list>
-          </q-card-section>
-        </q-card>
       </q-expansion-item>
-
-      <!-- Volumes section -->
-      <q-expansion-item
-        v-if="tree.volumes?.length"
-        icon="inventory_2"
-        :label="`Volumes (${tree.volumes.length})`"
-        :default-opened="expandAll || volumesWithLowConfidence > 0"
-        group="title-volumes"
-        :header-class="{
-          'text-primary': volumesWithLowConfidence === 0,
-          'bg-red-1': volumesWithCriticalConfidence > 0,
-          'bg-orange-1':
-            volumesWithLowConfidence > 0 && volumesWithCriticalConfidence === 0,
-        }"
-        :expand-icon-class="{
-          'text-primary': volumesWithLowConfidence === 0,
-          'text-negative': volumesWithCriticalConfidence > 0,
-          'text-warning':
-            volumesWithLowConfidence > 0 && volumesWithCriticalConfidence === 0,
-        }"
-      >
-        <template #header>
-          <q-item-section avatar>
-            <q-icon
-              name="inventory_2"
-              :color="
-                volumesWithCriticalConfidence > 0
-                  ? 'negative'
-                  : volumesWithLowConfidence > 0
-                    ? 'warning'
-                    : 'primary'
-              "
-            />
-          </q-item-section>
-
-          <q-item-section>
-            <q-item-label>Volumes ({{ tree.volumes.length }})</q-item-label>
-            <q-item-label caption v-if="volumesWithLowConfidence > 0">
-              {{ volumesWithLowConfidence }} volumes need attention
-            </q-item-label>
-          </q-item-section>
-
-          <q-item-section side v-if="volumesWithLowConfidence > 0">
-            <q-chip
-              dense
-              :color="
-                volumesWithCriticalConfidence > 0 ? 'negative' : 'warning'
-              "
-              text-color="white"
-              icon="warning"
-            >
-              {{ volumesWithLowConfidence }} / {{ tree.volumes.length }}
-            </q-chip>
-          </q-item-section>
-        </template>
-
-        <q-card>
-          <q-card-section>
-            <div class="volume-list">
-              <div
-                v-for="volume in tree.volumes"
-                :key="volume.id"
-                class="volume-item q-mb-md"
-                :class="{
-                  'critical-confidence-container':
-                    hasVolumeCriticalConfidence(volume),
-                  'low-confidence-container':
-                    hasVolumeLowConfidence(volume) &&
-                    !hasVolumeCriticalConfidence(volume),
-                }"
-              >
-                <!-- We use VolumeTree component to render each volume -->
-                <VolumeTree :tree="volume" />
-              </div>
-            </div>
-          </q-card-section>
-        </q-card>
-      </q-expansion-item>
-    </q-list>
-  </q-card>
+    </div>
+  </div>
 </template>
 
 <style scoped>
 .title-tree {
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(
+    100vh - 170px
+  ); /* Maximum height with space for UI elements */
 }
 
-.confidence-chip {
-  font-size: 0.9rem;
-  padding: 8px 12px;
+.title-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: white;
 }
 
-.critical-confidence {
-  border-left: 4px solid var(--q-negative);
+.critical-header {
+  background-color: rgba(255, 0, 0, 0.05);
+  border-left: 3px solid var(--q-negative);
 }
 
-.low-confidence {
-  border-left: 4px solid var(--q-warning);
+.warning-header {
+  background-color: rgba(255, 186, 0, 0.05);
+  border-left: 3px solid var(--q-warning);
 }
 
-.critical-confidence-container {
-  border: 3px solid var(--q-negative);
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(255, 0, 0, 0.15);
+.title-group {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
 }
 
-.low-confidence-container {
-  border: 3px solid var(--q-warning);
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(255, 150, 0, 0.15);
+.field-item {
+  padding: 2px 8px;
 }
 
-.bg-red-1 {
-  background-color: rgba(255, 0, 0, 0.1);
-}
-
-.bg-orange-1 {
-  background-color: rgba(255, 153, 0, 0.1);
-}
-
-.confidence-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+.field-section {
   margin-bottom: 8px;
 }
 
-.confidence-badge {
-  font-size: 0.8rem;
-  margin-bottom: 4px;
+.inactive-field {
+  opacity: 0.7;
 }
 
-.confidence-value {
-  font-size: 0.9rem;
-  padding: 8px 12px;
+.clickable {
+  cursor: pointer;
 }
 
-.volume-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.clickable:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.field-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.confidence-chip {
+  height: 16px;
+  font-size: 10px;
+}
+
+.volumes-container {
+  padding: 0 4px;
+  max-height: 60vh; /* Limit the volumes container height */
+  overflow-y: auto;
 }
 
 .volume-item {
-  border-radius: 8px;
-  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+:deep(.q-expansion-item__content) {
+  padding: 0;
 }
 </style>

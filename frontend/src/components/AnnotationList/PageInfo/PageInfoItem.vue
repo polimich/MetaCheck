@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import {
   getConfidencePercent,
@@ -26,6 +26,16 @@ const emit = defineEmits(['update:value', 'save', 'refresh']);
 // Local state to track edits
 const localValue = ref(props.value);
 const isEdited = ref(false);
+
+// Reset local value and isEdited when props change
+watch(
+  () => props.value,
+  (newValue) => {
+    localValue.value = newValue;
+    isEdited.value = false;
+  },
+  { immediate: true },
+);
 
 // Stores
 const loadingState = useLoadingState();

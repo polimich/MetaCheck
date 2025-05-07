@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { ImageState } from 'src/types/frontend-state';
 import PageInfoItem from './PageInfoItem.vue';
 import { useImage } from 'src/stores';
@@ -12,9 +12,27 @@ const props = defineProps<{
 // Image store for updating page metadata
 const imageStore = useImage();
 
+// Local reactive values to track changes in the image prop
+const pageIndex = ref(props.image.page_index || '');
+const pageIndexConfidence = ref(props.image.page_index_confidence || 0);
+const pageType = ref(props.image.page_type || '');
+const pageTypeConfidence = ref(props.image.page_type_confidence || 0);
+
+// Watch for changes to the image prop and update local values
+watch(
+  () => props.image,
+  (newImage) => {
+    pageIndex.value = newImage.page_index || '';
+    pageIndexConfidence.value = newImage.page_index_confidence || 0;
+    pageType.value = newImage.page_type || '';
+    pageTypeConfidence.value = newImage.page_type_confidence || 0;
+  },
+  { immediate: true, deep: true },
+);
+
 // Check if we have page info to display
 const hasPageInfo = computed(() => {
-  return !!props.image.page_index || !!props.image.page_type;
+  return !!pageIndex.value || !!pageType.value;
 });
 
 // Handle page info updates
@@ -28,6 +46,15 @@ const handlePageInfoUpdate = async ({
   confidence: number;
 }) => {
   console.log(`Updating ${type} to: ${value} with confidence: ${confidence}`);
+
+  // Update local values
+  if (type === 'page_index') {
+    pageIndex.value = value;
+    pageIndexConfidence.value = confidence;
+  } else if (type === 'page_type') {
+    pageType.value = value;
+    pageTypeConfidence.value = confidence;
+  }
 
   // Update the image in the store
   if (imageStore.image) {
@@ -75,10 +102,10 @@ const handleRefresh = async (imageId: string) => {
 
     <!-- Page Index -->
     <PageInfoItem
-      v-if="image.page_index !== undefined"
+      v-if="pageIndex !== undefined"
       type="page_index"
-      :value="image.page_index"
-      :confidence="image.page_index_confidence || 0"
+      :value="pageIndex"
+      :confidence="pageIndexConfidence"
       :imageId="image.id"
       :loading="loading"
       @save="handlePageInfoUpdate"
@@ -87,10 +114,10 @@ const handleRefresh = async (imageId: string) => {
 
     <!-- Page Type -->
     <PageInfoItem
-      v-if="image.page_type !== undefined"
+      v-if="pageType !== undefined"
       type="page_type"
-      :value="image.page_type"
-      :confidence="image.page_type_confidence || 0"
+      :value="pageType"
+      :confidence="pageTypeConfidence"
       :imageId="image.id"
       :loading="loading"
       @save="handlePageInfoUpdate"

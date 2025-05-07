@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { useCollection } from './useCollection';
-import { DetectionType, ImageType, DetectionNewType } from './types';
+import { HierarchicalImage, useCollection } from './useCollection';
+import { DetectionType, DetectionNewType, ImageType } from './types';
 import {
-  getImage,
   createDetection,
   updateDetection as apiUpdateDetection,
   deleteDetection as apiDeleteDetection,
@@ -44,8 +43,28 @@ export const useImage = defineStore('image', () => {
   const collectionStore = useCollection();
 
   // State
-  const image = ref<ImageType | null>(null);
-  const detections = ref<DetectionWithUI[]>([]);
+  const image = computed(() => {
+    console.log('[useImage] image', collectionStore.selectedImage);
+    return collectionStore.selectedImage?.image;
+  });
+  const imageLocation = computed(() => {
+    console.log('[useImage] imageLocation', collectionStore.selectedImage);
+    return collectionStore.selectedImage?.location;
+  });
+
+  // Transform the detections into UI-friendly format
+  const detections = computed<DetectionWithUI[]>(() => {
+    if (!image.value?.detections) {
+      console.log('[useImage] No detections found in selectedImage');
+      return [];
+    }
+    console.log(
+      '[useImage] Converting detections',
+      image.value.detections.length,
+    );
+    return convertDetectionsForUI(image.value.detections);
+  });
+
   const selectedDetectionId = ref<string | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
@@ -54,10 +73,10 @@ export const useImage = defineStore('image', () => {
 
   // Image statistics
   const annotatedDetectionCount = computed(
-    () => detections.value.filter((d) => d.annotated).length,
+    () => detections.value.filter((d) => d.annotated).length || 0,
   );
 
-  const totalDetectionCount = computed(() => detections.value.length);
+  const totalDetectionCount = computed(() => detections.value.length || 0);
 
   const verificationStatus = computed(() => {
     if (totalDetectionCount.value === 0) return 'unverified';
@@ -83,14 +102,14 @@ export const useImage = defineStore('image', () => {
     return (
       detectionsToAdd.value.length > 0 ||
       detectionsToDelete.value.length > 0 ||
-      detections.value.some((d) => d.edited)
+      detections.value.some((d) => d.edited) ||
+      false
     );
   });
 
   // Methods
   const resetState = () => {
-    image.value = null;
-    detections.value = [];
+    // We don't need to reset detections as it's a computed property
     selectedDetectionId.value = null;
     detectionsToAdd.value = [];
     detectionsToDelete.value = [];
@@ -117,7 +136,7 @@ export const useImage = defineStore('image', () => {
     // Define low confidence threshold
     const LOW_CONFIDENCE_THRESHOLD = 0.7;
 
-    return !!detections.value.find(
+    return detections.value.some(
       (d) =>
         d.confidence !== undefined && d.confidence < LOW_CONFIDENCE_THRESHOLD,
     );
@@ -134,7 +153,7 @@ export const useImage = defineStore('image', () => {
     // If any detection has low confidence, we don't consider the image to have "medium" confidence
     if (hasLowConfidenceDetections.value) return false;
 
-    return !!detections.value.find(
+    return detections.value.some(
       (d) =>
         d.confidence !== undefined &&
         d.confidence >= LOW_CONFIDENCE_THRESHOLD &&
@@ -152,166 +171,82 @@ export const useImage = defineStore('image', () => {
 
   // Convert detections from API format to UI format
   const convertDetectionsForUI = (
-    detections: DetectionType[],
+    apiDetections: DetectionType[],
   ): DetectionWithUI[] => {
-    return detections.map((detection) => {
-      const { x, y, width, height } = bboxToObject(detection.bbox);
-      return {
-        ...detection,
-        x,
-        y,
-        width,
-        height,
-        edited: false,
-        loadingMetaRoles: false,
-      };
+    console.log(
+      '[useImage] Converting detections, count:',
+      apiDetections.length,
+    );
+    return apiDetections.map((detection) => {
+      // Make sure detection has a valid bbox
+      if (!detection.bbox) {
+        console.warn('[useImage] Detection missing bbox:', detection.id);
+        // Default to empty values if bbox is missing
+        return {
+          ...detection,
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          edited: false,
+          loadingMetaRoles: false,
+        };
+      }
+
+      try {
+        const { x, y, width, height } = bboxToObject(detection.bbox);
+        return {
+          ...detection,
+          x,
+          y,
+          width,
+          height,
+          edited: false,
+          loadingMetaRoles: false,
+        };
+      } catch (error) {
+        console.error(
+          '[useImage] Error converting bbox for detection:',
+          detection.id,
+          error,
+        );
+        // Return default values on error
+        return {
+          ...detection,
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+          edited: false,
+          loadingMetaRoles: false,
+        };
+      }
     });
-  };
-
-  // Load image data from API
-  const loadImage = async (imageId: string, collectionId?: string) => {
-    if (!imageId) {
-      console.error('[useImage] No image ID provided');
-      return { success: false, error: 'No image ID provided' };
-    }
-
-    isLoading.value = true;
-    error.value = null;
-
-    try {
-      // Store the collection ID
-      if (collectionId) {
-        currentCollectionId.value = collectionId;
-
-        // Ensure collection is loaded to get meta roles and image data
-        console.log(
-          '[useImage] Ensuring collection data is ready before loading image',
-        );
-        const isReady =
-          await collectionStore.waitForCollectionReady(collectionId);
-
-        if (!isReady) {
-          error.value = 'Failed to fully load collection data';
-          isLoading.value = false;
-          return {
-            success: false,
-            error: 'Failed to fully load collection data',
-          };
-        }
-      } else if (currentCollectionId.value) {
-        // Use stored collection ID if not provided
-        collectionId = currentCollectionId.value;
-        console.log(`[useImage] Using stored collection ID: ${collectionId}`);
-
-        // Ensure the stored collection is ready
-        await collectionStore.waitForCollectionReady(collectionId);
-      } else {
-        // Try to extract collection ID from image ID (often formatted as "collectionId_imageId")
-        const possibleCollectionId = imageId.split('_')[0];
-        if (possibleCollectionId) {
-          console.log(
-            `[useImage] Extracted possible collection ID: ${possibleCollectionId} from image ID`,
-          );
-          collectionId = possibleCollectionId;
-          currentCollectionId.value = possibleCollectionId;
-
-          // Ensure the extracted collection is ready
-          const isReady =
-            await collectionStore.waitForCollectionReady(possibleCollectionId);
-          if (!isReady) {
-            console.warn(
-              '[useImage] Collection not fully ready, but proceeding with image load',
-            );
-          }
-        } else {
-          error.value = 'No collection ID provided or stored';
-          isLoading.value = false;
-          return {
-            success: false,
-            error: 'No collection ID provided or stored',
-          };
-        }
-      }
-
-      // Check if the collection store is ready to use
-      if (
-        !collectionStore.allImagesFlattened ||
-        collectionStore.allImagesFlattened.length === 0
-      ) {
-        console.log(
-          '[useImage] Waiting for collection images to be available...',
-        );
-        // Wait a short time for the collection data to be processed
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-
-      // First check if the image exists in the collection store
-      const imageInCollection = collectionStore.allImagesFlattened.find(
-        (img) => img.id === imageId,
-      );
-
-      if (!imageInCollection) {
-        console.warn(
-          `[useImage] Image ${imageId} not found in collection store's flattened images`,
-        );
-        // The image might not be in allImagesFlattened yet, proceed anyway
-        console.log(
-          '[useImage] Proceeding with image load without collection verification',
-        );
-      }
-
-      // Get full image data from the API
-      const response = await getImage(imageId);
-
-      if (response.error) {
-        console.error(`[useImage] API error loading image: ${response.error}`);
-        error.value = response.error;
-        isLoading.value = false;
-        return { success: false, error: response.error };
-      }
-
-      if (!response.data) {
-        console.error('[useImage] No image data received from API');
-        error.value = 'No image data received';
-        isLoading.value = false;
-        return { success: false, error: 'No image data received' };
-      }
-
-      // Update the store with the image data
-      image.value = response.data;
-      currentImageId.value = imageId;
-
-      // Set the selected image in the collection store as well
-      if (collectionId && collectionStore.selectImage) {
-        collectionStore.selectImage(imageId);
-      }
-
-      // Convert detections to UI format
-      detections.value = convertDetectionsForUI(response.data.detections);
-
-      console.log(
-        `[useImage] Loaded image ${imageId} with ${detections.value.length} detections`,
-      );
-
-      // Reset change tracking
-      detectionsToAdd.value = [];
-      detectionsToDelete.value = [];
-
-      isLoading.value = false;
-      return { success: true };
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Unknown error loading image';
-      console.error(`[useImage] Error loading image: ${errorMessage}`);
-      error.value = errorMessage;
-      isLoading.value = false;
-      return { success: false, error: errorMessage };
-    }
   };
 
   // Select a detection
   const selectDetection = (detectionId: string | null) => {
+    console.log(`[useImage] Selecting detection: ${detectionId}`);
+
+    if (!detectionId) {
+      console.log('[useImage] Clearing selected detection');
+      selectedDetectionId.value = null;
+      return;
+    }
+
+    // Check if the detection exists in our current list
+    const detectionExists = detections.value.some((d) => d.id === detectionId);
+
+    if (!detectionExists) {
+      console.warn(
+        `[useImage] Detection ${detectionId} not found in current image detections`,
+      );
+      // We'll still set it, in case the detection data hasn't loaded yet
+    }
+
     selectedDetectionId.value = detectionId;
+    console.log(`[useImage] Selected detection ${detectionId}`);
+
     // Could emit an event or call a function to scroll to the detection in the ImageAnnotator
   };
 
@@ -355,10 +290,8 @@ export const useImage = defineStore('image', () => {
       loadingMetaRoles: false,
     };
 
-    // Add to local state
-    detections.value.push(newDetection);
-
-    // Add to changes to sync with backend
+    // We can't directly push to the detections computed array
+    // Instead, add it to detectionsToAdd, which we'll apply on save
     detectionsToAdd.value.push(newDetection);
 
     console.log(`[useImage] Added new detection: ${newDetection.id}`);
@@ -382,8 +315,8 @@ export const useImage = defineStore('image', () => {
       detection.edited = true;
       detection.last_change = new Date().toISOString();
 
-      // Update in local state
-      detections.value[index] = detection;
+      // We can't directly update the detections computed array
+      // The changes will be tracked and saved on saveAllChanges
 
       console.log(`[useImage] Updated detection: ${detection.id}`);
     } else {
@@ -394,35 +327,19 @@ export const useImage = defineStore('image', () => {
   };
 
   // Delete a detection
-  const deleteDetection = (detectionId: string) => {
-    const index = detections.value.findIndex((d) => d.id === detectionId);
-
-    if (index !== -1) {
-      // Remove from local state
-      detections.value.splice(index, 1);
-
-      // If this was previously added but not saved, remove from additions
-      const addIndex = detectionsToAdd.value.findIndex(
-        (d) => d.id === detectionId,
-      );
-      if (addIndex !== -1) {
-        detectionsToAdd.value.splice(addIndex, 1);
-      } else {
-        // Otherwise, add to deletions
-        detectionsToDelete.value.push(detectionId);
-      }
-
-      // If the deleted detection was selected, clear selection
-      if (selectedDetectionId.value === detectionId) {
-        selectedDetectionId.value = null;
-      }
-
-      console.log(`[useImage] Deleted detection: ${detectionId}`);
-    } else {
-      console.error(
-        `[useImage] Cannot delete detection: ID ${detectionId} not found`,
-      );
+  const deleteDetection = async (detectionId: string) => {
+    // call api
+    const response = await apiDeleteDetection(detectionId);
+    if (response.error) {
+      console.error(`[useImage] Error deleting detection: ${response.error}`);
     }
+
+    // update state in  useCollection
+    collectionStore.deleteDetectionFromImage(
+      image.value?.id || '',
+      detectionId,
+      imageLocation.value,
+    );
   };
 
   // Prepare detection for API - convert from UI format to API format
@@ -452,6 +369,45 @@ export const useImage = defineStore('image', () => {
     };
   };
 
+  // Load image by ID
+  const loadImage = async (imageId: string, collectionId?: string) => {
+    console.log('[useImage] loadImage', imageId, collectionId);
+
+    // We need to handle both collectionId and imageId for backwards compatibility
+    if (collectionId) {
+      // Make sure the collection is loaded first if we have a collectionId
+      const collectionReady =
+        await collectionStore.waitForCollectionReady(collectionId);
+      if (!collectionReady) {
+        console.error(
+          `[useImage] Collection ${collectionId} failed to load properly`,
+        );
+        return {
+          success: false,
+          error: `Collection ${collectionId} failed to load`,
+        };
+      }
+    }
+
+    // Select the image in the collection store
+    collectionStore.selectImage(imageId);
+
+    // Update local tracking variables for backward compatibility
+    currentImageId.value = imageId;
+    if (collectionId) {
+      currentCollectionId.value = collectionId;
+    }
+
+    // Check if the image was actually selected successfully
+    if (!image.value || image.value.id !== imageId) {
+      console.error(`[useImage] Failed to select image ${imageId}`);
+      return { success: false, error: `Failed to select image ${imageId}` };
+    }
+
+    // Return success
+    return { success: true };
+  };
+
   // Save all changes to backend
   const saveAllChanges = async () => {
     if (!hasChanges.value) {
@@ -463,6 +419,63 @@ export const useImage = defineStore('image', () => {
     error.value = null;
 
     try {
+      // First, synchronize changes with the collection store for local state
+      const currentImageId = image.value?.id;
+      const location = imageLocation.value;
+
+      // If we have access to the collection structure, update it directly
+      if (currentImageId && location) {
+        // Handle additions - update in collection store first
+        for (const detection of detectionsToAdd.value) {
+          console.log(
+            `[useImage] Adding detection ${detection.id} to collection structure`,
+          );
+          collectionStore.addDetectionToImage(
+            currentImageId,
+            detection,
+            location,
+          );
+        }
+
+        // Handle deletions - update in collection store first
+        for (const detectionId of detectionsToDelete.value) {
+          console.log(
+            `[useImage] Removing detection ${detectionId} from collection structure`,
+          );
+          collectionStore.deleteDetectionFromImage(
+            currentImageId,
+            detectionId,
+            location,
+          );
+        }
+
+        // Handle updates to existing detections
+        const detectionsToUpdate = detections.value.filter(
+          (d) => d.edited && !detectionsToAdd.value.some((a) => a.id === d.id),
+        );
+
+        for (const detection of detectionsToUpdate) {
+          console.log(
+            `[useImage] Updating detection ${detection.id} in collection structure`,
+          );
+          collectionStore.modifyDetectionInImage(
+            currentImageId,
+            detection.id,
+            {
+              bbox: detection.bbox,
+              value: detection.value,
+              annotated: detection.annotated,
+              confidence: detection.confidence,
+              computed_color: detection.computed_color,
+              computed_type: detection.computed_type,
+              computed_display_type: detection.computed_display_type,
+              last_change: new Date().toISOString(),
+            },
+            location,
+          );
+        }
+      }
+
       // Handle additions
       for (const detection of detectionsToAdd.value) {
         const apiDetection = prepareDetectionForAPI(detection);
@@ -473,26 +486,6 @@ export const useImage = defineStore('image', () => {
           error.value = `Error saving detection: ${response.error}`;
           isLoading.value = false;
           return { success: false, error: response.error };
-        }
-
-        // Update local detection with data from API (like the real ID)
-        if (response.data) {
-          const index = detections.value.findIndex(
-            (d) => d.id === detection.id,
-          );
-          if (index !== -1) {
-            // Update with new API data while preserving UI props
-            const { x, y, width, height } = bboxToObject(response.data.bbox);
-            detections.value[index] = {
-              ...response.data,
-              x,
-              y,
-              width,
-              height,
-              edited: false,
-              loadingMetaRoles: false,
-            };
-          }
         }
       }
 
@@ -542,39 +535,11 @@ export const useImage = defineStore('image', () => {
           isLoading.value = false;
           return { success: false, error: response.error };
         }
-
-        // Update local detection with data from API if needed
-        if (response.data) {
-          const index = detections.value.findIndex(
-            (d) => d.id === detection.id,
-          );
-          if (index !== -1) {
-            // Preserve UI props while updating API data
-            const { x, y, width, height } = bboxToObject(response.data.bbox);
-            detections.value[index] = {
-              ...response.data,
-              x,
-              y,
-              width,
-              height,
-              edited: false,
-              loadingMetaRoles: false,
-            };
-          }
-        }
       }
 
       // Clear change tracking after successful save
       detectionsToAdd.value = [];
       detectionsToDelete.value = [];
-
-      // Mark all detections as not edited
-      detections.value.forEach((d) => {
-        d.edited = false;
-      });
-
-      // Update the collection store to reflect changes
-      updateCollectionStore();
 
       console.log('[useImage] All changes saved successfully');
 
@@ -587,21 +552,6 @@ export const useImage = defineStore('image', () => {
       error.value = errorMessage;
       isLoading.value = false;
       return { success: false, error: errorMessage };
-    }
-  };
-
-  // Update collection store after changes
-  const updateCollectionStore = () => {
-    // This method would update the collection store with the latest detection data
-    // Implementation depends on how the collection store organizes its data
-    console.log(
-      '[useImage] Updating collection store with latest detection data',
-    );
-
-    // Example implementation (modify based on actual collection store structure)
-    if (collectionStore && image.value?.id) {
-      // Logic to update detection counts or other metadata in the collection
-      console.log('[useImage] Collection store updated');
     }
   };
 
@@ -632,7 +582,37 @@ export const useImage = defineStore('image', () => {
     error.value = null;
 
     try {
-      const response = await apiUpdateImage(image.value);
+      // Create minimal data structure with only the properties needed by the API
+      const imageData = {
+        // Required base properties
+        id: image.value.id,
+        // Add minimal required fields with defaults - avoid 'any' type
+        created_date:
+          (image.value as { created_date?: string })?.created_date ||
+          new Date().toISOString(),
+        last_change:
+          (image.value as { last_change?: string })?.last_change ||
+          new Date().toISOString(),
+        last_access:
+          (image.value as { last_access?: string })?.last_access ||
+          new Date().toISOString(),
+        deleted: (image.value as { deleted?: boolean })?.deleted || false,
+        // Copy other relevant properties
+        name: image.value.name,
+        detection_count: image.value.detection_count,
+        annotated_detection_count: image.value.annotated_detection_count,
+        confidence: image.value.confidence,
+        width: image.value.width,
+        height: image.value.height,
+        page_index: image.value.page_index,
+        page_type: image.value.page_type,
+        order: image.value.order,
+      };
+
+      console.log('[useImage] Saving image with data:', imageData);
+
+      // Use a more specific type instead of 'any'
+      const response = await apiUpdateImage(imageData as ImageType);
 
       if (response.error) {
         console.error(`[useImage] Error saving image: ${response.error}`);
@@ -641,12 +621,12 @@ export const useImage = defineStore('image', () => {
         return { success: false, error: response.error };
       }
 
-      // Update local image with data from API if needed
-      if (response.data) {
-        image.value = response.data;
-      }
-
       console.log('[useImage] Image saved successfully');
+
+      // Update the image in the collection store
+      collectionStore.modifyImageInStructure(
+        response.data as HierarchicalImage,
+      );
 
       isLoading.value = false;
       return { success: true };
@@ -767,6 +747,31 @@ export const useImage = defineStore('image', () => {
     }
   };
 
+  // Diagnostic function for debugging
+  const diagnosticInfo = () => {
+    console.log('[useImage] Diagnostic information:');
+    console.log('  currentImageId:', currentImageId.value);
+    console.log('  currentCollectionId:', currentCollectionId.value);
+    console.log('  image.value?.id:', image.value?.id);
+    console.log('  image derived from collection:', !!image.value);
+    console.log('  detections count:', detections.value?.length);
+    console.log(
+      '  collectionStore.selectedImage?.id:',
+      collectionStore.selectedImage?.image.id,
+    );
+    console.log(
+      '  collectionStore.selectedImageId:',
+      collectionStore.selectedImageId,
+    );
+
+    return {
+      imageId: image.value?.id,
+      selectedImageId: collectionStore.selectedImageId,
+      derived: !!image.value,
+      detectionsCount: detections.value?.length || 0,
+    };
+  };
+
   return {
     // State
     image,
@@ -799,8 +804,8 @@ export const useImage = defineStore('image', () => {
     updateDetection,
     deleteDetection,
     saveAllChanges,
-    updateCollectionStore,
     saveImage,
     updateDetectionWithMetaRole,
+    diagnosticInfo,
   };
 });

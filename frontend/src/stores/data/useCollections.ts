@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { DAResponse } from '../data-access/types';
+import { ApiResponse } from 'src/types';
 import { computed, ref } from 'vue';
 import {
   getCollections as apiGetCollections,
@@ -29,11 +29,11 @@ export const useCollections = defineStore('collections', () => {
     await loadCollections();
   };
 
-  const loadCollections = async (): Promise<DAResponse<CollectionType[]>> => {
+  const loadCollections = async (): Promise<ApiResponse<CollectionType[]>> => {
     setLoading(true);
     error.value = '';
 
-    const requestPromise = new Promise<DAResponse<CollectionType[]>>(
+    const requestPromise = new Promise<ApiResponse<CollectionType[]>>(
       async (resolve) => {
         try {
           const response = await apiGetCollections();
@@ -103,7 +103,7 @@ export const useCollections = defineStore('collections', () => {
 
   const addCollection = async (
     collection: CollectionNewType,
-  ): Promise<DAResponse> => {
+  ): Promise<ApiResponse<CollectionNewType>> => {
     setLoading(true);
     error.value = '';
 
@@ -125,7 +125,7 @@ export const useCollections = defineStore('collections', () => {
     }
   };
 
-  const importCollection = async (file: File): Promise<DAResponse> => {
+  const importCollection = async (file: File): Promise<ApiResponse<void>> => {
     setLoading(true);
     error.value = '';
 

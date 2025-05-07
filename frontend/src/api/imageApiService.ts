@@ -1,18 +1,14 @@
 import { axios, axiosErrorHandler } from './index';
-import { ImageAddDto } from 'src/stores';
-import {
-  DetectionState,
-  DetectionStateToDa,
-  MetaRoleDA,
-  MetaRoleOption,
-  ImageDA,
-} from 'src/types';
+import { ImageNewType } from 'src/stores';
+import { MetaRoleDA, MetaRoleOption, ImageDA } from 'src/types';
 
 /**
  * Upload an image to a collection
  * @returns Error message if there's an error, empty string if successful
  */
-export const uploadImage = async (imageToAdd: ImageAddDto): Promise<string> => {
+export const uploadImage = async (
+  imageToAdd: ImageNewType,
+): Promise<string> => {
   try {
     const formData = new FormData();
     if (imageToAdd.file) {
@@ -72,36 +68,6 @@ export const loadMetaRolesForDetection = async (
   }));
 
   return { data: formattedData, error: '' };
-};
-
-/**
- * Create a new detection
- * @returns Error message if there's an error, empty string if successful
- */
-export const createDetection = async (
-  detection: DetectionState,
-): Promise<string> => {
-  try {
-    await axios.post('/detection', DetectionStateToDa(detection));
-    return '';
-  } catch (e) {
-    return axiosErrorHandler(e);
-  }
-};
-
-/**
- * Update an existing detection
- * @returns Error message if there's an error, empty string if successful
- */
-export const updateDetection = async (
-  detection: DetectionState,
-): Promise<string> => {
-  try {
-    await axios.put('/detection', DetectionStateToDa(detection));
-    return '';
-  } catch (e) {
-    return axiosErrorHandler(e);
-  }
 };
 
 /**

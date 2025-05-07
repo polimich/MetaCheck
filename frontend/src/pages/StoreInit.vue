@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { useCollection } from 'src/stores/data/useCollection';
-import { useImageStore } from 'src/stores';
+import { useImage } from 'src/stores';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { useStateManager } from 'src/stores/app/stateManager';
 import { checkApiHealth } from 'src/api/services';
 import { onMounted, ref, watch } from 'vue';
 import { useQuasar } from 'quasar';
-import { AppLoadingSplash } from 'src/components';
 import { useRoute } from 'vue-router';
+import { GlobalLoadingOverlay } from 'src/components';
 
 defineOptions({
   name: 'StoreInitPage',
@@ -17,7 +17,7 @@ defineOptions({
 const loadingState = useLoadingState();
 const stateManager = useStateManager();
 const collectionStore = useCollection();
-const imageStore = useImageStore();
+const imageStore = useImage();
 const $q = useQuasar();
 const route = useRoute();
 
@@ -32,13 +32,14 @@ const loadingMessage = ref('Initializing application...');
 // Function to check API health with retries
 const checkConnection = async (): Promise<boolean> => {
   loadingMessage.value = 'Checking server connection...';
-  initProgress.value = 10;
+  loadingState.startLoading('appInit', loadingMessage.value);
+  updateProgress(10);
 
   while (retryCount.value < maxRetries) {
     const { isHealthy, error } = await checkApiHealth();
     if (isHealthy) {
       connectionError.value = '';
-      initProgress.value = 20;
+      updateProgress(20);
       return true;
     }
 
@@ -56,7 +57,18 @@ const checkConnection = async (): Promise<boolean> => {
 
   // Show retry button after all retries failed
   showRetry.value = true;
+  loadingState.startLoading('criticalError', connectionError.value);
   return false;
+};
+
+// Update progress and synchronize with loadingState
+const updateProgress = (progress: number) => {
+  initProgress.value = progress;
+  // Store progress in loadingState so GlobalLoadingOverlay can access it
+  // Use string representation of the number since componentLoadingStates expects boolean
+  loadingState.setComponentLoading('appInitProgress', true);
+  // Store the actual progress value elsewhere
+  localStorage.setItem('appInitProgress', progress.toString());
 };
 
 // Retry initialization
@@ -64,6 +76,7 @@ const handleRetry = () => {
   retryCount.value = 0;
   connectionError.value = '';
   showRetry.value = false;
+  loadingState.stopLoading('criticalError');
   stateManager.clearState(); // Clear state on connection errors
   initApplication();
 };
@@ -93,8 +106,9 @@ const checkStoresAlreadyInitialized = (
 // Perform initialization tasks
 const initApplication = async () => {
   console.log('Initializing application stores...');
-  initProgress.value = 0;
+  updateProgress(0);
   loadingMessage.value = 'Initializing application...';
+  loadingState.startLoading('appInit', loadingMessage.value);
 
   try {
     // First check API health
@@ -103,16 +117,17 @@ const initApplication = async () => {
     }
 
     loadingMessage.value = 'Starting application...';
-    initProgress.value = 30;
+    loadingState.startLoading('appInit', loadingMessage.value);
+    updateProgress(30);
 
     // Initialize state manager first (centralizes state)
     const state = stateManager.init();
-    initProgress.value = 40;
+    updateProgress(40);
 
     // Initialize all stores without loading data yet
     await Promise.all([collectionStore.init()]);
 
-    initProgress.value = 50;
+    updateProgress(50);
     console.log('All stores initialized');
 
     // Check if we have URL parameters for collection and image
@@ -132,7 +147,7 @@ const initApplication = async () => {
       console.log(
         'Stores already initialized with the required data, skipping loading',
       );
-      initProgress.value = 100;
+      updateProgress(100);
       return;
     }
 
@@ -145,9 +160,10 @@ const initApplication = async () => {
       } else {
         loadingMessage.value = 'Restoring previous session...';
       }
+      loadingState.startLoading('appInit', loadingMessage.value);
 
       console.log(`Loading collection ${targetCollectionId}`);
-      initProgress.value = 60;
+      updateProgress(60);
 
       try {
         // 1. Load Collection
@@ -157,7 +173,7 @@ const initApplication = async () => {
         console.log('Waiting for collection to be fully ready...');
         await collectionStore.waitForCollectionReady(targetCollectionId);
 
-        initProgress.value = 70;
+        updateProgress(70);
 
         // Check if collection loaded successfully before proceeding
         if (!collectionStore.loaded || collectionStore.error) {
@@ -175,10 +191,10 @@ const initApplication = async () => {
 
           // Then load the image with explicit collection ID
           await imageStore.loadImage(targetImageId, targetCollectionId);
-          initProgress.value = 85;
+          updateProgress(85);
 
           // Check if image loaded successfully before proceeding
-          if (!imageStore.image.id || imageStore.error) {
+          if (!imageStore.image?.id || imageStore.error) {
             // Handle image loading error - Notify user, but don't stop app init completely
             console.error(
               `Error loading image ${targetImageId}: ${imageStore.error || 'Unknown error'}`,
@@ -193,8 +209,7 @@ const initApplication = async () => {
           } else {
             // 3. Load Detections (only if image loaded successfully)
             console.log(`Loading detections for image ${targetImageId}`);
-            await imageStore.loadDetections(targetImageId);
-            initProgress.value = 95;
+            updateProgress(95);
             // Update state manager after successful image+detection load
             stateManager.updateState(targetCollectionId, targetImageId);
 
@@ -238,16 +253,20 @@ const initApplication = async () => {
     }
 
     // Set progress to 100% after completion
-    initProgress.value = 100;
+    updateProgress(100);
   } catch (error) {
     console.error('Error during store initialization:', error);
     stateManager.handleError(error, 'Error initializing application');
     connectionError.value =
       'Error initializing application. Please refresh the page.';
     showRetry.value = true;
+    loadingState.startLoading('criticalError', connectionError.value);
   } finally {
-    loadingState.stopLoading('appInit');
-    console.log('Application stores initialization complete');
+    // Small delay to show 100% completion
+    setTimeout(() => {
+      loadingState.stopLoading('appInit');
+      console.log('Application stores initialization complete');
+    }, 500);
   }
 };
 
@@ -333,14 +352,7 @@ watch(
 
 <template>
   <div>
-    <AppLoadingSplash
-      v-if="initProgress < 100"
-      :message="loadingMessage"
-      :error="connectionError"
-      :progress="initProgress"
-      :show-retry="showRetry"
-      @retry="handleRetry"
-    />
+    <GlobalLoadingOverlay @retry="handleRetry" />
   </div>
 </template>
 

@@ -234,3 +234,52 @@ export const importCollection = async (file: File): Promise<string> => {
     return axiosErrorHandler(error);
   }
 };
+
+/**
+ * Get collection hierarchical tree data
+ */
+export const getCollectionHierarchical = async (
+  collectionId: string,
+): Promise<{ data: CollectionType | null; error: string }> => {
+  try {
+    console.log(`API: Fetching hierarchical collection ${collectionId}`);
+    const { data } = await axios.get<CollectionType>(
+      `/collection/${collectionId}/hierarchical`,
+    );
+    console.log(
+      `API: Successfully fetched hierarchical collection ${collectionId}`,
+    );
+    return { data, error: '' };
+  } catch (error) {
+    const errorMessage = axiosErrorHandler(error);
+    return { data: null, error: errorMessage };
+  }
+};
+
+export const apiGetCollectionHierarchical = getCollectionHierarchical;
+
+/**
+ * Get collections that are available for processing
+ */
+export const getCollectionAvailable = async (): Promise<{
+  data: CollectionType[];
+  error: string;
+}> => {
+  try {
+    console.log('API: Fetching available collections');
+    const { data } = await axios.get<CollectionType[]>('collection/available');
+
+    // Validate the response data
+    try {
+      const validatedData = CollectionListSchema.parse(data);
+      return { data: validatedData as unknown as CollectionType[], error: '' };
+    } catch (validationError) {
+      const errorMessage = handleZodError(validationError, 'collections');
+      console.error('Validation error:', validationError);
+      return { data: [], error: errorMessage || 'Data validation failed' };
+    }
+  } catch (error) {
+    const errorMessage = axiosErrorHandler(error);
+    return { data: [], error: errorMessage };
+  }
+};

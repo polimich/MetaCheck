@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue';
 import { DetectionState } from 'src/types';
-import { useImageStore } from 'src/stores';
+import { useImage } from 'src/stores';
 
 /**
  * Interface for the ImageAnnotator component instance
@@ -16,7 +16,7 @@ export interface ImageAnnotatorInstance {
 export function useSynchronization() {
   // Store for the annotator instance reference
   const annotatorRef = ref<ImageAnnotatorInstance | null>(null);
-  const imageStore = useImageStore();
+  const imageStore = useImage();
 
   // Track if synchronization is active
   const isSyncActive = ref(true);

@@ -34,6 +34,11 @@ const viewMode = ref<ViewMode>(
 
 // Load the collection when component is mounted
 onMounted(async () => {
+  // Stop any navigation loading
+  if (loadingState.currentOperation === 'navigatingToCollection') {
+    loadingState.stopLoading('navigatingToCollection');
+  }
+
   await loadCurrentCollection();
 });
 
@@ -98,13 +103,26 @@ const loadCurrentCollection = async () => {
 
 // Handle image selection
 const handleSelectImage = (imageId: string) => {
-  router.push({
-    name: 'image',
-    params: {
-      imageId,
-      collectionId: collectionId.value,
-    },
-  });
+  // 1. Start loading state IMMEDIATELY
+  loadingState.startLoading('navigatingToImage', 'Preparing image...');
+
+  // 2. Force the UI to fully update by using a small timeout instead of nextTick
+  //    This ensures the loading state is fully rendered before navigation
+  setTimeout(() => {
+    // 3. Then navigate to the image detail page
+    router
+      .push({
+        name: 'image',
+        params: {
+          imageId,
+          collectionId: collectionId.value,
+        },
+      })
+      .catch((error) => {
+        console.error('Navigation error:', error);
+        loadingState.stopLoading('navigatingToImage');
+      });
+  }, 50); // Small timeout to ensure loading state is fully rendered
 };
 
 // Handle view mode changes with string parameter type to match PageList emit type

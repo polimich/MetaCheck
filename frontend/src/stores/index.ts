@@ -31,9 +31,6 @@ export default store((/* { ssrContext } */) => {
   return pinia;
 });
 
-export * from './data-access';
-export * from './collection';
 export * from './meta-role-store/metaRoleStore';
 export * from './app';
-export * from './image';
 export * from './data';

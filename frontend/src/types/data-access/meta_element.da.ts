@@ -48,11 +48,15 @@ export type MetaElementDetectionDA = BaseEntityType & {
   detection?: DetectionDA;
 };
 
+export type ImageHierarchical = BaseEntityType &
+  ImageDA & {
+    detections: DetectionHierarchical[];
+  };
+
 export type MetaElementHierarchical = BaseEntityType &
   MetaElementDA & {
-    detections: DetectionHierarchical[];
     children: MetaElementHierarchical[];
-    images: ImageDA[];
+    images: ImageHierarchical[];
   };
 
 export type MetaElementDetectionAttributeTypeDA = BaseEntityType & {

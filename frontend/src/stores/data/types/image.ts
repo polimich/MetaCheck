@@ -20,3 +20,9 @@ export type ImageType = BaseType & {
   page_type: string;
   page_type_confidence: number;
 };
+
+export type ImageNewType = {
+  collection_id: string;
+  order: number;
+  file?: File;
+};

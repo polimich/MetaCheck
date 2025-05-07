@@ -74,7 +74,7 @@ console.log('Select mode is:', props.selectMode);
     class="bulk-actions-container"
     :class="{ 'layout-full-width': layoutMode === 'full-width' }"
   >
-    <div class="actions-toolbar q-px-md q-py-sm">
+    <div class="actions-toolbar">
       <!-- Selection mode toggle -->
       <q-btn
         flat
@@ -133,7 +133,7 @@ console.log('Select mode is:', props.selectMode);
           <q-tooltip>Download selected</q-tooltip>
         </q-btn>
 
-        <!-- New action: Change page index -->
+        <!-- Page index change -->
         <q-btn
           flat
           round
@@ -144,7 +144,7 @@ console.log('Select mode is:', props.selectMode);
           <q-tooltip>Change page indices</q-tooltip>
         </q-btn>
 
-        <!-- New action: Change page type -->
+        <!-- Page type change -->
         <q-btn
           flat
           round
@@ -157,12 +157,12 @@ console.log('Select mode is:', props.selectMode);
       </template>
 
       <!-- Selection counter -->
-      <div v-if="selectedImages.length > 0" class="selection-counter q-mx-sm">
+      <div v-if="selectedImages.length > 0" class="selection-counter">
         {{ selectedImages.length }} selected
       </div>
 
       <!-- Show page count when no selection -->
-      <div v-else class="page-count q-mx-sm text-caption text-grey">
+      <div v-else class="page-count text-caption text-grey">
         <slot name="page-count"></slot>
       </div>
     </div>
@@ -285,16 +285,19 @@ console.log('Select mode is:', props.selectMode);
 
 <style lang="scss" scoped>
 .bulk-actions-container {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
   background-color: white;
   border-top: 1px solid rgba(0, 0, 0, 0.12);
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  z-index: 9999;
-  padding: 8px 0;
+  z-index: 10;
+  width: 100%;
+
+  /* Only use fixed positioning in full-width layout */
+  &.layout-full-width {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
 }
 
 .actions-toolbar {
@@ -302,16 +305,31 @@ console.log('Select mode is:', props.selectMode);
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
-  padding: 0 16px;
+  padding: 8px 16px;
 }
 
 .selection-counter {
   margin-left: auto;
   font-weight: 500;
   color: var(--q-primary);
+  padding: 0 8px;
 }
 
 .page-count {
   margin-left: auto;
+  padding: 0 8px;
+}
+
+/* Optimize button spacing for small screens */
+@media (max-width: 599px) {
+  .actions-toolbar {
+    justify-content: space-between;
+    padding: 8px;
+  }
+
+  /* Stack buttons if needed */
+  .q-btn + .q-btn {
+    margin-left: 2px;
+  }
 }
 </style>

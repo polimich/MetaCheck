@@ -4,6 +4,8 @@ import { Vector2d } from 'konva/lib/types';
 import { DetectionState, newDetectionState } from 'src/types';
 import { useImageCanvas } from './useImageCanvas';
 import { useImage } from 'src/stores/data/useImage';
+import { useCollection } from 'src/stores/data/useCollection';
+import { DetectionType } from 'src/stores/data/types';
 
 // Helper function to convert coordinates to bbox string
 function objectToBbox(
@@ -62,7 +64,7 @@ function useHistoryManagement(
     });
 
     // Check for newly created annotations that are being removed by this undo
-    // and remove them from the imageStore
+    // and handle them appropriately with the imageStore
     const imageStore = useImage();
     const currentIds = new Set(currentAnnotations.map((a) => a.id));
     const prevIds = new Set(prevState.annotations.map((a) => a.id));
@@ -72,23 +74,32 @@ function useHistoryManagement(
 
     if (removedIds.length > 0) {
       console.log(
-        '[History] Removing annotations from store on undo:',
+        '[History] Managing annotations removed by undo:',
         removedIds,
       );
 
-      // Remove from detectionsToAdd array (backend persistence queue)
-      imageStore.detectionsToAdd = imageStore.detectionsToAdd.filter(
-        (detection: DetectionState) => !removedIds.includes(detection.id),
-      );
+      // For each removed ID, either:
+      // 1. Remove from detectionsToAdd if it's not yet saved to backend
+      // 2. Add to detectionsToDelete if it's an existing annotation
+      removedIds.forEach((id) => {
+        // Find if this detection is in the detectionsToAdd array
+        const indexInToAdd = imageStore.detectionsToAdd.findIndex(
+          (d: DetectionType) => d.id === id,
+        );
+        if (indexInToAdd !== -1) {
+          // Simply remove from detectionsToAdd
+          console.log('[History] Removing from detectionsToAdd on undo:', id);
+          imageStore.detectionsToAdd.splice(indexInToAdd, 1);
+        } else {
+          // Add to detectionsToDelete if it's not already there
+          if (!imageStore.detectionsToDelete.includes(id)) {
+            console.log('[History] Adding to detectionsToDelete on undo:', id);
+            imageStore.detectionsToDelete.push(id);
+          }
+        }
+      });
 
-      // ALSO remove from the main detections array (UI state)
-      imageStore.detections = imageStore.detections.filter(
-        (detection: DetectionState) => !removedIds.includes(detection.id),
-      );
-
-      console.log(
-        '[History] Removed undone annotations from both store arrays',
-      );
+      console.log('[History] Updated store arrays for undo operation');
     }
 
     // Restore previous state
@@ -124,47 +135,40 @@ function useHistoryManagement(
     const addedIds = [...nextIds].filter((id) => !currentIds.has(id));
 
     if (addedIds.length > 0) {
-      console.log(
-        '[History] Potentially adding annotations back on redo:',
-        addedIds,
-      );
+      console.log('[History] Managing annotations re-added by redo:', addedIds);
+
       // Find the annotations in the next state that need to be re-added to the store
       const annotationsToAdd = nextState.annotations.filter((a) =>
         addedIds.includes(a.id),
       );
 
-      // Add these back to both store arrays if they're not already there
+      // Process each annotation being re-added
       annotationsToAdd.forEach((annotation) => {
-        // Add to detectionsToAdd for backend persistence
-        if (!imageStore.detectionsToAdd.some((d) => d.id === annotation.id)) {
+        // Check if this ID is in detectionsToDelete
+        const indexInToDelete = imageStore.detectionsToDelete.indexOf(
+          annotation.id,
+        );
+        if (indexInToDelete !== -1) {
+          // Remove from deletionsToDelete since we're re-adding it
+          console.log(
+            '[History] Removing from detectionsToDelete on redo:',
+            annotation.id,
+          );
+          imageStore.detectionsToDelete.splice(indexInToDelete, 1);
+        }
+
+        // Add to detectionsToAdd if not already there
+        if (
+          !imageStore.detectionsToAdd.some(
+            (d: DetectionType) => d.id === annotation.id,
+          )
+        ) {
           console.log(
             '[History] Re-adding annotation to detectionsToAdd on redo:',
             annotation.id,
           );
+          // Need to create a proper detection object
           imageStore.detectionsToAdd.push({
-            ...annotation,
-            image_id: annotation.image_id,
-            bbox: objectToBbox(
-              annotation.x,
-              annotation.y,
-              annotation.width,
-              annotation.height,
-            ),
-            created_date: annotation.created_date || new Date().toISOString(),
-            last_change: new Date().toISOString(),
-            last_access: new Date().toISOString(),
-            deleted: false,
-            loadingMetaRoles: false,
-          });
-        }
-
-        // Also add to main detections array for UI state
-        if (!imageStore.detections.some((d) => d.id === annotation.id)) {
-          console.log(
-            '[History] Re-adding annotation to detections on redo:',
-            annotation.id,
-          );
-          imageStore.detections.push({
             ...annotation,
             image_id: annotation.image_id,
             bbox: objectToBbox(
@@ -182,7 +186,7 @@ function useHistoryManagement(
         }
       });
 
-      console.log('[History] Re-added annotations to both store arrays');
+      console.log('[History] Updated store arrays for redo operation');
     }
 
     // Restore next state
@@ -248,6 +252,7 @@ function useAnnotationNormalization(
 export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
   // --- Dependencies --- //
   const imageStore = useImage();
+  const collectionStore = useCollection();
   const { normalizeAnnotation } = useAnnotationNormalization(imageCanvas);
 
   // --- State --- //
@@ -369,7 +374,6 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     newAnnotation.height = 0;
     newAnnotation.created_date = new Date().toISOString();
     newAnnotation.confidence = 1.0;
-    newAnnotation.edited = true;
     newAnnotation.annotated = true;
     newAnnotation.computed_type = '';
     newAnnotation.computed_color = '#ff0000';
@@ -399,6 +403,48 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     isCreating.value = false;
     creatingAnnotation.value = null;
 
+    // Also add to collection store if we have the required info
+    const currentImageId = imageStore.image?.id;
+    const selectedImageData = collectionStore.selectedImage;
+    const imageLocation = selectedImageData?.location;
+
+    if (currentImageId && imageLocation) {
+      // Create a detection object from our annotation
+      const newDetection: DetectionType = {
+        id: annotation.id,
+        image_id: currentImageId,
+        bbox: objectToBbox(
+          annotation.x,
+          annotation.y,
+          annotation.width,
+          annotation.height,
+        ),
+        value: annotation.value || '',
+        confidence: annotation.confidence || 1.0,
+        annotated: annotation.annotated || false,
+        computed_color: annotation.computed_color || '#ff0000',
+        computed_type: annotation.computed_type || '',
+        computed_display_type: annotation.computed_display_type || '',
+        created_date: annotation.created_date || new Date().toISOString(),
+        last_change: new Date().toISOString(),
+        last_access: new Date().toISOString(),
+        deleted: false,
+      };
+
+      // Add to collection structure
+      const added = collectionStore.addDetectionToImage(
+        currentImageId,
+        newDetection,
+        imageLocation,
+      );
+
+      if (added) {
+        console.log(
+          `[Annotations] Detection ${annotation.id} added to collection structure`,
+        );
+      }
+    }
+
     selectAnnotation(annotation.id, false); // Select the new annotation
 
     console.log('[Annotations] Created annotation:', annotation);
@@ -414,12 +460,12 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     // Remove from local annotations
     annotations.value = annotations.value.filter((a) => a.id !== id);
 
-    // Remove from both imageStore arrays if it exists there
+    // Remove from imageStore arrays if it exists there
     const imageStore = useImage();
 
     // Remove from detectionsToAdd (backend persistence queue)
     const detectionInToAdd = imageStore.detectionsToAdd.find(
-      (d) => d.id === id,
+      (d: DetectionType) => d.id === id,
     );
     if (detectionInToAdd) {
       console.log(
@@ -427,20 +473,23 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
         id,
       );
       imageStore.detectionsToAdd = imageStore.detectionsToAdd.filter(
-        (detection) => detection.id !== id,
+        (detection: DetectionType) => detection.id !== id,
       );
     }
 
-    // Also remove from main detections array (UI state)
-    const detectionInMain = imageStore.detections.find((d) => d.id === id);
+    // Check if detection exists in the main detections
+    const detectionInMain = imageStore.detections.find(
+      (d: DetectionType) => d.id === id,
+    );
     if (detectionInMain) {
       console.log(
-        '[Annotations] Removing cancelled annotation from detections array:',
+        '[Annotations] Adding to detectionsToDelete for cancelled annotation:',
         id,
       );
-      imageStore.detections = imageStore.detections.filter(
-        (detection) => detection.id !== id,
-      );
+      // Add to delete list instead of modifying detections directly
+      if (!imageStore.detectionsToDelete.includes(id)) {
+        imageStore.detectionsToDelete.push(id);
+      }
     }
 
     isCreating.value = false;
@@ -455,7 +504,6 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     saveState(); // Save state before move for undo
     annotation.x += delta.x;
     annotation.y += delta.y;
-    annotation.edited = true;
     console.log(`[Annotations] Moved annotation ${id}`);
   }
 
@@ -467,13 +515,41 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     if (!annotation) return;
     saveState(); // Save state before resize for undo
     Object.assign(annotation, newDimensions);
-    annotation.edited = true;
     const normalized = normalizeAnnotation(annotation);
     Object.assign(annotation, normalized);
 
+    // Get current image info
+    const currentImageId = imageStore.image?.id;
+    const selectedImageData = collectionStore.selectedImage;
+    const imageLocation = selectedImageData?.location;
+
+    // Update in collection if possible
+    if (currentImageId && imageLocation) {
+      const { x, y, width, height } = normalized;
+      // Create a proper detection update object
+      const detectionUpdate: Partial<DetectionType> = {
+        bbox: objectToBbox(x, y, width, height),
+        last_change: new Date().toISOString(),
+      };
+
+      const updated = collectionStore.modifyDetectionInImage(
+        currentImageId,
+        id,
+        detectionUpdate,
+        imageLocation,
+      );
+
+      if (updated) {
+        console.log(
+          `[Annotations] Updated detection ${id} in collection structure`,
+        );
+      }
+    }
+
     // Update the corresponding detection in the store if it exists
-    const imageStore = useImage();
-    const storeIndex = imageStore.detections.findIndex((d) => d.id === id);
+    const storeIndex = imageStore.detections.findIndex(
+      (d: DetectionType) => d.id === id,
+    );
     if (storeIndex !== -1) {
       // Update with normalized dimensions and ensure bbox is updated
       const { x, y, width, height } = normalized;
@@ -482,7 +558,6 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
         y,
         width,
         height,
-        edited: true,
         bbox: objectToBbox(x, y, width, height),
         last_change: new Date().toISOString(),
       });
@@ -506,10 +581,72 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     }
     saveState(); // Save state before deletion for undo
     const idsToDelete = new Set(selectedIds.value);
+
+    // Remove from local annotations first
     annotations.value = annotations.value.filter((a) => !idsToDelete.has(a.id));
+
+    // Get current image and its location
+    const currentImageId = imageStore.image?.id;
+    const selectedImageData = collectionStore.selectedImage;
+    const imageLocation = selectedImageData?.location;
+
+    if (!currentImageId) {
+      console.warn(
+        '[Annotations] No current image ID, cannot delete detections in collection',
+      );
+    }
+
+    // For each ID to delete, either:
+    // 1. Remove from detectionsToAdd if it's a new annotation not yet saved
+    // 2. Add to detectionsToDelete if it's an existing annotation
+    // 3. Update the collection store directly if we have the image location
     idsToDelete.forEach((id) => {
-      imageStore.deleteDetection(id);
+      // Check if it's in detectionsToAdd first (not yet saved to backend)
+      const indexInToAdd = imageStore.detectionsToAdd.findIndex(
+        (d: DetectionType) => d.id === id,
+      );
+      if (indexInToAdd !== -1) {
+        // Remove from detectionsToAdd if it's a new annotation
+        console.log(
+          `[Annotations] Removing unsaved annotation ${id} from detectionsToAdd`,
+        );
+        imageStore.detectionsToAdd.splice(indexInToAdd, 1);
+      } else {
+        // First, update the collection store if we have an image ID and location
+        if (currentImageId && imageLocation) {
+          // Try to delete directly in the collection structure
+          const deleted = collectionStore.deleteDetectionFromImage(
+            currentImageId,
+            id,
+            imageLocation,
+          );
+
+          if (deleted) {
+            console.log(
+              `[Annotations] Detection ${id} directly deleted in collection structure`,
+            );
+          } else {
+            // Only call deleteDetection again if the first attempt failed
+            console.log(
+              `[Annotations] Direct deletion failed, adding to delete queue for ${id}`,
+            );
+            // Add to imageStore.detectionsToDelete for tracking and later deletion
+            if (!imageStore.detectionsToDelete.includes(id)) {
+              imageStore.detectionsToDelete.push(id);
+            }
+          }
+        } else {
+          // No image location available, add to delete queue
+          console.log(
+            `[Annotations] No image location, adding to delete queue for ${id}`,
+          );
+          if (!imageStore.detectionsToDelete.includes(id)) {
+            imageStore.detectionsToDelete.push(id);
+          }
+        }
+      }
     });
+
     selectedIds.value.clear();
     console.log('[Annotations] Deleted locally and queued in store.');
   }
@@ -553,7 +690,6 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
       );
       saveState(); // Save state before applying meta for undo
       annotation.value = value;
-      annotation.edited = true;
       // computed_type/display_type are set in ImageAnnotator
     } else {
       console.error(
@@ -572,11 +708,11 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     // Remove from local annotations
     annotations.value = annotations.value.filter((a) => a.id !== idToRemove);
 
-    // Remove from both imageStore arrays
+    // Handle imageStore operations properly
 
     // Remove from detectionsToAdd array (backend persistence queue)
     const detectionInToAdd = imageStore.detectionsToAdd.find(
-      (d) => d.id === idToRemove,
+      (d: DetectionType) => d.id === idToRemove,
     );
     if (detectionInToAdd) {
       console.log(
@@ -584,22 +720,20 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
         idToRemove,
       );
       imageStore.detectionsToAdd = imageStore.detectionsToAdd.filter(
-        (detection) => detection.id !== idToRemove,
+        (detection: DetectionType) => detection.id !== idToRemove,
       );
     }
 
-    // Also remove from main detections array (UI state)
-    const detectionInMain = imageStore.detections.find(
-      (d) => d.id === idToRemove,
-    );
-    if (detectionInMain) {
+    // For main detections array (which is now a computed property),
+    // add the ID to detectionsToDelete so it will be properly handled on save
+    if (imageStore.detections.some((d: DetectionType) => d.id === idToRemove)) {
       console.log(
-        '[Annotations] Removing cancelled annotation from detections array:',
+        '[Annotations] Adding cancelled annotation to detectionsToDelete:',
         idToRemove,
       );
-      imageStore.detections = imageStore.detections.filter(
-        (detection) => detection.id !== idToRemove,
-      );
+      if (!imageStore.detectionsToDelete.includes(idToRemove)) {
+        imageStore.detectionsToDelete.push(idToRemove);
+      }
     }
 
     // Revert the startCreate history entry
@@ -608,6 +742,155 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     if (selectedIds.value.has(idToRemove)) {
       selectedIds.value.delete(idToRemove);
     }
+  }
+
+  // --- Saving Implementation --- //
+
+  /**
+   * Prepares changes for saving by comparing local annotations to store detections
+   * and organizing them into add, modify, and delete categories.
+   */
+  function prepareChangesForSave() {
+    const imageStore = useImage();
+
+    // Create sets and maps for efficient lookups
+    const localAnnotationMap = new Map(
+      annotations.value.map((annotation) => [annotation.id, annotation]),
+    );
+    const storeDetectionMap = new Map(
+      imageStore.detections.map((detection) => [detection.id, detection]),
+    );
+
+    const localIds = new Set(localAnnotationMap.keys());
+    const storeIds = new Set(storeDetectionMap.keys());
+
+    // Identify annotations to add (present in local but not in store)
+    const annotationsToAdd = Array.from(localIds)
+      .filter((id) => !storeIds.has(id))
+      .map((id) => localAnnotationMap.get(id))
+      .filter((ann): ann is DetectionState => ann !== undefined);
+
+    // Identify annotations to delete (present in store but not in local)
+    const annotationsToDelete = Array.from(storeIds).filter(
+      (id) => !localIds.has(id),
+    );
+
+    // Identify annotations to modify (present in both but with changes)
+    const annotationsToModify = Array.from(localIds)
+      .filter((id) => storeIds.has(id))
+      .map((id) => {
+        const localAnnotation = localAnnotationMap.get(id);
+        const storeDetection = storeDetectionMap.get(id);
+
+        // Skip if either doesn't exist (shouldn't happen but for safety)
+        if (!localAnnotation || !storeDetection) return null;
+
+        // Compare relevant properties to detect changes
+        const hasPositionChanged =
+          localAnnotation.x !== storeDetection.x ||
+          localAnnotation.y !== storeDetection.y ||
+          localAnnotation.width !== storeDetection.width ||
+          localAnnotation.height !== storeDetection.height;
+
+        const hasMetadataChanged =
+          localAnnotation.value !== storeDetection.value ||
+          localAnnotation.computed_type !== storeDetection.computed_type ||
+          localAnnotation.computed_color !== storeDetection.computed_color ||
+          localAnnotation.computed_display_type !==
+            storeDetection.computed_display_type ||
+          localAnnotation.annotated !== storeDetection.annotated ||
+          localAnnotation.confidence !== storeDetection.confidence;
+
+        // If any property changed, include in modifications
+        if (hasPositionChanged || hasMetadataChanged) {
+          return localAnnotation;
+        }
+
+        return null;
+      })
+      .filter((ann): ann is DetectionState => ann !== null);
+
+    console.log(
+      `[Annotations] Prepared changes: ${annotationsToAdd.length} to add, ` +
+        `${annotationsToModify.length} to modify, ${annotationsToDelete.length} to delete`,
+    );
+
+    return {
+      annotationsToAdd,
+      annotationsToModify,
+      annotationsToDelete,
+    };
+  }
+
+  /**
+   * Processes the changes identified by prepareChangesForSave.
+   * This function will be implemented by external code.
+   * @param changes The changes object from prepareChangesForSave
+   */
+  function processChanges(changes: {
+    annotationsToAdd: DetectionState[];
+    annotationsToModify: DetectionState[];
+    annotationsToDelete: string[];
+  }) {
+    // These functions will be implemented by the caller
+    processAdditions(changes.annotationsToAdd);
+    processModifications(changes.annotationsToModify);
+    processDeletions(changes.annotationsToDelete);
+
+    console.log('[Annotations] Changes processed successfully');
+    return { success: true };
+  }
+
+  /**
+   * Placeholder for processing annotations to add
+   */
+  function processAdditions(annotationsToAdd: DetectionState[]) {
+    console.log(
+      `[Annotations] Processing ${annotationsToAdd.length} additions`,
+    );
+    // External implementation will handle this
+  }
+
+  /**
+   * Placeholder for processing annotations to modify
+   */
+  function processModifications(annotationsToModify: DetectionState[]) {
+    console.log(
+      `[Annotations] Processing ${annotationsToModify.length} modifications`,
+    );
+    // External implementation will handle this
+  }
+
+  /**
+   * Placeholder for processing annotations to delete
+   */
+  function processDeletions(annotationsToDelete: string[]) {
+    console.log(
+      `[Annotations] Processing ${annotationsToDelete.length} deletions`,
+    );
+    // External implementation will handle this
+  }
+
+  /**
+   * Main function to save changes to annotations.
+   * Compares local state with store and prepares changes for processing.
+   */
+  function saveChanges() {
+    console.log('[Annotations] Preparing changes for save...');
+    const changes = prepareChangesForSave();
+
+    const totalChanges =
+      changes.annotationsToAdd.length +
+      changes.annotationsToModify.length +
+      changes.annotationsToDelete.length;
+
+    if (totalChanges === 0) {
+      console.log('[Annotations] No changes to save');
+      return { success: true, message: 'No changes to save' };
+    }
+
+    // Process the changes (using the placeholder for now)
+    return processChanges(changes);
   }
 
   // --- Provide / Inject --- //
@@ -645,6 +928,7 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     loadAnnotations,
     confirmAnnotationMeta,
     cancelAnnotationMeta,
+    saveChanges, // Expose the new save changes function
   };
 }
 

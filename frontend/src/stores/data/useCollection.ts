@@ -4,9 +4,9 @@ import {
   CollectionHierarchical,
   MetaRole,
   MetaElementHierarchical,
+  ImageDA,
 } from 'src/types/data-access';
 import { getMetaRolesForCollection } from 'src/api/metaRoleApiService';
-import { DAResponse } from '../data-access/types';
 import {
   apiGetCollectionHierarchical,
   getDetectionsForImage as apiGetDetectionsForImage,
@@ -15,6 +15,7 @@ import { DetectionType } from './types';
 import { getDetectionById } from 'src/api/detectionApiService';
 import { updateDetectionWithMetaRole as apiUpdateDetectionWithMetaRole } from 'src/api/imageApiNew';
 import { updateDetection as apiUpdateDetection } from 'src/api/imageApiNew';
+import { ApiResponse } from 'src/types';
 
 // Define a more specific type for the image update data
 interface UpdatedImageData {
@@ -50,6 +51,8 @@ export interface HierarchicalImage {
   page_type?: string;
   page_type_confidence?: number;
   detections?: DetectionType[];
+  height?: number;
+  width?: number;
 }
 
 // Interface for hierarchical section item with its parent info
@@ -66,6 +69,12 @@ interface ImageLocation {
   parentIds: string[];
   index: number;
   image: HierarchicalImage;
+}
+
+// Add a new interface for the enhanced selected image data
+interface SelectedImageData {
+  image: HierarchicalImage;
+  location: ImageLocation;
 }
 
 export const useCollection = defineStore('collection', () => {
@@ -392,12 +401,274 @@ export const useCollection = defineStore('collection', () => {
     };
   });
 
+  // Update the selectedImage computed property to return both image and location info
+  const selectedImage = computed((): SelectedImageData | undefined => {
+    if (!selectedImageId.value || !collection.value?.global_structure)
+      return undefined;
+
+    // Use the image location map to efficiently find the image
+    const location = imageLocationMap.value.get(selectedImageId.value);
+    console.log(
+      '[useCollection] selectedImage',
+      selectedImageId.value,
+      location,
+    );
+    if (!location) return undefined;
+
+    // Return the image directly from the collection global structure
+    // based on the section and index found in the map
+    if (
+      location.sectionId === 'global' &&
+      collection.value.global_structure.images
+    ) {
+      // Image is in the top-level global structure
+      const index = location.index;
+      if (
+        index >= 0 &&
+        index < collection.value.global_structure.images.length
+      ) {
+        return {
+          image: collection.value.global_structure.images[index],
+          location,
+        };
+      }
+    } else {
+      // Find the section in the hierarchical sections
+      const section = hierarchicalSections.value.find(
+        (s) => s.section.id === location.sectionId,
+      );
+      if (
+        section &&
+        section.section.images &&
+        location.index >= 0 &&
+        location.index < section.section.images.length
+      ) {
+        return {
+          image: section.section.images[location.index],
+          location,
+        };
+      }
+    }
+
+    return undefined;
+  });
+
   // Helper functions
   const setLoading = (isLoading: boolean) => {
     loading.value = isLoading;
   };
   const init = async () => {};
 
+  // Cache for section lookups to avoid repeated searches
+  const sectionCache = ref(new Map<string, HierarchicalSection>());
+
+  // Function to delete a detection from an image in the collection
+  const deleteDetectionFromImage = (
+    imageId: string,
+    detectionId: string,
+    providedLocation?: ImageLocation,
+  ): boolean => {
+    const startTime = performance.now();
+    console.time(`deleteDetection:${detectionId}`);
+
+    // Fast path: we need imageId, detectionId and a valid collection
+    if (!imageId || !detectionId || !collection.value) {
+      console.timeEnd(`deleteDetection:${detectionId}`);
+      return false;
+    }
+
+    // Fast path: Direct access via provided location
+    const locationLookupStart = performance.now();
+    const location = providedLocation || imageLocationMap.value.get(imageId);
+    const locationLookupTime = performance.now() - locationLookupStart;
+    console.log(
+      `[PERF] Location lookup took: ${locationLookupTime.toFixed(2)}ms`,
+    );
+
+    if (!location) {
+      console.log(`[PERF] Failed to find location for image ${imageId}`);
+      console.timeEnd(`deleteDetection:${detectionId}`);
+      return false;
+    }
+
+    try {
+      console.log(
+        `[PERF] Using location: section=${location.sectionId}, index=${location.index}, path=${location.parentIds.join('/')}`,
+      );
+
+      // Direct access to the image using its location
+      const imageAccessStart = performance.now();
+      let image: HierarchicalImage | undefined;
+
+      // Global images are directly accessible
+      if (
+        location.sectionId === 'global' &&
+        collection.value.global_structure?.images
+      ) {
+        image = collection.value.global_structure.images[location.index];
+        console.log('[PERF] Global section direct access path');
+      }
+      // Section images require one-step section lookup
+      else {
+        console.log(`[PERF] Looking up section: ${location.sectionId}`);
+        const sectionLookupStart = performance.now();
+
+        // Check section cache first
+        let section: HierarchicalSection | undefined;
+
+        // Use cached section if available to avoid repeated searches
+        if (sectionCache.value.has(location.sectionId)) {
+          section = sectionCache.value.get(location.sectionId);
+          console.log('[PERF] Using cached section');
+        } else {
+          // If section isn't cached, find it and cache for future use
+          const sections = hierarchicalSections.value;
+          console.log(`[PERF] Total sections to search: ${sections.length}`);
+
+          // Build cache for all sections if we have a large collection
+          if (sections.length > 100 && sectionCache.value.size === 0) {
+            console.log('[PERF] Building full section cache');
+            const cacheBuildStart = performance.now();
+
+            // Add all sections to cache
+            for (const s of sections) {
+              if (!sectionCache.value.has(s.section.id)) {
+                sectionCache.value.set(s.section.id, s);
+              }
+            }
+
+            console.log(
+              `[PERF] Built section cache with ${sectionCache.value.size} entries in ${(performance.now() - cacheBuildStart).toFixed(2)}ms`,
+            );
+            section = sectionCache.value.get(location.sectionId);
+          } else {
+            // For smaller collections or if cache is already built
+            section = sections.find((s) => s.section.id === location.sectionId);
+
+            // Cache this section for future use
+            if (section) {
+              sectionCache.value.set(location.sectionId, section);
+            }
+          }
+        }
+
+        console.log(
+          `[PERF] Section lookup took: ${(performance.now() - sectionLookupStart).toFixed(2)}ms`,
+        );
+        console.log(`[PERF] Section found: ${!!section}`);
+
+        // Access the image directly if section exists
+        if (section?.section.images) {
+          const imageArraySize = section.section.images.length;
+          console.log(
+            `[PERF] Section has ${imageArraySize} images, accessing index ${location.index}`,
+          );
+
+          if (location.index >= 0 && location.index < imageArraySize) {
+            image = section.section.images[location.index];
+          } else {
+            console.log(
+              `[PERF] Image index ${location.index} is out of bounds (0-${imageArraySize - 1})`,
+            );
+          }
+        }
+      }
+
+      const imageAccessTime = performance.now() - imageAccessStart;
+      console.log(`[PERF] Image access took: ${imageAccessTime.toFixed(2)}ms`);
+
+      // Fast failure if image not found
+      if (!image) {
+        console.log('[PERF] Image not found with the provided location');
+        console.timeEnd(`deleteDetection:${detectionId}`);
+        return false;
+      }
+
+      if (!image.detections) {
+        console.log('[PERF] Image has no detections array');
+        console.timeEnd(`deleteDetection:${detectionId}`);
+        return false;
+      }
+
+      // Log detection array details
+      console.log(`[PERF] Image has ${image.detections.length} detections`);
+
+      // Direct access to the detection
+      const detectionLookupStart = performance.now();
+      const detectionIndex = image.detections.findIndex(
+        (d) => d.id === detectionId,
+      );
+      const detectionLookupTime = performance.now() - detectionLookupStart;
+      console.log(
+        `[PERF] Detection lookup took: ${detectionLookupTime.toFixed(2)}ms, found at index: ${detectionIndex}`,
+      );
+
+      if (detectionIndex === -1) {
+        console.log(
+          `[PERF] Detection ${detectionId} not found in image - likely already deleted`,
+        );
+        console.timeEnd(`deleteDetection:${detectionId}`);
+        // Return true to prevent retry attempts if the detection is already gone
+        // This helps with the double-deletion pattern observed in the logs
+        return true;
+      }
+
+      // Cache annotated state
+      const wasAnnotated = image.detections[detectionIndex].annotated;
+
+      // Fast array removal
+      const spliceStart = performance.now();
+      image.detections.splice(detectionIndex, 1);
+      console.log(
+        `[PERF] Array splice took: ${(performance.now() - spliceStart).toFixed(2)}ms`,
+      );
+
+      // Direct property updates - no heavy calculations
+      image.detection_count = image.detections.length;
+
+      // Extremely efficient annotated count update - just decrement
+      if (wasAnnotated && typeof image.annotated_detection_count === 'number') {
+        image.annotated_detection_count = Math.max(
+          0,
+          image.annotated_detection_count - 1,
+        );
+      }
+
+      // Keep location map in sync
+      if (location.image) {
+        location.image.detection_count = image.detection_count;
+        if (
+          wasAnnotated &&
+          typeof image.annotated_detection_count === 'number'
+        ) {
+          location.image.annotated_detection_count =
+            image.annotated_detection_count;
+        }
+      }
+
+      const totalTime = performance.now() - startTime;
+      console.log(`[PERF] Total deletion time: ${totalTime.toFixed(2)}ms`);
+      console.timeEnd(`deleteDetection:${detectionId}`);
+      return true;
+    } catch (error) {
+      console.error(
+        '[useCollection] Fast-path detection delete failed:',
+        error,
+      );
+      console.log(
+        `[PERF] Function failed after ${(performance.now() - startTime).toFixed(2)}ms`,
+      );
+      console.timeEnd(`deleteDetection:${detectionId}`);
+      return false;
+    }
+  };
+
+  // Helper to clear the section cache when collection changes
+  const clearSectionCache = () => {
+    sectionCache.value.clear();
+  };
+
+  // Update resetState to clear section cache
   const resetState = () => {
     collection.value = undefined;
     collectionMetaRoles.value = [];
@@ -406,6 +677,7 @@ export const useCollection = defineStore('collection', () => {
     loading.value = false;
     expandedSections.value = [];
     imageLocationMap.value.clear();
+    clearSectionCache();
   };
 
   const loadCollection = async (collectionId: string) => {
@@ -415,7 +687,7 @@ export const useCollection = defineStore('collection', () => {
     setLoading(true);
     error.value = '';
 
-    const requestPromise = new Promise<DAResponse<CollectionHierarchical>>(
+    const requestPromise = new Promise<ApiResponse<CollectionHierarchical>>(
       async (resolve) => {
         try {
           const response = await apiGetCollectionHierarchical(collectionId);
@@ -785,11 +1057,14 @@ export const useCollection = defineStore('collection', () => {
     if (!collection.value?.global_structure) return map;
 
     // Helper function to add image-section mappings recursively
-    // Using any type to avoid type errors with the collection structure
-    const processSection = (section: any, path: string[] = []) => {
+    // Using a proper type for sections in the collection structure
+    const processSection = (
+      section: MetaElementHierarchical,
+      path: string[] = [],
+    ) => {
       // Add images from this section
       if (section.images && Array.isArray(section.images)) {
-        section.images.forEach((image: any, index: number) => {
+        section.images.forEach((image: ImageDA, index: number) => {
           map.set(image.id, {
             sectionId: section.id,
             parentIds: [...path],
@@ -801,7 +1076,7 @@ export const useCollection = defineStore('collection', () => {
 
       // Process children recursively
       if (section.children && Array.isArray(section.children)) {
-        section.children.forEach((child: any) => {
+        section.children.forEach((child: MetaElementHierarchical) => {
           processSection(child, [...path, section.id]);
         });
       }
@@ -813,7 +1088,7 @@ export const useCollection = defineStore('collection', () => {
       Array.isArray(collection.value.global_structure.images)
     ) {
       collection.value.global_structure.images.forEach(
-        (image: any, index: number) => {
+        (image: ImageDA, index: number) => {
           map.set(image.id, {
             sectionId: 'global',
             parentIds: [],
@@ -829,9 +1104,11 @@ export const useCollection = defineStore('collection', () => {
       collection.value.global_structure.children &&
       Array.isArray(collection.value.global_structure.children)
     ) {
-      collection.value.global_structure.children.forEach((child: any) => {
-        processSection(child, ['global']);
-      });
+      collection.value.global_structure.children.forEach(
+        (child: MetaElementHierarchical) => {
+          processSection(child, ['global']);
+        },
+      );
     }
 
     return map;
@@ -857,7 +1134,7 @@ export const useCollection = defineStore('collection', () => {
 
     try {
       // Get the section based on the location info
-      let targetSection: any = null;
+      let targetSection: MetaElementHierarchical | null = null;
 
       // Handle global section
       if (
@@ -869,7 +1146,8 @@ export const useCollection = defineStore('collection', () => {
       // Handle nested sections
       else if (collection.value?.global_structure) {
         // Start with global structure
-        let currentSection: any = collection.value.global_structure;
+        let currentSection: MetaElementHierarchical =
+          collection.value.global_structure;
 
         // Follow the path to find the target section
         for (const parentId of location.parentIds) {
@@ -887,7 +1165,7 @@ export const useCollection = defineStore('collection', () => {
           }
 
           const nextSection = currentSection.children.find(
-            (child: any) => child.id === parentId,
+            (child: MetaElementHierarchical) => child.id === parentId,
           );
           if (!nextSection) {
             console.warn(
@@ -907,7 +1185,7 @@ export const useCollection = defineStore('collection', () => {
           Array.isArray(currentSection.children)
         ) {
           const foundSection = currentSection.children.find(
-            (child: any) => child.id === location.sectionId,
+            (child: MetaElementHierarchical) => child.id === location.sectionId,
           );
           if (foundSection) {
             targetSection = foundSection;
@@ -923,13 +1201,22 @@ export const useCollection = defineStore('collection', () => {
         location.index >= 0 &&
         location.index < targetSection.images.length
       ) {
-        // Update the image at the specified index
-        targetSection.images[location.index] = {
-          ...targetSection.images[location.index],
-          ...updatedImageData,
+        // Get the current image to preserve required type fields
+        const currentImage = targetSection.images[location.index];
+
+        // Important: We need to preserve the hierarchical structure of detections
+        // Update the image at the specified index while keeping the existing detections
+        const updatedImage = {
+          ...currentImage, // Keep all existing properties, especially detections
+          ...updatedImageData, // Apply updates
+          // Explicitly ensure detections are preserved with their hierarchical structure
+          detections: currentImage.detections,
         };
 
-        // Also update the mapped reference
+        // Assign the updated image to the correct position
+        targetSection.images[location.index] = updatedImage;
+
+        // Also update the location map reference
         location.image = {
           ...location.image,
           ...updatedImageData,
@@ -1094,6 +1381,310 @@ export const useCollection = defineStore('collection', () => {
     }
   };
 
+  // Add a new helper function to modify an image directly using just the image data
+  const modifyImageInStructure = (
+    imageData: HierarchicalImage,
+    providedLocation?: ImageLocation,
+  ): boolean => {
+    if (!imageData.id || !collection.value?.global_structure) {
+      console.warn(
+        '[useCollection] Invalid image data or collection structure',
+      );
+      return false;
+    }
+
+    // Use provided location if available (faster) or look it up otherwise
+    const location =
+      providedLocation || imageLocationMap.value.get(imageData.id);
+    if (!location) {
+      console.warn(
+        `[useCollection] Image ${imageData.id} location not found in map`,
+      );
+      return false;
+    }
+
+    // Get reference to the containing section
+    let targetSection: MetaElementHierarchical | null = null;
+
+    // Handle global section
+    if (location.sectionId === 'global') {
+      targetSection = collection.value.global_structure;
+    } else {
+      // Navigate to the target section using the location info
+      const sectionData = hierarchicalSections.value.find(
+        (s) => s.section.id === location.sectionId,
+      );
+      if (sectionData) {
+        targetSection = sectionData.section;
+      }
+    }
+
+    // Update the image if we found the section
+    if (
+      targetSection?.images &&
+      Array.isArray(targetSection.images) &&
+      location.index >= 0 &&
+      location.index < targetSection.images.length
+    ) {
+      try {
+        // Use updateImageDirectly which already handles type compatibility
+        // This is our safer approach to just update specific fields
+        const result = updateImageDirectly(imageData.id, {
+          name: imageData.name,
+          confidence: imageData.confidence,
+          order: imageData.order,
+          annotated: imageData.annotated,
+          detection_count: imageData.detection_count,
+          annotated_detection_count: imageData.annotated_detection_count,
+          page_index: imageData.page_index,
+          page_index_confidence: imageData.page_index_confidence,
+          page_type: imageData.page_type,
+          page_type_confidence: imageData.page_type_confidence,
+          // Only include height/width if defined to avoid type issues
+          ...(imageData.height !== undefined
+            ? { height: imageData.height }
+            : {}),
+          ...(imageData.width !== undefined ? { width: imageData.width } : {}),
+        });
+
+        if (result) {
+          console.log(
+            `[useCollection] Image ${imageData.id} updated in collection structure`,
+          );
+          return true;
+        }
+      } catch (error) {
+        console.error('[useCollection] Error updating image:', error);
+      }
+    }
+
+    console.warn(
+      `[useCollection] Failed to update image ${imageData.id} in collection structure`,
+    );
+    return false;
+  };
+
+  // Add a new helper function to modify a single detection in an image
+  const modifyDetectionInImage = (
+    imageId: string,
+    detectionId: string,
+    updatedDetection: Partial<DetectionType>,
+    providedLocation?: ImageLocation,
+  ): boolean => {
+    if (!imageId || !detectionId || !collection.value?.global_structure) {
+      console.warn(
+        '[useCollection] Invalid image/detection data or collection structure',
+      );
+      return false;
+    }
+
+    // Use provided location if available (faster) or look it up otherwise
+    const location = providedLocation || imageLocationMap.value.get(imageId);
+    if (!location) {
+      console.warn(
+        `[useCollection] Image ${imageId} location not found in map`,
+      );
+      return false;
+    }
+
+    // Get reference to the containing section
+    let targetSection: MetaElementHierarchical | null = null;
+
+    // Handle global section
+    if (location.sectionId === 'global') {
+      targetSection = collection.value.global_structure;
+    } else {
+      // Navigate to the target section using the location info
+      const sectionData = hierarchicalSections.value.find(
+        (s) => s.section.id === location.sectionId,
+      );
+      if (sectionData) {
+        targetSection = sectionData.section;
+      }
+    }
+
+    // Find the image in the section
+    if (
+      targetSection?.images &&
+      Array.isArray(targetSection.images) &&
+      location.index >= 0 &&
+      location.index < targetSection.images.length
+    ) {
+      try {
+        // Get the image
+        const image = targetSection.images[location.index];
+
+        // Make sure the image has detections array
+        if (!image.detections || !Array.isArray(image.detections)) {
+          console.warn(
+            `[useCollection] Image ${imageId} has no detections array`,
+          );
+          return false;
+        }
+
+        // Find the detection to update
+        const detectionIndex = image.detections.findIndex(
+          (detection) => detection.id === detectionId,
+        );
+
+        if (detectionIndex === -1) {
+          console.warn(
+            `[useCollection] Detection ${detectionId} not found in image ${imageId}`,
+          );
+          return false;
+        }
+
+        // Update the detection
+        const currentDetection = image.detections[detectionIndex];
+        image.detections[detectionIndex] = {
+          ...currentDetection,
+          ...updatedDetection,
+          // Ensure last_change is updated
+          last_change: new Date().toISOString(),
+        };
+
+        // If we're updating the detection's annotated status, also update the image's counts
+        if (updatedDetection.annotated !== undefined) {
+          // Count annotated detections
+          const annotatedCount = image.detections.filter(
+            (d) => d.annotated,
+          ).length;
+          image.annotated_detection_count = annotatedCount;
+
+          // Update location map reference
+          if (location.image) {
+            location.image.annotated_detection_count = annotatedCount;
+          }
+        }
+
+        console.log(
+          `[useCollection] Detection ${detectionId} updated in image ${imageId}`,
+        );
+        return true;
+      } catch (error) {
+        console.error('[useCollection] Error updating detection:', error);
+        return false;
+      }
+    }
+
+    console.warn(
+      `[useCollection] Failed to update detection ${detectionId} in image ${imageId}`,
+    );
+    return false;
+  };
+
+  // Function to add a new detection to an image in the collection
+  const addDetectionToImage = (
+    imageId: string,
+    newDetection: DetectionType,
+    providedLocation?: ImageLocation,
+  ): boolean => {
+    if (!imageId || !newDetection || !collection.value?.global_structure) {
+      console.warn(
+        '[useCollection] Invalid image/detection data or collection structure',
+      );
+      return false;
+    }
+
+    // Use provided location if available (faster) or look it up otherwise
+    const location = providedLocation || imageLocationMap.value.get(imageId);
+    if (!location) {
+      console.warn(
+        `[useCollection] Image ${imageId} location not found in map`,
+      );
+      return false;
+    }
+
+    // Get reference to the containing section
+    let targetSection: MetaElementHierarchical | null = null;
+
+    // Handle global section
+    if (location.sectionId === 'global') {
+      targetSection = collection.value.global_structure;
+    } else {
+      // Navigate to the target section using the location info
+      const sectionData = hierarchicalSections.value.find(
+        (s) => s.section.id === location.sectionId,
+      );
+      if (sectionData) {
+        targetSection = sectionData.section;
+      }
+    }
+
+    // Find the image in the section
+    if (
+      targetSection?.images &&
+      Array.isArray(targetSection.images) &&
+      location.index >= 0 &&
+      location.index < targetSection.images.length
+    ) {
+      try {
+        // Get the image
+        const image = targetSection.images[location.index];
+
+        // Initialize detections array if needed
+        if (!image.detections) {
+          image.detections = [];
+        } else if (!Array.isArray(image.detections)) {
+          console.warn(
+            `[useCollection] Image ${imageId} has invalid detections property`,
+          );
+          return false;
+        }
+
+        // Make sure the detection has an id and image_id (required fields)
+        if (!newDetection.id) {
+          console.warn('[useCollection] New detection must have an id');
+          return false;
+        }
+
+        // Ensure detection has the correct image_id
+        const detectionToAdd = {
+          ...newDetection,
+          image_id: imageId,
+          // Ensure last_change and other required timestamp fields
+          last_change: new Date().toISOString(),
+          created_date: newDetection.created_date || new Date().toISOString(),
+          last_access: newDetection.last_access || new Date().toISOString(),
+        };
+
+        // Add the detection
+        image.detections.push(detectionToAdd);
+
+        // Update counts
+        image.detection_count = image.detections.length;
+
+        // Update annotated count if needed
+        if (detectionToAdd.annotated) {
+          const annotatedCount = image.detections.filter(
+            (d) => d.annotated,
+          ).length;
+          image.annotated_detection_count = annotatedCount;
+        }
+
+        // Update location map reference
+        if (location.image) {
+          location.image.detection_count = image.detection_count;
+          if (detectionToAdd.annotated) {
+            location.image.annotated_detection_count =
+              image.annotated_detection_count;
+          }
+        }
+
+        console.log(
+          `[useCollection] Detection ${detectionToAdd.id} added to image ${imageId}`,
+        );
+        return true;
+      } catch (error) {
+        console.error('[useCollection] Error adding detection:', error);
+        return false;
+      }
+    }
+
+    console.warn(`[useCollection] Failed to add detection to image ${imageId}`);
+    return false;
+  };
+
   return {
     collection,
     collectionMetaRoles,
@@ -1102,6 +1693,7 @@ export const useCollection = defineStore('collection', () => {
     loading,
     expandedSections,
     selectedImageId,
+    selectedImage,
     imageLocationMap,
     image_count,
     detection_count,
@@ -1135,5 +1727,9 @@ export const useCollection = defineStore('collection', () => {
     updateDetectionWithMetaRole,
     getImageLocation,
     updateImageDirectly,
+    modifyImageInStructure,
+    modifyDetectionInImage,
+    deleteDetectionFromImage,
+    addDetectionToImage,
   };
 });

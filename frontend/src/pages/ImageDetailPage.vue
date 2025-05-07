@@ -13,8 +13,11 @@ import {
 import { useSynchronization } from 'src/components/ImageAnnotator/composables/useSynchronization';
 import { ANNOTATION_EVENTS, IMAGE_EVENTS } from 'src/constants/events';
 import { DetectionState, ImageState } from 'src/types/frontend-state';
+import HierarchicalTree from 'src/components/HierarchicalTree/HierarchicalTree.vue';
+import { useHierarchicalTree } from 'src/stores/data/useHierarchicalTree';
+import { usePanelLayout } from '../composables/usePanelLayout';
 
-// Define the interface for the ImageAnnotator instance - using the same type as in useSynchronization
+// Define the interface for the ImageAnnotator instance
 interface ImageAnnotatorInstance {
   handleSelectAnnotation: (id: string, shift?: boolean) => void;
   scrollToAnnotation: (detection: DetectionState) => void;
@@ -34,15 +37,34 @@ const metaRoleStore = useMetaRoleStore();
 const loadingState = useLoadingState();
 const stateManager = useStateManager();
 const notificationStore = useNotificationStore();
+const hierarchicalTreeStore = useHierarchicalTree();
+const structureTab = ref('structure'); // Default tab for structure section
+
+// Use panel layout composable
+const {
+  leftPanelCollapsed,
+  rightPanelCollapsed,
+  annotationPanelCollapsed,
+  leftColumnStyle,
+  rightColumnStyle,
+  middleColumnStyle,
+  structureSectionStyle,
+  annotationSectionStyle,
+  toggleLeftPanel,
+  toggleRightPanel,
+  toggleAnnotationPanel,
+  startLeftDrag,
+  startRightDrag,
+  startStructureDrag,
+} = usePanelLayout();
 
 // Use the synchronization composable
 const synchronization = useSynchronization();
 
 // Computed properties
-const detections = computed(() => {
-  return imageStore.detections || [];
-});
+const detections = computed(() => imageStore.detections || []);
 const loadingMessage = computed(() => loadingState.currentLoadingMessage);
+const hierarchicalTree = computed(() => hierarchicalTreeStore.tree);
 
 // Convert imageStore.image to the expected ImageState for the AnnotationList component
 const imageForAnnotationList = computed((): ImageState => {
@@ -63,33 +85,24 @@ const imageForAnnotationList = computed((): ImageState => {
     page_type_confidence: 0,
   };
 
-  // If no image is loaded, return the default
-  if (!imageStore.image) {
-    return defaultImage;
-  }
+  if (!imageStore.image) return defaultImage;
 
-  // Map the image properties from ImageType to ImageState
   return {
     id: imageStore.image.id,
     name: imageStore.image.name,
-    height: imageStore.image.height,
-    width: imageStore.image.width,
+    height: imageStore.image.height || 0,
+    width: imageStore.image.width || 0,
     confidence: imageStore.image.confidence,
-    detection_count: imageStore.image.detection_count,
-    annotated_detection_count: imageStore.image.annotated_detection_count,
+    detection_count: imageStore.image.detection_count || 0,
+    annotated_detection_count: imageStore.image.annotated_detection_count || 0,
     order: imageStore.image.order,
-    detections: [], // We use the detections from the separate computed property
-    edited: false, // Add the required BaseState property
-    page_index: imageStore.image.page_index,
-    page_index_confidence: imageStore.image.page_index_confidence,
-    page_type: imageStore.image.page_type,
-    page_type_confidence: imageStore.image.page_type_confidence,
+    detections: [],
+    edited: false,
+    page_index: imageStore.image.page_index || '',
+    page_index_confidence: imageStore.image.page_index_confidence || 0,
+    page_type: imageStore.image.page_type || '',
+    page_type_confidence: imageStore.image.page_type_confidence || 0,
   };
-});
-
-// Component ID for loading state
-const componentId = computed(() => {
-  return `annotator_${imageStore.currentImageId}`;
 });
 
 // Use both route params and store state for the imageId
@@ -100,10 +113,7 @@ const imageId = computed({
     if (value !== route.params.imageId) {
       router.push({
         name: route.name as string,
-        params: {
-          ...route.params,
-          imageId: value,
-        },
+        params: { ...route.params, imageId: value },
       });
     }
   },
@@ -114,45 +124,30 @@ const annotatorRef = ref<ImageAnnotatorInstance | null>(null);
 
 // Set the annotator ref in the synchronization composable once it's mounted
 watch(annotatorRef, (newRef) => {
-  if (newRef) {
-    synchronization.setAnnotatorRef(newRef);
-  }
+  if (newRef) synchronization.setAnnotatorRef(newRef);
 });
 
-// Track collection loading status to prevent multiple calls
+// Track collection loading status
 const isCollectionLoading = ref(false);
 
-// Load collection data with optimized approach
+// Load collection data
 const loadCollectionData = async (collectionId: string) => {
-  if (isCollectionLoading.value) {
-    console.log('Collection already loading, skipping redundant load');
+  if (
+    isCollectionLoading.value ||
+    collectionStore.isCollectionReady(collectionId)
+  )
     return;
-  }
-
-  // If collection is already loaded and ready, no need to load it again
-  if (collectionStore.isCollectionReady(collectionId)) {
-    console.log(
-      `Collection ${collectionId} is already loaded and ready, skipping redundant load`,
-    );
-    return;
-  }
 
   isCollectionLoading.value = true;
   const loadingKey = `collection_${collectionId}`;
   loadingState.setComponentLoading(loadingKey, true);
 
   try {
-    console.log(`Loading collection ${collectionId} from ImageDetailPage`);
-
-    // Use the new waitForCollectionReady method
     const isReady = await collectionStore.waitForCollectionReady(collectionId);
-
     if (!isReady) {
       console.warn(
         `Collection ${collectionId} failed to be fully ready within the timeout period`,
       );
-    } else {
-      console.log('Collection loaded successfully and is fully ready');
     }
   } catch (error) {
     console.error('Error loading collection:', error);
@@ -163,128 +158,38 @@ const loadCollectionData = async (collectionId: string) => {
   }
 };
 
-// Load image and detections when component mounts
-onMounted(async () => {
-  if (collectionId.value) {
-    console.log(
-      `ImageDetailPage mounted, validating collection ${collectionId.value}`,
-    );
-
-    // Validate collection ID
-    if (!stateManager.validateIds({ lastCollectionId: collectionId.value })) {
-      notificationStore.error('Invalid collection ID');
-      return;
-    }
-
-    // Check if data is already loaded by StoreInit
-    const routeImageId = route.params.imageId as string;
-
-    // If collection is not ready, wait for it (StoreInit might be loading it)
-    if (!collectionStore.isCollectionReady(collectionId.value)) {
-      console.log(
-        'Collection not ready, waiting for it to be loaded by StoreInit or loading it directly',
-      );
-      await loadCollectionData(collectionId.value);
-    } else {
-      console.log('Collection already ready, no need to load it again');
-    }
-
-    // Check if image is already loaded by StoreInit
-    if (routeImageId && imageStore.currentImageId !== routeImageId) {
-      console.log(`Image ${routeImageId} not loaded yet, loading it now`);
-      // Set loading state to indicate work in progress
-      loadingState.setComponentLoading(`annotator_${routeImageId}`, true);
-
-      try {
-        // Load image if not already loaded
-        await loadImageData(routeImageId);
-      } catch (error) {
-        console.error('Error loading image data on mount:', error);
-        notificationStore.error('Error loading image data');
-      } finally {
-        loadingState.setComponentLoading(`annotator_${routeImageId}`, false);
-      }
-    } else if (routeImageId) {
-      console.log(
-        `Image ${routeImageId} already loaded by StoreInit, skipping redundant load`,
-      );
-      // Just update the UI state to reflect the current image
-      imageId.value = routeImageId;
-    }
-  } else {
-    notificationStore.error('Missing required parameters');
-    console.error('Missing required route parameter: collectionId');
-  }
-});
-
-// Replace the route parameter watchers with a more efficient approach
-// that works alongside StoreInit instead of duplicating its work
-watch(
-  () => [route.params.collectionId, route.params.imageId],
-  async ([newCollectionId, newImageId]) => {
-    // Update local state to match route parameters
-    if (newCollectionId && newCollectionId !== collectionId.value) {
-      console.log(
-        `Collection ID changed to ${newCollectionId}, updating local state`,
-      );
-      collectionId.value = newCollectionId as string;
-    }
-
-    // Check if image ID has changed and is not yet loaded
-    if (newImageId && newImageId !== imageId.value) {
-      console.log(`Image ID changed to ${newImageId}, updating local state`);
-
-      // Only load if StoreInit hasn't already loaded it
-      if (imageStore.currentImageId !== newImageId) {
-        console.log(
-          `Image ${newImageId} not loaded by StoreInit yet, loading it now`,
-        );
-        await loadImageData(newImageId as string);
-      } else {
-        console.log(
-          `Image ${newImageId} already loaded by StoreInit, just updating UI`,
-        );
-        imageId.value = newImageId as string;
-      }
-    }
-  },
-);
-
-// Function to load image data - optimized for performance
+// Load image data
 const loadImageData = async (imageIdToLoad?: string) => {
   const targetImageId = imageIdToLoad || (route.params.imageId as string);
 
-  if (!targetImageId) {
-    console.log('No image selected, skipping load');
-    return;
-  }
+  if (!targetImageId) return;
 
   // Skip loading if image is already loaded
   if (imageStore.currentImageId === targetImageId && imageStore.image) {
-    console.log(
-      `Image ${targetImageId} is already loaded in the store, skipping redundant load.`,
-    );
-
     // Ensure state manager is updated
     if (stateManager.lastImageId !== targetImageId) {
       stateManager.updateState(collectionId.value, targetImageId);
     }
-
-    // Still update the UI route/refs if needed
     imageId.value = targetImageId;
+
+    // Make sure to stop any existing changing image loading state
+    if (loadingState.currentOperation === 'changingImage') {
+      loadingState.stopLoading('changingImage');
+    }
+
     return;
   }
 
-  // Set component-specific loading states
+  // Set loading states
   loadingState.setComponentLoading(`annotator_${targetImageId}`, true);
   loadingState.setComponentLoading(`annotationList_${targetImageId}`, true);
 
-  try {
-    console.log(
-      `Loading image ${targetImageId} from collection ${collectionId.value}`,
-    );
+  // Update loading message if appropriate
+  if (loadingState.currentOperation === 'changingImage') {
+    loadingState.startLoading('changingImage', 'Loading image data...');
+  }
 
-    // Load the image using the new store
+  try {
     const result = await imageStore.loadImage(
       targetImageId,
       collectionId.value,
@@ -299,12 +204,8 @@ const loadImageData = async (imageIdToLoad?: string) => {
 
     // Show appropriate notification based on detection count
     if (imageStore.detections.length === 0) {
-      console.warn('No detections found for this image');
       notificationStore.warning('No annotations found for this image');
     } else {
-      console.log(
-        `Successfully loaded ${imageStore.detections.length} detections`,
-      );
       notificationStore.success(
         `Loaded ${imageStore.detections.length} annotations`,
       );
@@ -326,81 +227,148 @@ const loadImageData = async (imageIdToLoad?: string) => {
     loadingState.startLoading('criticalError', 'Error loading image data');
     setTimeout(() => loadingState.stopLoading('criticalError'), 2000);
   } finally {
-    // Clear component-specific loading states
+    // Clear loading states
     loadingState.setComponentLoading(`annotator_${targetImageId}`, false);
     loadingState.setComponentLoading(`annotationList_${targetImageId}`, false);
+
+    // Also stop the changing image loading state if it's active
+    if (loadingState.currentOperation === 'changingImage') {
+      loadingState.stopLoading('changingImage');
+    }
   }
 };
+
+// Initial setup
+onMounted(async () => {
+  if (!collectionId.value) {
+    notificationStore.error('Missing required parameters');
+    return;
+  }
+
+  // Validate collection ID
+  if (!stateManager.validateIds({ lastCollectionId: collectionId.value })) {
+    notificationStore.error('Invalid collection ID');
+    return;
+  }
+
+  const routeImageId = route.params.imageId as string;
+
+  // Load collection if not ready
+  if (!collectionStore.isCollectionReady(collectionId.value)) {
+    await loadCollectionData(collectionId.value);
+  }
+
+  // Load image if needed
+  if (routeImageId && imageStore.currentImageId !== routeImageId) {
+    loadingState.setComponentLoading(`annotator_${routeImageId}`, true);
+    try {
+      await loadImageData(routeImageId);
+    } catch (error) {
+      notificationStore.error('Error loading image data');
+    } finally {
+      loadingState.setComponentLoading(`annotator_${routeImageId}`, false);
+
+      // Clear any navigation loading states that might still be active
+      if (
+        loadingState.currentOperation === 'navigatingToImage' ||
+        loadingState.currentOperation === 'changingImage'
+      ) {
+        loadingState.stopLoading(loadingState.currentOperation);
+      }
+    }
+  } else if (routeImageId) {
+    // Just update the UI state
+    imageId.value = routeImageId;
+
+    // Ensure no leftover loading states
+    if (
+      loadingState.currentOperation === 'navigatingToImage' ||
+      loadingState.currentOperation === 'changingImage'
+    ) {
+      loadingState.stopLoading(loadingState.currentOperation);
+    }
+  }
+});
+
+// Watch for route parameter changes
+watch(
+  () => [route.params.collectionId, route.params.imageId],
+  async ([newCollectionId, newImageId]) => {
+    // Update collection ID if changed
+    if (newCollectionId && newCollectionId !== collectionId.value) {
+      collectionId.value = newCollectionId as string;
+    }
+
+    // Update image if changed
+    if (newImageId && newImageId !== imageId.value) {
+      if (imageStore.currentImageId !== newImageId) {
+        await loadImageData(newImageId as string);
+      } else {
+        imageId.value = newImageId as string;
+      }
+    }
+  },
+);
 
 // Handle image selection from PageList
 const handleSelectImage = async (
   selectedImageId: string,
   options = { isSelectionOnly: false, exists: false },
 ) => {
-  if (selectedImageId !== imageId.value) {
-    console.log(`Image selection changed to ${selectedImageId}`, options);
+  if (selectedImageId === imageId.value) return;
 
-    // If this is just a selection change and the image exists in the collection
+  // Show loading state when changing images
+  loadingState.startLoading('changingImage', 'Switching to new image...');
+
+  try {
+    // Simple selection change or full load
     if (options.isSelectionOnly && options.exists) {
-      console.log('Handling as selection-only change (optimized path)');
-
-      // Update the route to reflect the new selection without triggering full reload
       router.push({
         name: route.name as string,
-        params: {
-          ...route.params,
-          imageId: selectedImageId,
-        },
-        // Use replace to avoid creating a new history entry for just selection changes
+        params: { ...route.params, imageId: selectedImageId },
         replace: true,
       });
 
-      // Update local state without triggering a full reload
       imageId.value = selectedImageId;
-
-      // Update state manager to track the selection
       stateManager.updateState(collectionId.value, selectedImageId);
 
-      // If the image is already loaded in the store, we're done
-      if (imageStore.image?.id === selectedImageId) {
-        console.log('Image already loaded in store, no further loading needed');
-        return;
-      }
-
-      // Otherwise load just the image data without loading annotations or triggering full page reload
-      console.log('Loading minimal image data without full page reload');
-      loadingState.setComponentLoading(`annotator_${selectedImageId}`, true);
-      try {
-        await imageStore.loadImage(selectedImageId, collectionId.value);
-        loadingState.setComponentLoading(`annotator_${selectedImageId}`, false);
-      } catch (error) {
-        console.error('Error loading image data:', error);
-        loadingState.setComponentLoading(`annotator_${selectedImageId}`, false);
+      // Load minimal image data if not already loaded
+      if (imageStore.image?.id !== selectedImageId) {
+        loadingState.setComponentLoading(`annotator_${selectedImageId}`, true);
+        try {
+          await imageStore.loadImage(selectedImageId, collectionId.value);
+        } catch (error) {
+          console.error('Error loading image data:', error);
+        } finally {
+          loadingState.setComponentLoading(
+            `annotator_${selectedImageId}`,
+            false,
+          );
+        }
       }
     } else {
-      // If we need to actually load the image data, use the full loading process
-      console.log('Full image loading required');
+      // Full image loading
       await loadImageData(selectedImageId);
     }
+  } catch (error) {
+    console.error('Error selecting image:', error);
+  } finally {
+    // Stop loading state
+    loadingState.stopLoading('changingImage');
   }
 };
 
-// Create function to save detections - used by child components
+// Save detections function
 const saveDetections = async () => {
-  if (!imageStore.hasChanges) {
-    console.log('No changes to save');
-    return;
-  }
+  if (!imageStore.hasChanges) return;
 
   loadingState.startLoading('savingDetections', 'Saving annotations...');
 
   try {
     const result = await imageStore.saveAllChanges();
-
     if (!result.success) {
       throw new Error(result.error || 'Error saving changes');
     }
-
     notificationStore.success('Annotations saved successfully');
   } catch (error) {
     console.error('Error saving detections:', error);
@@ -409,11 +377,54 @@ const saveDetections = async () => {
     loadingState.stopLoading('savingDetections');
   }
 };
+
+// Add this to the script section at an appropriate location
+const handleHierarchicalTreeClick = (event: MouseEvent) => {
+  console.log(
+    '[EVENT-DEBUG] HierarchicalTree click event captured in ImageDetailPage',
+  );
+
+  // Find the clicked element
+  const target = event.target as HTMLElement;
+  const clickableItem = target.closest('.clickable-item');
+
+  // Extract detection data if available
+  if (clickableItem) {
+    const detectionId = clickableItem.getAttribute('data-detection-id');
+    const imageId = clickableItem.getAttribute('data-image-id');
+
+    if (detectionId && imageId) {
+      console.log('[EVENT-DEBUG] Found detection data in clicks', {
+        detectionId,
+        imageId,
+      });
+
+      // If this is a different image, navigate to it
+      if (imageId !== imageStore.currentImageId) {
+        // Update route if different from current route params
+        router.push({
+          name: route.name as string,
+          params: { ...route.params, imageId: imageId },
+        });
+      }
+
+      // Select the detection after a short delay to ensure image is loaded
+      setTimeout(() => {
+        try {
+          console.log(`[EVENT-DEBUG] Selecting detection ${detectionId}`);
+          imageStore.selectDetection(detectionId);
+        } catch (err) {
+          console.error('[EVENT-DEBUG] Error selecting detection:', err);
+        }
+      }, 500);
+    }
+  }
+};
 </script>
 
 <template>
   <q-page class="column">
-    <!-- Only show loading overlay for critical errors -->
+    <!-- Loading overlay for critical errors -->
     <div
       v-if="loadingState.currentOperation === 'criticalError'"
       class="loading-overlay"
@@ -422,20 +433,10 @@ const saveDetections = async () => {
       <div class="text-subtitle1 q-mt-sm">{{ loadingMessage }}</div>
     </div>
 
-    <!-- Debug info for development -->
-    <div class="debug-info q-pa-xs bg-grey-1 text-caption" v-if="false">
-      <div>Collection ID: {{ collectionId }}</div>
-      <div>Image ID: {{ imageId }}</div>
-      <div>Detections: {{ detections.length }}</div>
-      <div>Component ID: {{ componentId }}</div>
-      <div>Loading: {{ loadingState.isComponentLoading(componentId) }}</div>
-    </div>
-
-    <div class="row items-stretch" style="min-height: inherit">
-      <!-- Left column with HierarchicalTree and PageList -->
-      <div class="col-3 flex flex-col">
-        <!-- Page list component -->
-        <div class="flex-grow">
+    <div class="row no-wrap app-container">
+      <!-- Left column with PageList -->
+      <div class="left-column" :style="leftColumnStyle">
+        <div v-if="!leftPanelCollapsed" class="column-content">
           <PageList
             :collection-id="collectionId"
             layout="sidebar"
@@ -446,59 +447,161 @@ const saveDetections = async () => {
             @[IMAGE_EVENTS.SELECT]="handleSelectImage"
           />
         </div>
+        <div v-else class="collapsed-panel">
+          <q-icon name="photo_library" size="24px" />
+        </div>
+
+        <!-- Toggle button -->
+        <div class="panel-toggle left-toggle" @click="toggleLeftPanel">
+          <q-icon
+            :name="leftPanelCollapsed ? 'chevron_right' : 'chevron_left'"
+            size="20px"
+          />
+        </div>
+
+        <!-- Resize handle -->
+        <div
+          v-if="!leftPanelCollapsed"
+          class="resize-handle left-handle"
+          @mousedown.prevent="startLeftDrag"
+        ></div>
       </div>
 
       <!-- Image annotator column -->
-      <div class="col-5">
-        <div v-if="imageStore.currentImageId" class="fit position-relative">
-          <ImageAnnotator
-            :image-id="imageStore.currentImageId"
-            :collection-id="collectionId"
-            ref="annotatorRef"
-            @save="saveDetections"
-          />
-          <div v-show="loadingState.isLoading" class="loading-overlay">
-            <q-circular-progress indeterminate color="primary" size="50px" />
-            <div class="text-subtitle1 q-mt-sm">{{ loadingMessage }}</div>
+      <div class="middle-column" :style="middleColumnStyle">
+        <div class="column-content">
+          <div v-if="imageStore.currentImageId" class="annotator-container">
+            <ImageAnnotator
+              :image-id="imageStore.currentImageId"
+              :collection-id="collectionId"
+              ref="annotatorRef"
+              @save="saveDetections"
+            />
+            <div v-show="loadingState.isLoading" class="loading-overlay">
+              <q-circular-progress indeterminate color="primary" size="50px" />
+              <div class="text-subtitle1 q-mt-sm">{{ loadingMessage }}</div>
+            </div>
           </div>
-
-          <!-- Optional debugging info overlay -->
-          <div v-if="false" class="debug-info q-pa-sm bg-grey-1">
-            <div>Collection: {{ collectionId }}</div>
-            <div>Image: {{ imageStore.currentImageId }}</div>
-            <div>Detections: {{ imageStore.detections?.length || 0 }}</div>
-          </div>
-        </div>
-        <div v-else class="flex flex-center full-height q-pa-md">
-          <div class="text-center">
-            <q-icon name="image" size="50px" color="grey-5" />
-            <div class="text-subtitle1 q-mt-sm">
-              Select an image from the list
+          <div v-else class="flex flex-center empty-state">
+            <div class="text-center">
+              <q-icon name="image" size="50px" color="grey-5" />
+              <div class="text-subtitle1 q-mt-sm">
+                Select an image from the list
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Annotation list column -->
-      <div class="col-4 justify-center overflow-hidden">
-        <!-- HierarchicalTree component -->
-        <!-- <div class="row q-mb-md">
-          <HierarchicalTree :tree="hierarchicalTree.tree" />
-        </div> -->
+      <div class="right-column" :style="rightColumnStyle">
+        <!-- Resize handle -->
+        <div
+          v-if="!rightPanelCollapsed"
+          class="resize-handle right-handle"
+          @mousedown.prevent="startRightDrag"
+        ></div>
 
-        <AnnotationList
-          :detections="detections"
-          :loading="
-            loadingState.isComponentLoading(
-              `annotationList_${imageStore.currentImageId}`,
-            )
-          "
-          :image="imageForAnnotationList"
-          @[ANNOTATION_EVENTS.SCROLL_TO]="
-            synchronization.handleScrollToAnnotation
-          "
-          @[ANNOTATION_EVENTS.SELECT]="synchronization.handleSelectAnnotation"
-        />
+        <!-- Toggle button -->
+        <div class="panel-toggle right-toggle" @click="toggleRightPanel">
+          <q-icon
+            :name="rightPanelCollapsed ? 'chevron_left' : 'chevron_right'"
+            size="20px"
+          />
+        </div>
+
+        <div v-if="!rightPanelCollapsed" class="column-content">
+          <!-- HierarchicalTree component -->
+          <div
+            class="structure-section"
+            v-if="hierarchicalTree"
+            :style="structureSectionStyle"
+          >
+            <div class="structure-header">
+              <q-tabs
+                v-model="structureTab"
+                dense
+                indicator-color="primary"
+                active-color="primary"
+                narrow-indicator
+                class="q-mb-none"
+              >
+                <q-tab name="structure" icon="account_tree" label="Structure" />
+              </q-tabs>
+              <q-separator />
+            </div>
+            <div class="structure-content">
+              <HierarchicalTree
+                :tree="hierarchicalTree"
+                @click="handleHierarchicalTreeClick"
+              />
+            </div>
+          </div>
+
+          <!-- Empty structure state -->
+          <div v-else class="structure-section" :style="structureSectionStyle">
+            <div class="structure-header">
+              <q-tabs
+                v-model="structureTab"
+                dense
+                indicator-color="primary"
+                active-color="primary"
+                narrow-indicator
+                class="q-mb-none"
+              >
+                <q-tab name="structure" icon="account_tree" label="Structure" />
+              </q-tabs>
+              <q-separator />
+            </div>
+            <div class="empty-structure q-pa-md text-center">
+              <q-icon name="account_tree" size="36px" color="grey-5" />
+              <div class="text-subtitle2 q-mt-sm">No structure information</div>
+            </div>
+          </div>
+
+          <!-- Panel divider with resize handle -->
+          <div class="panel-divider" @mousedown.prevent="startStructureDrag">
+            <div
+              class="panel-toggle annotation-toggle"
+              @click.stop="toggleAnnotationPanel"
+            >
+              <q-icon
+                name="expand_more"
+                size="20px"
+                :class="{ 'rotate-180': annotationPanelCollapsed }"
+                class="toggle-icon"
+              />
+            </div>
+            <div class="divider-grip"></div>
+          </div>
+
+          <!-- Annotation list -->
+          <div class="annotation-container" :style="annotationSectionStyle">
+            <AnnotationList
+              v-if="!annotationPanelCollapsed"
+              :detections="detections"
+              :loading="
+                loadingState.isComponentLoading(
+                  `annotationList_${imageStore.currentImageId}`,
+                )
+              "
+              :image="imageForAnnotationList"
+              @[ANNOTATION_EVENTS.SCROLL_TO]="
+                synchronization.handleScrollToAnnotation
+              "
+              @[ANNOTATION_EVENTS.SELECT]="
+                synchronization.handleSelectAnnotation
+              "
+            />
+            <div v-else class="collapsed-annotation">
+              <q-icon name="list" size="20px" class="q-mr-xs" />
+              <span class="text-caption">Annotations</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="collapsed-panel">
+          <q-icon name="list" size="24px" />
+        </div>
       </div>
     </div>
   </q-page>
@@ -506,7 +609,7 @@ const saveDetections = async () => {
 
 <style scoped>
 .loading-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   right: 0;
@@ -515,20 +618,246 @@ const saveDetections = async () => {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.6);
   z-index: 999;
+  color: white;
+  font-weight: bold;
 }
 
-.debug-info {
+/* Main container layout */
+.app-container {
+  height: calc(100vh - 50px);
+  overflow: visible;
+  position: relative;
+}
+
+/* Column layout styles */
+.left-column,
+.middle-column,
+.right-column {
+  height: 100%;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: width 0.3s ease;
+}
+
+.left-column {
+  border-right: 1px solid #ddd;
+}
+
+.right-column {
+  border-left: 1px solid #ddd;
+}
+
+/* Annotator container */
+.annotator-container {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Empty state when no image selected */
+.empty-state {
+  height: 100%;
+}
+
+/* Structure section */
+.structure-section {
+  flex: 0 0 auto;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.structure-header {
+  flex: 0 0 auto;
+  background-color: white;
+  border-radius: 8px 8px 0 0;
+  position: relative;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.structure-content {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.empty-structure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Annotation list container */
+.annotation-container {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+/* Panel collapse and resize styles */
+.collapsed-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background-color: #fafafa;
+  color: #757575;
+  border-right: 1px solid #eeeeee;
+  border-left: 1px solid #eeeeee;
+}
+
+.panel-toggle {
   position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 900;
-  font-family: monospace;
-  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background-color: white;
+  border: 1px solid #eeeeee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 100;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: background-color 0.2s ease;
 }
 
-.full-height {
-  height: calc(100vh - 180px);
+.toggle-icon {
+  transition: transform 0.3s ease;
+}
+
+.rotate-180 {
+  transform: rotate(180deg);
+}
+
+.panel-toggle:hover {
+  background-color: #f5f5f5;
+}
+
+/* Toggle button positions */
+.annotation-toggle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9100;
+}
+
+.left-toggle {
+  right: -15px;
+}
+
+.right-toggle {
+  left: -15px;
+}
+
+/* Resize handle */
+.resize-handle {
+  position: absolute;
+  background-color: rgba(0, 0, 0, 0.02);
+  z-index: 80;
+  transition: background-color 0.2s ease;
+}
+
+.resize-handle:hover,
+.resize-handle:active {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.left-handle {
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.right-handle {
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 8px;
+  cursor: col-resize;
+}
+
+/* Panel divider */
+.panel-divider {
+  position: relative;
+  height: 24px;
+  background-color: transparent;
+  margin: 4px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: row-resize;
+  z-index: 90;
+}
+
+.panel-divider::before {
+  content: '';
+  position: absolute;
+  height: 2px;
+  width: 100%;
+  background-color: #e0e0e0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 100;
+}
+
+.divider-grip {
+  position: absolute;
+  width: 30px;
+  height: 4px;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+  z-index: 101;
+}
+
+.panel-divider:hover .divider-grip {
+  background-color: #bdbdbd;
+}
+
+.panel-divider:hover::before {
+  background-color: #bdbdbd;
+  height: 2px;
+}
+
+/* Collapsed annotation */
+.collapsed-annotation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background-color: #fafafa;
+  color: #757575;
+  padding: 8px;
+  border-radius: 8px;
+  width: 100%;
+  font-weight: 500;
+}
+
+/* Column content wrapper */
+.column-content {
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 </style>

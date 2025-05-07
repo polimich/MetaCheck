@@ -17,6 +17,8 @@ import { onClickOutside } from '@vueuse/core';
 import { useImage } from 'src/stores';
 import { useMetaRoleStore } from 'src/stores/meta-role-store';
 import { useNotificationStore } from 'src/stores/app/notificationService';
+import { useCollection } from 'src/stores/data/useCollection';
+import { DetectionType } from 'src/stores/data/types';
 // Import the type from the local composable for annotations
 import { DetectionState } from 'src/types';
 
@@ -70,6 +72,7 @@ const bboxToObject = (bbox: string) => {
 const imageStore = useImage();
 const metaRoleStore = useMetaRoleStore();
 const notificationStore = useNotificationStore();
+const collectionStore = useCollection(); // Add collection store instance
 
 // --- Component Refs --- //
 const annotatorBox = ref<HTMLDivElement | null>(null); // Main container div
@@ -343,98 +346,146 @@ function handleConfirmMeta(metaRole: string | null, value: string) {
   // First confirm the metadata in the local annotation state with undo/redo tracking
   annotations.confirmAnnotationMeta(metaRole, value);
 
-  // Then update the store
+  // Get the updated annotation from the local state
   const confirmedAnnotation = annotations.annotations.value.find(
     (a) => a.id === confirmedAnnotationId,
   );
-  if (confirmedAnnotation) {
-    let metaRoleObj = null;
-    if (metaRole) {
-      metaRoleObj = metaRoles.value.find((role) => role.value === metaRole) as
-        | {
-            value: string;
-            label: string;
-            color?: string;
-            id?: string;
-          }
-        | undefined;
-    }
-    if (metaRoleObj) {
-      confirmedAnnotation.computed_color = metaRoleObj.color || '#ff0000';
-      confirmedAnnotation.computed_display_type = metaRoleObj.label;
-      confirmedAnnotation.computed_type = metaRoleObj.value;
-    } else if (metaRole) {
-      confirmedAnnotation.computed_type = metaRole;
-      confirmedAnnotation.computed_display_type = metaRole;
-      confirmedAnnotation.computed_color = '#ff0000';
-    }
-
-    // Prepare payload for store - ensure bbox is included from coordinates
-    const storePayload = {
-      ...confirmedAnnotation,
-      bbox: objectToBbox(
-        confirmedAnnotation.x,
-        confirmedAnnotation.y,
-        confirmedAnnotation.width,
-        confirmedAnnotation.height,
-      ),
-      created_date:
-        confirmedAnnotation.created_date || new Date().toISOString(),
-      last_change: new Date().toISOString(),
-      last_access: new Date().toISOString(),
-      edited: true,
-      loadingMetaRoles: false,
-      deleted: false, // Required by DetectionType
-    };
-
-    // Add to image store
-    const existingIndex = imageStore.detections.findIndex(
-      (d) => d.id === confirmedAnnotation.id,
-    );
-
-    if (existingIndex === -1) {
-      // Add to detections array (for local rendering)
-      imageStore.detections.push(storePayload);
-
-      // Add to detectionsToAdd array (for backend persistence)
-      // Only add if not already there
-      if (
-        !imageStore.detectionsToAdd.some((d) => d.id === confirmedAnnotation.id)
-      ) {
-        imageStore.detectionsToAdd.push({
-          ...storePayload,
-          image_id: props.imageId ?? '',
-        });
-        console.log(
-          `[Annotator] Added new annotation ${confirmedAnnotation.id} to image store`,
-        );
-      } else {
-        console.log(
-          `[Annotator] Annotation ${confirmedAnnotation.id} already in detectionsToAdd, updating`,
-        );
-        // Update the existing entry
-        const index = imageStore.detectionsToAdd.findIndex(
-          (d) => d.id === confirmedAnnotation.id,
-        );
-        if (index !== -1) {
-          imageStore.detectionsToAdd[index] = {
-            ...storePayload,
-            image_id: props.imageId ?? '',
-          };
-        }
-      }
-    } else {
-      // Update existing detection
-      imageStore.detections[existingIndex] = storePayload;
-      console.log(
-        `[Annotator] Updated existing annotation ${confirmedAnnotation.id} in image store`,
-      );
-    }
-  } else {
+  if (!confirmedAnnotation) {
     console.error(
       `[Annotator] Could not find confirmed annotation locally with ID: ${confirmedAnnotationId}`,
     );
+    return;
   }
+
+  // Apply meta role information if available
+  let metaRoleObj = null;
+  if (metaRole) {
+    metaRoleObj = metaRoles.value.find((role) => role.value === metaRole) as
+      | {
+          value: string;
+          label: string;
+          color?: string;
+          id?: string;
+        }
+      | undefined;
+  }
+
+  if (metaRoleObj) {
+    confirmedAnnotation.computed_color = metaRoleObj.color || '#ff0000';
+    confirmedAnnotation.computed_display_type = metaRoleObj.label;
+    confirmedAnnotation.computed_type = metaRoleObj.value;
+  } else if (metaRole) {
+    confirmedAnnotation.computed_type = metaRole;
+    confirmedAnnotation.computed_display_type = metaRole;
+    confirmedAnnotation.computed_color = '#ff0000';
+  }
+
+  // Prepare payload for store - ensure bbox is included from coordinates
+  const storePayload: DetectionType = {
+    id: confirmedAnnotation.id,
+    image_id: confirmedAnnotation.image_id || props.imageId || '',
+    bbox: objectToBbox(
+      confirmedAnnotation.x,
+      confirmedAnnotation.y,
+      confirmedAnnotation.width,
+      confirmedAnnotation.height,
+    ),
+    value: confirmedAnnotation.value || value,
+    confidence: confirmedAnnotation.confidence || 1.0,
+    annotated: true, // Always mark as annotated when confirming metadata
+    computed_color: confirmedAnnotation.computed_color || '#ff0000',
+    computed_type: confirmedAnnotation.computed_type || '',
+    computed_display_type: confirmedAnnotation.computed_display_type || '',
+    created_date: confirmedAnnotation.created_date || new Date().toISOString(),
+    last_change: new Date().toISOString(),
+    last_access: new Date().toISOString(),
+    deleted: false,
+  };
+
+  // Get image location information
+  const currentImageId = props.imageId;
+  const selectedImageData = collectionStore.selectedImage;
+  const imageLocation = selectedImageData?.location;
+
+  if (!currentImageId || !imageLocation) {
+    console.error(
+      '[Annotator] Cannot update collection: Missing image location information',
+    );
+    metaSelectedRole.value = null;
+    metaInputValue.value = '';
+    return;
+  }
+
+  console.log(
+    `[Annotator] Updating detection ${confirmedAnnotation.id} in collection`,
+  );
+
+  // Check if this is a new detection or an existing one
+  const isNewDetection = !imageStore.detections.some(
+    (d: DetectionType) => d.id === confirmedAnnotation.id,
+  );
+
+  // Handle the update based on whether it's new or existing
+  if (isNewDetection) {
+    // This is a new detection - add it to the collection structure
+    const added = collectionStore.addDetectionToImage(
+      currentImageId,
+      storePayload,
+      imageLocation,
+    );
+
+    if (added) {
+      console.log(
+        `[Annotator] New detection ${confirmedAnnotation.id} added to collection structure`,
+      );
+
+      // Also add to detectionsToAdd for backend persistence
+      if (
+        !imageStore.detectionsToAdd.some(
+          (d: DetectionType) => d.id === confirmedAnnotation.id,
+        )
+      ) {
+        imageStore.detectionsToAdd.push({
+          ...storePayload,
+          image_id: currentImageId,
+          // Add required UI properties
+          x: confirmedAnnotation.x,
+          y: confirmedAnnotation.y,
+          width: confirmedAnnotation.width,
+          height: confirmedAnnotation.height,
+          edited: true,
+          loadingMetaRoles: false,
+        });
+        console.log(
+          `[Annotator] Detection ${confirmedAnnotation.id} added to detectionsToAdd for backend persistence`,
+        );
+      }
+    } else {
+      console.error(
+        `[Annotator] Failed to add detection ${confirmedAnnotation.id} to collection structure`,
+      );
+    }
+  } else {
+    // This is an existing detection - update it in the collection structure
+    const updated = collectionStore.modifyDetectionInImage(
+      currentImageId,
+      confirmedAnnotation.id,
+      storePayload,
+      imageLocation,
+    );
+
+    if (updated) {
+      console.log(
+        `[Annotator] Existing detection ${confirmedAnnotation.id} updated in collection structure`,
+      );
+    } else {
+      console.error(
+        `[Annotator] Failed to update detection ${confirmedAnnotation.id} in collection structure`,
+      );
+    }
+  }
+
+  // Clear the input state
   metaSelectedRole.value = null;
   metaInputValue.value = '';
 }
@@ -484,7 +535,31 @@ async function loadImageData() {
     if (!isCurrentImageValid.value) {
       if (props.imageId) {
         try {
-          await imageStore.loadImage(props.imageId, props.collectionId);
+          // Debug current state before loading
+          console.log(
+            '[ImageAnnotator] Before loadImage - current image:',
+            imageStore.image?.id,
+          );
+          console.log('[ImageAnnotator] Loading image:', props.imageId);
+
+          const result = await imageStore.loadImage(
+            props.imageId,
+            props.collectionId,
+          );
+
+          // Debug result and store state after loading
+          console.log('[ImageAnnotator] After loadImage - result:', result);
+          console.log(
+            '[ImageAnnotator] After loadImage - current image:',
+            imageStore.image?.id,
+          );
+
+          if (!result.success) {
+            console.error('Error loading image from store:', result.error);
+            loadingState.value = LoadingState.ERROR;
+            return;
+          }
+
           if (!isCurrentImageValid.value) {
             console.error('Still no image data after loading from store');
             loadingState.value = LoadingState.ERROR;
@@ -517,26 +592,48 @@ async function loadImageData() {
 
     loadingState.value = LoadingState.LOADING_ANNOTATIONS;
 
+    // Log the detections being loaded
+    console.log(
+      '[ImageAnnotator] Loading detections:',
+      imageStore.detections.length,
+      'from image:',
+      imageStore.image?.id,
+    );
+
     // Load annotations from store
-    const detectionsForUI = imageStore.detections.map((detection) => {
-      return {
-        id: detection.id,
-        x: detection.x,
-        y: detection.y,
-        width: detection.width,
-        height: detection.height,
-        value: detection.value,
-        edited: detection.edited ?? false,
-        image_id: detection.image_id,
-        annotated: detection.annotated,
-        computed_type: detection.computed_type,
-        computed_color: detection.computed_color,
-        computed_display_type: detection.computed_display_type,
-      } as DetectionState;
-    });
+    const detectionsForUI =
+      imageStore.detections?.map(
+        (
+          detection: DetectionType & {
+            x?: number;
+            y?: number;
+            width?: number;
+            height?: number;
+            edited?: boolean;
+          },
+        ) => {
+          return {
+            id: detection.id,
+            x: detection.x ?? 0,
+            y: detection.y ?? 0,
+            width: detection.width ?? 0,
+            height: detection.height ?? 0,
+            value: detection.value,
+            edited: detection.edited ?? false,
+            image_id: detection.image_id,
+            annotated: detection.annotated,
+            computed_type: detection.computed_type,
+            computed_color: detection.computed_color,
+            computed_display_type: detection.computed_display_type,
+          } as DetectionState;
+        },
+      ) || [];
 
     // Update view based on detection count
     if (detectionsForUI.length === 0) {
+      console.log(
+        '[ImageAnnotator] No detections found, using empty array and resetting view',
+      );
       imageCanvas.resetView();
     }
 
@@ -577,8 +674,138 @@ async function save() {
       return;
     }
 
+    // Get current image info for collection updates
+    const currentImageId = props.imageId;
+    const selectedImageData = collectionStore.selectedImage;
+    const imageLocation = selectedImageData?.location;
+
+    // Ensure we're saving the most current state from the history
+    console.log(
+      '[Annotator] Ensuring we save the most recent annotations from history',
+    );
+
+    // We need to make sure any modified annotations from the current state are reflected in the image store
+    const currentAnnotations = annotations.annotations.value;
+    if (currentAnnotations.length > 0) {
+      console.log(
+        '[Annotator] Syncing current annotations state with store before saving',
+      );
+
+      // For each annotation in our current state, update the corresponding detection in the store
+      currentAnnotations.forEach((annotation) => {
+        // Check if this annotation exists in the detections array
+        const existingDetection = imageStore.detections.find(
+          (d: DetectionType & { edited?: boolean }) => d.id === annotation.id,
+        );
+
+        if (existingDetection) {
+          // Update the existing detection with the current annotation values
+          console.log(
+            `[Annotator] Updating detection ${annotation.id} with current state`,
+          );
+
+          // Update coordinates and bbox
+          existingDetection.x = annotation.x;
+          existingDetection.y = annotation.y;
+          existingDetection.width = annotation.width;
+          existingDetection.height = annotation.height;
+          existingDetection.bbox = objectToBbox(
+            annotation.x,
+            annotation.y,
+            annotation.width,
+            annotation.height,
+          );
+
+          // Update other properties if they exist
+          if (annotation.value !== undefined)
+            existingDetection.value = annotation.value;
+          if (annotation.annotated !== undefined)
+            existingDetection.annotated = annotation.annotated;
+          if (annotation.computed_type !== undefined)
+            existingDetection.computed_type = annotation.computed_type;
+          if (annotation.computed_color !== undefined)
+            existingDetection.computed_color = annotation.computed_color;
+          if (annotation.computed_display_type !== undefined)
+            existingDetection.computed_display_type =
+              annotation.computed_display_type;
+
+          // Mark as edited to ensure it gets updated
+          existingDetection.edited = true;
+          existingDetection.last_change = new Date().toISOString();
+        } else {
+          // This is a brand new annotation that's not yet in the store
+          // Check if it's in detectionsToAdd first
+          const inToAdd = imageStore.detectionsToAdd.some(
+            (d: DetectionType) => d.id === annotation.id,
+          );
+
+          if (!inToAdd) {
+            console.log(
+              `[Annotator] Adding new detection ${annotation.id} to store`,
+            );
+            // Add to detectionsToAdd for backend persistence
+            imageStore.detectionsToAdd.push({
+              ...annotation,
+              image_id: currentImageId,
+              bbox: objectToBbox(
+                annotation.x,
+                annotation.y,
+                annotation.width,
+                annotation.height,
+              ),
+              confidence: annotation.confidence || 1.0,
+              annotated: annotation.annotated || true,
+              created_date: annotation.created_date || new Date().toISOString(),
+              last_change: new Date().toISOString(),
+              last_access: new Date().toISOString(),
+              deleted: false,
+              loadingMetaRoles: false,
+              edited: true,
+            });
+          }
+        }
+      });
+
+      // Now check for annotations that exist in the store but are deleted in our current state
+      // Get a set of all annotation IDs in the current state
+      const currentAnnotationIds = new Set(currentAnnotations.map((a) => a.id));
+
+      // Check store detections that are not in our current annotation set
+      imageStore.detections.forEach((detection: DetectionType) => {
+        if (!currentAnnotationIds.has(detection.id)) {
+          // This detection exists in the store but not in our current annotations
+          // It might have been deleted through undo/redo
+
+          // Skip if it's already in detectionsToDelete
+          if (imageStore.detectionsToDelete.includes(detection.id)) {
+            return;
+          }
+
+          // Check if it's in detectionsToAdd - if so, just remove it from there
+          const indexInToAdd = imageStore.detectionsToAdd.findIndex(
+            (d: DetectionType) => d.id === detection.id,
+          );
+
+          if (indexInToAdd !== -1) {
+            console.log(
+              `[Annotator] Removing detection ${detection.id} from detectionsToAdd`,
+            );
+            imageStore.detectionsToAdd.splice(indexInToAdd, 1);
+          } else {
+            // Add to detectionsToDelete
+            console.log(
+              `[Annotator] Adding detection ${detection.id} to detectionsToDelete`,
+            );
+            imageStore.detectionsToDelete.push(detection.id);
+          }
+        }
+      });
+    }
+
     // Perform a detailed check of changes
-    const editedDetections = imageStore.detections.filter((d) => d.edited);
+    const editedDetections = imageStore.detections.filter(
+      (d: DetectionType & { edited?: boolean }) => d.edited,
+    );
     console.log('[Annotator] Edited detections:', editedDetections.length);
     console.log(
       '[Annotator] Detections to add:',
@@ -596,40 +823,100 @@ async function save() {
     let detectionFixed = false;
 
     // Ensure all edited detections have valid bbox strings
-    editedDetections.forEach((detection) => {
-      // Check if bbox is missing or invalid
-      if (!detection.bbox) {
-        console.log(
-          '[Annotator] Adding missing bbox to detection:',
-          detection.id,
-        );
-        // Generate bbox from x, y, width, height properties
-        detection.bbox = objectToBbox(
-          detection.x,
-          detection.y,
-          detection.width,
-          detection.height,
-        );
-        detectionFixed = true;
-      }
-    });
+    editedDetections.forEach(
+      (
+        detection: DetectionType & {
+          x?: number;
+          y?: number;
+          width?: number;
+          height?: number;
+          edited?: boolean;
+        },
+      ) => {
+        // Check if bbox is missing or invalid
+        if (!detection.bbox) {
+          console.log(
+            '[Annotator] Adding missing bbox to detection:',
+            detection.id,
+          );
+
+          // Make sure we have the coordinate properties
+          if (
+            detection.x !== undefined &&
+            detection.y !== undefined &&
+            detection.width !== undefined &&
+            detection.height !== undefined
+          ) {
+            // Generate bbox from x, y, width, height properties
+            detection.bbox = objectToBbox(
+              detection.x,
+              detection.y,
+              detection.width,
+              detection.height,
+            );
+            detectionFixed = true;
+
+            // If we have collection access, update there too
+            if (currentImageId && imageLocation) {
+              const updated = collectionStore.modifyDetectionInImage(
+                currentImageId,
+                detection.id,
+                { bbox: detection.bbox },
+                imageLocation,
+              );
+              if (updated) {
+                console.log(
+                  `[Annotator] Updated bbox in collection for detection ${detection.id}`,
+                );
+              }
+            }
+          } else {
+            console.warn(
+              `[Annotator] Cannot fix missing bbox for detection ${detection.id} - missing coordinate properties`,
+            );
+          }
+        }
+      },
+    );
 
     // Also ensure detectionsToAdd all have valid bbox strings
-    imageStore.detectionsToAdd.forEach((detection) => {
-      if (!detection.bbox) {
-        console.log(
-          '[Annotator] Adding missing bbox to detection in detectionsToAdd:',
-          detection.id,
-        );
-        detection.bbox = objectToBbox(
-          detection.x,
-          detection.y,
-          detection.width,
-          detection.height,
-        );
-        detectionFixed = true;
-      }
-    });
+    imageStore.detectionsToAdd.forEach(
+      (
+        detection: DetectionType & {
+          x?: number;
+          y?: number;
+          width?: number;
+          height?: number;
+        },
+      ) => {
+        if (!detection.bbox) {
+          console.log(
+            '[Annotator] Adding missing bbox to detection in detectionsToAdd:',
+            detection.id,
+          );
+
+          // Make sure we have coordinate properties
+          if (
+            detection.x !== undefined &&
+            detection.y !== undefined &&
+            detection.width !== undefined &&
+            detection.height !== undefined
+          ) {
+            detection.bbox = objectToBbox(
+              detection.x,
+              detection.y,
+              detection.width,
+              detection.height,
+            );
+            detectionFixed = true;
+          } else {
+            console.warn(
+              `[Annotator] Cannot fix missing bbox for detection in detectionsToAdd ${detection.id} - missing coordinate properties`,
+            );
+          }
+        }
+      },
+    );
 
     if (detectionFixed) {
       console.log(
@@ -645,7 +932,9 @@ async function save() {
         'to add,',
         imageStore.detectionsToDelete.length,
         'to delete,',
-        imageStore.detections.filter((d) => d.edited).length,
+        imageStore.detections.filter(
+          (d: DetectionType & { edited?: boolean }) => d.edited,
+        ).length,
         'edited',
       );
 
@@ -779,7 +1068,14 @@ function scrollToAnnotation(detection: {
       } else {
         // Last resort - try to find it in the store
         const storeDetection = imageStore.detections.find(
-          (d) => d.id === detection.id,
+          (
+            d: DetectionType & {
+              x?: number;
+              y?: number;
+              width?: number;
+              height?: number;
+            },
+          ) => d.id === detection.id,
         );
         if (storeDetection) {
           // Convert bbox to coordinates
@@ -1097,7 +1393,28 @@ async function forceImageRefresh() {
     if (isCurrentImageValid.value && props.imageId) {
       try {
         // Force reload from store first
-        await imageStore.loadImage(props.imageId, props.collectionId);
+        console.log(
+          '[ImageAnnotator] forceImageRefresh - loading image:',
+          props.imageId,
+        );
+        const result = await imageStore.loadImage(
+          props.imageId,
+          props.collectionId,
+        );
+        console.log('[ImageAnnotator] forceImageRefresh - result:', result);
+
+        if (!result.success) {
+          console.error('Error reloading image:', result.error);
+          loadingState.value = LoadingState.ERROR;
+          return;
+        }
+
+        // Check if image is valid
+        if (!imageStore.image || imageStore.image.id !== props.imageId) {
+          console.error('Image not properly loaded after refresh');
+          loadingState.value = LoadingState.ERROR;
+          return;
+        }
 
         // Create URL with cache-busting timestamp
         const imageUrl = getRasterImage(props.imageId) + `?t=${Date.now()}`;
@@ -1109,23 +1426,39 @@ async function forceImageRefresh() {
         resetStagePosition();
         imageCanvas.resetView();
 
+        // Log the detections being loaded
+        console.log(
+          '[ImageAnnotator] forceImageRefresh - Detections:',
+          imageStore.detections.length,
+        );
+
         // Load annotations
-        const detectionsForUI = imageStore.detections.map((detection) => {
-          return {
-            id: detection.id,
-            x: detection.x,
-            y: detection.y,
-            width: detection.width,
-            height: detection.height,
-            value: detection.value,
-            edited: detection.edited ?? false,
-            image_id: detection.image_id,
-            annotated: detection.annotated,
-            computed_type: detection.computed_type,
-            computed_color: detection.computed_color,
-            computed_display_type: detection.computed_display_type,
-          } as DetectionState;
-        });
+        const detectionsForUI = imageStore.detections.map(
+          (
+            detection: DetectionType & {
+              x?: number;
+              y?: number;
+              width?: number;
+              height?: number;
+              edited?: boolean;
+            },
+          ) => {
+            return {
+              id: detection.id,
+              x: detection.x ?? 0,
+              y: detection.y ?? 0,
+              width: detection.width ?? 0,
+              height: detection.height ?? 0,
+              value: detection.value,
+              edited: detection.edited ?? false,
+              image_id: detection.image_id,
+              annotated: detection.annotated,
+              computed_type: detection.computed_type,
+              computed_color: detection.computed_color,
+              computed_display_type: detection.computed_display_type,
+            } as DetectionState;
+          },
+        );
 
         annotations.loadAnnotations(detectionsForUI);
 
@@ -1168,16 +1501,23 @@ onMounted(() => {
         (!imageStore.image || imageStore.image.id !== props.imageId)
       ) {
         // First make sure the store has the image data
-        imageStore.loadImage(props.imageId, props.collectionId).then(() => {
-          // Then initialize Konva and load the image
-          if (stage.value && !konvaStage.value) {
-            initializeKonvaObjects().then(() => {
-              if (konvaStage.value && konvaLayer.value) {
-                loadImageData();
-              }
-            });
-          }
-        });
+        console.log('[ImageAnnotator onMounted] Loading image:', props.imageId);
+        imageStore
+          .loadImage(props.imageId, props.collectionId)
+          .then((result: { success: boolean; error?: string }) => {
+            console.log(
+              '[ImageAnnotator onMounted] Image load result:',
+              result,
+            );
+            // Then initialize Konva and load the image
+            if (stage.value && !konvaStage.value) {
+              initializeKonvaObjects().then(() => {
+                if (konvaStage.value && konvaLayer.value) {
+                  loadImageData();
+                }
+              });
+            }
+          });
       }
     }
   }, 100);

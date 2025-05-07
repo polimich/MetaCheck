@@ -57,6 +57,24 @@ export const useLoadingState = defineStore('loadingState', () => {
     componentLoadingStates.value[componentId] = isLoading;
   };
 
+  // Clear all loading states
+  const clearAllLoadingStates = (): void => {
+    // Clear all global loading operations
+    Object.keys(loadingOperations.value).forEach((id) => {
+      delete loadingOperations.value[id];
+    });
+
+    // Clear all component loading states
+    Object.keys(componentLoadingStates.value).forEach((id) => {
+      componentLoadingStates.value[id] = false;
+    });
+
+    // Reset current operation
+    currentOperation.value = '';
+
+    console.warn('All loading states have been cleared');
+  };
+
   return {
     loadingOperations,
     componentLoadingStates,
@@ -68,5 +86,6 @@ export const useLoadingState = defineStore('loadingState', () => {
     startLoading,
     stopLoading,
     setComponentLoading,
+    clearAllLoadingStates,
   };
 });

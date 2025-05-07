@@ -1186,24 +1186,26 @@ const handleDescriptionExpand = () => {
                       color="primary"
                       class="q-ml-sm"
                       v-if="item.imageCount > 0"
-                      v-tooltip="
-                        item.level === 1
-                          ? 'Total images in this section and subsections'
-                          : ''
-                      "
                     >
                       {{ item.imageCount }} images{{
                         item.level === 1 ? ' total' : ''
                       }}
+                      <q-tooltip>
+                        {{
+                          item.level == 1
+                            ? 'Total images in this section and subsections'
+                            : ''
+                        }}
+                      </q-tooltip>
                     </q-badge>
 
                     <q-badge
                       v-if="item.directImageCount > 0 && item.level <= 2"
                       color="primary"
                       class="q-ml-sm"
-                      v-tooltip="'Images directly in this section'"
                     >
                       ({{ item.directImageCount }} direct)
+                      <q-tooltip> Images directly in this section </q-tooltip>
                     </q-badge>
 
                     <q-badge
@@ -1212,21 +1214,21 @@ const handleDescriptionExpand = () => {
                       "
                       color="secondary"
                       class="q-ml-sm"
-                      v-tooltip="'Nested subsections'"
                     >
                       {{ item.sectionCounts.children }} subsections
                       <span v-if="item.sectionCounts.grandchildren > 0">
                         ({{ item.sectionCounts.grandchildren }} nested)
                       </span>
+                      <q-tooltip> Nested subsections </q-tooltip>
                     </q-badge>
 
                     <q-badge
                       v-if="item.level === 2 && item.subsectionCount > 0"
                       color="secondary"
                       class="q-ml-sm"
-                      v-tooltip="'Nested subsections'"
                     >
                       {{ item.subsectionCount }} subsections
+                      <q-tooltip> Nested subsections </q-tooltip>
                     </q-badge>
 
                     <q-space />
@@ -1360,7 +1362,7 @@ const handleDescriptionExpand = () => {
       </div>
     </div>
 
-    <!-- Bulk action toolbar - outside the scroll area to stay fixed at the bottom -->
+    <!-- Bulk action toolbar -->
     <div class="page-list-footer" v-if="enableBulkActions">
       <BulkActions
         :selectMode="pageListStore.selectMode"
@@ -1384,160 +1386,132 @@ const handleDescriptionExpand = () => {
 </template>
 
 <style lang="scss" scoped>
-/* Main page list wrapper */
+/* 
+* COMMON STYLES FOR BOTH LAYOUTS 
+*/
 .page-list-wrapper {
   display: flex;
   flex-direction: column;
+  position: relative;
   height: 100%;
   width: 100%;
-  position: relative;
   overflow: hidden;
-
-  /* Sidebar layout styles */
-  &.layout-sidebar {
-    border-right: 1px solid rgba(0, 0, 0, 0.12);
-    padding: 12px;
-    height: calc(100vh - 50px); /* Adjust based on header height */
-    max-height: 100%;
-  }
-
-  /* Full width layout styles */
-  &.layout-full-width {
-    border: none;
-    background-color: #f8f8f8;
-  }
-}
-
-/* Header section */
-.page-list-header {
-  flex-shrink: 0;
-  z-index: 20;
   background-color: white;
-
-  .layout-full-width & {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  }
 }
 
-/* Stats section */
+.page-list-header,
 .page-list-stats {
-  flex-shrink: 0;
-  z-index: 15;
+  flex: 0 0 auto;
+  z-index: 5;
   background-color: white;
-
-  .layout-full-width & {
-    background-color: #f8f8f8;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  }
 }
 
-/* Main content area */
 .page-list-content {
-  flex: 1;
-  min-height: 0; /* Important for flexbox to allow proper scrolling */
-  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-
-  .empty-collection {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-  }
 }
 
-/* Scroll container */
 .page-list-scroll-container {
-  flex: 1;
-  min-height: 0; /* Important for flexbox to allow proper scrolling */
-  position: relative;
-  width: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Hide overflow but allow child elements to scroll */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* Virtual scroll container */
-.virtual-scroll-container {
-  height: calc(100% - 48px); /* Subtract section controls height */
-  width: 100%;
-  background-color: #f8f8f8;
-  overflow: auto; /* Ensure scrolling works */
-  max-height: calc(
-    100vh - 200px
-  ); /* Ensures it doesn't expand beyond viewport height */
-}
-
-/* Footer with bulk actions */
-.page-list-footer {
-  position: relative;
-  flex-shrink: 0;
-  z-index: 100;
-
-  .bulk-actions {
-    width: 100%;
-  }
-}
-
-/* Section controls */
 .section-controls {
-  margin-bottom: 8px;
+  flex: 0 0 auto;
+  background-color: #f5f5f5;
   border-radius: 4px;
+  margin-bottom: 8px;
+  z-index: 2;
 }
 
-/* Virtual items */
+.virtual-scroll-container {
+  flex: 1 1 auto;
+  overflow: auto;
+  background-color: #f8f8f8;
+}
+
+.page-list-footer {
+  flex: 0 0 auto;
+  z-index: 10;
+  background-color: white;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+  width: 100%;
+}
+
+/* Empty states */
+.empty-collection,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 auto;
+  min-height: 200px;
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  margin: 16px;
+}
+
+/* 
+* SIDEBAR LAYOUT STYLES 
+*/
+.page-list-wrapper.layout-sidebar {
+  height: calc(100vh - 50px);
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  padding: 12px;
+}
+
+/* 
+* FULL-WIDTH LAYOUT STYLES 
+*/
+.page-list-wrapper.layout-full-width {
+  background-color: #f8f8f8;
+}
+
+.layout-full-width .page-list-header {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.layout-full-width .page-list-stats {
+  background-color: #f8f8f8;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* 
+* COMPONENT STYLES
+*/
+/* Virtual item styles */
 .virtual-item {
   width: 100%;
   box-sizing: border-box;
 }
 
-/* Virtual item for section headers */
 .virtual-item-section-header {
   padding: 4px 8px;
 }
 
-/* Virtual item for images */
 .virtual-item-image {
   padding: 4px;
 
-  &.view-grid {
-    width: 100%;
-
-    &.level-1 {
-      padding-left: 16px;
-    }
-
-    &.level-2 {
-      padding-left: 32px;
-    }
-
-    &.level-3 {
-      padding-left: 48px;
-    }
+  &.level-1 {
+    padding-left: 16px;
   }
-
-  &.view-list-small,
-  &.view-list-large {
-    &.level-1 {
-      padding-left: 16px;
-    }
-
-    &.level-2 {
-      padding-left: 32px;
-    }
-
-    &.level-3 {
-      padding-left: 48px;
-    }
+  &.level-2 {
+    padding-left: 32px;
+  }
+  &.level-3 {
+    padding-left: 48px;
   }
 }
 
-/* Image container within virtual scroll */
+/* Image container styles */
 .image-container-item {
   width: 100%;
 
@@ -1546,12 +1520,9 @@ const handleDescriptionExpand = () => {
     flex-wrap: wrap;
     padding: 8px;
     gap: 12px;
-    width: 100%;
-    box-sizing: border-box;
     justify-content: flex-start;
 
     > * {
-      // Use flex basis for proper grid layout
       flex: 0 0
         calc(
           (100% - (var(--grid-columns, 3) - 1) * 12px) / var(--grid-columns, 3)
@@ -1566,53 +1537,32 @@ const handleDescriptionExpand = () => {
   &.level-1 {
     padding-left: 16px;
   }
-
   &.level-2 {
     padding-left: 32px;
   }
-
   &.level-3 {
     padding-left: 48px;
   }
 }
 
-/* Meta element sections */
+/* Section styles */
 .meta-element-section {
-  margin-bottom: 0; /* Reduced from 16px to avoid extra spacing in virtual scroll */
+  margin-bottom: 0;
   width: 100%;
-
-  /* Section level styling */
-  &.section-level-1,
-  .section-level-1 {
-    background-color: white;
-  }
-
-  &.section-level-2,
-  .section-level-2 {
-    background-color: #fafafa;
-  }
-
-  &.section-level-3,
-  .section-level-3 {
-    background-color: #f5f5f5;
-  }
 }
 
-/* Section headers */
 .section-header {
   background-color: #f5f5f5;
   transition: background-color 0.2s ease;
   position: relative;
-  z-index: 10;
+  z-index: 1;
 
   &:hover {
     background-color: #e0e0e0;
   }
 
-  /* Level specific styling */
   &.section-level-1 {
     background-color: #f5f5f5;
-
     &:hover {
       background-color: #e0e0e0;
     }
@@ -1620,32 +1570,17 @@ const handleDescriptionExpand = () => {
 
   &.section-level-2 {
     background-color: #f0f0f0;
-
     &:hover {
       background-color: #e5e5e5;
     }
   }
 
-  /* Level 3 styling */
   &.section-level-3 {
     background-color: #e8e8e8;
-
     &:hover {
       background-color: #dedede;
     }
   }
-}
-
-/* Empty state styling */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  background-color: rgba(0, 0, 0, 0.02);
-  border-radius: 8px;
-  margin: 16px;
 }
 
 /* Badge styles */
@@ -1659,12 +1594,7 @@ const handleDescriptionExpand = () => {
   }
 }
 
-/* Utility class for virtual scroll */
-:deep(.q-virtual-scroll--with-prev) {
-  margin-top: -8px; /* Reduce gap between consecutive images */
-}
-
-/* Add CSS for grid rows */
+/* Grid row styles */
 .grid-row {
   display: flex;
   flex-wrap: nowrap;
@@ -1672,7 +1602,7 @@ const handleDescriptionExpand = () => {
   gap: 12px;
   padding: 8px;
   box-sizing: border-box;
-  height: 330px; /* Increased to match virtual scroll size for grid */
+  height: 330px;
   overflow: hidden;
 
   .grid-item {
@@ -1684,13 +1614,16 @@ const handleDescriptionExpand = () => {
   &.level-1 {
     padding-left: 16px;
   }
-
   &.level-2 {
     padding-left: 32px;
   }
-
   &.level-3 {
     padding-left: 48px;
   }
+}
+
+/* Utility */
+:deep(.q-virtual-scroll--with-prev) {
+  margin-top: -8px;
 }
 </style>

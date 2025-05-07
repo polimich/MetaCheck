@@ -1,35 +1,6 @@
 import { axios, axiosErrorHandler } from './index';
 import { DetectionState } from 'src/types/frontend-state/detection.state';
-import { DetectionStateToUpdateDA } from 'src/types/mapper/mapper';
-
-/**
- * Update a single detection
- * @param detection The detection to update
- * @returns Error message if there's an error, empty string if successful
- */
-export const updateSingleDetection = async (
-  detection: DetectionState,
-): Promise<{ error: string; success: boolean }> => {
-  try {
-    console.log(`API: Updating detection ${detection.id}`);
-
-    // Convert frontend state to data access format
-    const detectionDA = DetectionStateToUpdateDA(detection);
-
-    // Send the update request
-    await axios.put('/detection', detectionDA);
-
-    console.log(`API: Successfully updated detection ${detection.id}`);
-    return { error: '', success: true };
-  } catch (error) {
-    const errorMessage = axiosErrorHandler(error);
-    console.error(
-      `API Error in updateSingleDetection for ${detection.id}:`,
-      errorMessage,
-    );
-    return { error: errorMessage, success: false };
-  }
-};
+import { DetectionType } from 'src/stores/data/types';
 
 /**
  * Get a single detection by ID
@@ -108,5 +79,29 @@ export const confirmDetection = async (
       errorMessage,
     );
     return { error: errorMessage, success: false };
+  }
+};
+
+/**
+ * Get all detections for an image
+ * @param imageId The ID of the image to get detections for
+ * @returns The detections data and any error message
+ */
+export const getDetectionsForImage = async (
+  imageId: string,
+): Promise<{ data: DetectionType[] | null; error: string }> => {
+  try {
+    console.log(`API: Fetching detections for image ${imageId}`);
+    const { data } = await axios.get(`/image/${imageId}/detections`);
+
+    console.log(`API: Successfully fetched detections for image ${imageId}`);
+    return { data, error: '' };
+  } catch (error) {
+    const errorMessage = axiosErrorHandler(error);
+    console.error(
+      `API Error in getDetectionsForImage for image ${imageId}:`,
+      errorMessage,
+    );
+    return { data: null, error: errorMessage };
   }
 };
