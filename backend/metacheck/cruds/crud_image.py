@@ -290,11 +290,30 @@ async def update_page_type(db: AsyncSession, image_id: UUID, page_type: str):
     This function uses a direct SQL UPDATE statement and doesn't return anything.
     """
     try:
+        # Check if the image exists first
+        check_query = select(model.Image).where(model.Image.id == image_id)
+        image_result = await db.execute(check_query)
+        existing_image = image_result.scalar_one_or_none()
+        
+        if not existing_image:
+            raise DBError(f"Image with ID {image_id} not found")
+            
+        # Validate page_type against enum if needed
+        from metacheck.schemas.base_objects.enums import PageType
+        valid_page_type = page_type
+        try:
+            # Try to convert string to enum value
+            enum_page_type = PageType(page_type)
+            valid_page_type = enum_page_type.value
+        except ValueError:
+            # Set to a valid default instead of failing
+            valid_page_type = PageType.NORMAL_PAGE.value
+        
         # Direct UPDATE statement without fetching the image first
         stmt = (
             update(model.Image)
             .where(model.Image.id == image_id)
-            .values(page_type=page_type, page_type_confidence=1.0)
+            .values(page_type=valid_page_type, page_type_confidence=1.0)
         )
         
         await db.execute(stmt)
@@ -311,7 +330,15 @@ async def update_page_index(db: AsyncSession, image_id: UUID, page_index: str):
     This function uses a direct SQL UPDATE statement and doesn't return anything.
     """
     try:
-        # Direct UPDATE statement without fetching the image first
+        # Check if the image exists first
+        check_query = select(model.Image).where(model.Image.id == image_id)
+        image_result = await db.execute(check_query)
+        existing_image = image_result.scalar_one_or_none()
+        
+        if not existing_image:
+            raise DBError(f"Image with ID {image_id} not found")
+            
+        # Direct UPDATE statement
         stmt = (
             update(model.Image)
             .where(model.Image.id == image_id)

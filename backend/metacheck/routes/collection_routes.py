@@ -112,53 +112,6 @@ async def get_collection_hierarchical(
 
 
 @collection_route.get(
-    "/{collection_id}/cache_status",
-    tags=["Collection", "Diagnostics"],
-)
-async def check_collection_cache_status(
-    collection_id: UUID, 
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Check the status of the hierarchical cache for a collection.
-    This is a diagnostic endpoint to help debug caching issues.
-    """
-    return await crud_collection.check_hierarchical_cache_status(db, collection_id)
-
-
-@collection_route.post(
-    "/invalidate_all_caches",
-    tags=["Collection", "Diagnostics"],
-)
-async def invalidate_all_collection_caches_endpoint(
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Invalidate the hierarchical cache for ALL collections.
-    Use this to force a fresh rebuild for all collections on next access.
-    This is useful after schema changes or when troubleshooting caching issues.
-    """
-    count = await crud_collection.invalidate_all_collection_caches(db)
-    return {"status": "success", "message": f"Cache for {count} collections has been invalidated"}
-
-
-@collection_route.post(
-    "/{collection_id}/invalidate_cache",
-    tags=["Collection", "Diagnostics"],
-)
-async def invalidate_collection_cache_endpoint(
-    collection_id: UUID, 
-    db: AsyncSession = Depends(get_async_session)
-):
-    """
-    Invalidate the hierarchical cache for a specific collection.
-    Use this to force a fresh rebuild on next access.
-    """
-    await crud_collection.invalidate_collection_cache(db, collection_id)
-    return {"status": "success", "message": f"Cache for collection {collection_id} has been invalidated"}
-
-
-@collection_route.get(
     "/{collection_id}/hierarchical_tree",
     tags=["Collection"],
 )

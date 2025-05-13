@@ -4,6 +4,9 @@ from db.model.detection import Detection
 from db.model.image import Image
 from db.model.meta_role import MetaRole
 from metacheck.cruds import crud_meta_element
+from db.model.meta_element_type import MetaElementType
+from db.model.meta_element_detection_attribute_type import MetaElementDetectionAttributeType
+from typing import Optional
 
 
 async def get_available_for_detection(detection_id: UUID, session: AsyncSession):
@@ -83,4 +86,51 @@ async def get_available_for_collection(collection_id: UUID, session: AsyncSessio
         processed_type_ids.add(meta_element.meta_element_type_id)
     
     return sorted(available_meta_roles, key=lambda x: x.computed_name)
+    
+    
+async def find_meta_role(meta_attribute_name: str, meta_element_name: str, session: AsyncSession) -> Optional[UUID]:
+    """
+    Find a meta role by meta attribute name and meta element name.
+    
+    Args:
+        meta_attribute_name: Name of the meta element detection attribute type
+        meta_element_name: Name of the meta element type
+        session: AsyncSession for database operations
+        
+    Returns:
+        UUID of the matching meta role or None if not found
+    """
+    # First find the meta element type by name
+    element_type_stmt = select(MetaElementType).where(
+        MetaElementType.name == meta_element_name,
+        MetaElementType.deleted == False
+    )
+    element_type_result = await session.execute(element_type_stmt)
+    element_type = element_type_result.scalar_one_or_none()
+    
+    if not element_type:
+        return None
+        
+    # Then find the meta element detection attribute type by name
+    attribute_type_stmt = select(MetaElementDetectionAttributeType).where(
+        MetaElementDetectionAttributeType.name == meta_attribute_name,
+        MetaElementDetectionAttributeType.deleted == False
+    )
+    attribute_type_result = await session.execute(attribute_type_stmt)
+    attribute_type = attribute_type_result.scalar_one_or_none()
+    
+    if not attribute_type:
+        return None
+        
+    # Finally find the meta role that matches both
+    role_stmt = select(MetaRole).where(
+        MetaRole.meta_element_type_id == element_type.id,
+        MetaRole.meta_element_detection_attribute_type_id == attribute_type.id,
+        MetaRole.deleted == False
+    )
+    role_result = await session.execute(role_stmt)
+    role = role_result.scalar_one_or_none()
+    
+    return role.id if role else None
+    
     

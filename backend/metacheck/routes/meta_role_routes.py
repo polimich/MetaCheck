@@ -3,6 +3,7 @@ import logging
 from fastapi import Depends
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from metacheck.cruds import crud_meta_role
 from db import model
@@ -35,3 +36,17 @@ async def get_available_for_collection(collection_id: UUID, session: AsyncSessio
 
 # If needed, add custom routes below:
 # @meta_role_route.get("/custom/{param}", ...) 
+
+@meta_role_route.get("/find/{meta_attribute_name}/{meta_element_name}", response_model=Optional[UUID], tags=["MetaRole"])
+async def find_meta_role(meta_attribute_name: str, meta_element_name: str, session: AsyncSession = Depends(get_async_session)):
+    """
+    Find a meta role by meta attribute name and meta element name.
+    
+    Args:
+        meta_attribute_name: Name of the meta element detection attribute type
+        meta_element_name: Name of the meta element type
+        
+    Returns:
+        UUID of the matching meta role
+    """
+    return await crud_meta_role.find_meta_role(meta_attribute_name, meta_element_name, session)

@@ -197,9 +197,21 @@ async def put_image_detection(
 
 @image_route.post("/update_page_type/{image_id}/{page_type}", tags=["Image"])
 async def update_page_type(image_id: UUID, page_type: str, db: AsyncSession = Depends(get_async_session)):
-    await crud_image.update_page_type(db, image_id, page_type)
+    try:
+        await crud_image.update_page_type(db, image_id, page_type)
+        return {"message": f"Page type updated to {page_type} for image {image_id}"}
+    except DBError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 
 @image_route.post("/update_page_index/{image_id}/{page_index}", tags=["Image"])
 async def update_page_index(image_id: UUID, page_index: str, db: AsyncSession = Depends(get_async_session)):
-    await crud_image.update_page_index(db, image_id, page_index)
+    try:
+        await crud_image.update_page_index(db, image_id, page_index)
+        return {"message": f"Page index updated to {page_index} for image {image_id}"}
+    except DBError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
