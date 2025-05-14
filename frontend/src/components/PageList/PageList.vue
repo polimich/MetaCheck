@@ -990,10 +990,16 @@ watch(
 watch(
   () => props.disableCache,
   (newValue) => {
+    console.log(
+      `[DEBUG-PageList] disableCache changed to ${newValue}, updating collectionStore setting`,
+    );
     collectionStore.value.setDisableCache(newValue);
 
     // Force reload when cache setting changes
     if (props.collectionId) {
+      console.log(
+        '[DEBUG-PageList] Forcing collection reload due to cache setting change',
+      );
       loadCollection();
     }
   },
@@ -1009,38 +1015,46 @@ const isCollectionEmpty = computed(() => {
 async function loadCollection() {
   if (!props.collectionId) return;
 
+  console.log(
+    `[DEBUG-PageList] LoadCollection called for collection: ${props.collectionId}`,
+  );
+
   // More comprehensive cache check with logging
   if (collectionStore.value.isCollectionReady(props.collectionId)) {
     console.log(
-      `PageList: Collection ${props.collectionId} already loaded and ready, using cached data.`,
+      `[DEBUG-PageList] Collection ${props.collectionId} already loaded and ready, using cached data.`,
     );
     return;
   }
 
   if (collectionStore.value.loading) {
     console.log(
-      `PageList: Collection ${props.collectionId} is currently loading, waiting...`,
+      `[DEBUG-PageList] Collection ${props.collectionId} is currently loading, waiting...`,
     );
     // Wait for the collection to be ready instead of returning
     await collectionStore.value.waitForCollectionReady(props.collectionId);
     return;
   }
 
-  console.log(`PageList: Loading collection ${props.collectionId}`);
+  console.log(`[DEBUG-PageList] Loading collection ${props.collectionId}`);
   try {
     // Use the waitForCollectionReady that includes loading if needed
     const ready = await collectionStore.value.waitForCollectionReady(
       props.collectionId,
     );
+    console.log(`[DEBUG-PageList] Collection ready result: ${ready}`);
     if (!ready) {
       console.warn(
-        `PageList: Collection ${props.collectionId} failed to fully load within the timeout period`,
+        `[DEBUG-PageList] Collection ${props.collectionId} failed to fully load within the timeout period`,
+      );
+    } else {
+      console.log(
+        `[DEBUG-PageList] Collection ${props.collectionId} loaded successfully`,
       );
     }
   } catch (error) {
     console.error(
-      `PageList: Error loading collection ${props.collectionId}:`,
-      `PageList: Error loading hierarchical collection ${props.collectionId}:`,
+      `[DEBUG-PageList] Error loading collection ${props.collectionId}:`,
       error,
     );
   }
@@ -1064,6 +1078,119 @@ const handleDescriptionExpand = () => {
     debouncedScrollRefresh();
   }
 };
+
+// Update an existing function where refreshData is likely to be handled
+function handleBulkActionsRefreshData() {
+  console.log('[DEBUG-PageList] Handling refreshData event from BulkActions');
+
+  // Safety check - make sure we have a collection ID
+  if (!props.collectionId) {
+    console.error(
+      '[DEBUG-PageList] Cannot refresh - no collection ID available',
+    );
+    return;
+  }
+
+  // Save the collection ID for later use
+  const collectionIdToRefresh = props.collectionId;
+  console.log(
+    `[DEBUG-PageList] Will refresh collection: ${collectionIdToRefresh}`,
+  );
+
+  // Force a fresh load of the collection data
+  const originalCacheState = collectionStore.value.disableCache;
+
+  // Temporarily disable caching to ensure we get fresh data
+  collectionStore.value.setDisableCache(true);
+  console.log('[DEBUG-PageList] Temporarily disabled cache to force refresh');
+
+  console.log('[DEBUG-PageList] Reloading collection to get latest data');
+
+  // Use loadCollection with explicit ID instead of reloadCollection
+  collectionStore.value
+    .loadCollection(collectionIdToRefresh)
+    .then(() => {
+      console.log('[DEBUG-PageList] Collection reloaded after bulk action');
+
+      // Re-enable cache after loading if it was previously enabled
+      if (!originalCacheState) {
+        console.log('[DEBUG-PageList] Restoring cache setting');
+        collectionStore.value.setDisableCache(originalCacheState);
+      }
+
+      // Force the virtual scroll to refresh
+      if (virtualScrollRef.value) {
+        console.log('[DEBUG-PageList] Forcing virtual scroll refresh');
+        nextTick(() => {
+          virtualScrollRef.value?.refresh();
+        });
+      }
+    })
+    .catch((error) => {
+      console.error('[DEBUG-PageList] Error reloading collection:', error);
+
+      // Always restore cache setting even on error
+      if (!originalCacheState) {
+        console.log('[DEBUG-PageList] Restoring cache setting after error');
+        collectionStore.value.setDisableCache(originalCacheState);
+      }
+    });
+}
+
+// Add a watcher for collection image changes to refresh the virtual scroll
+watch(
+  () => collectionStore.value.allImagesFlattened,
+  (newImages) => {
+    console.log(
+      '[DEBUG-PageList] Detected change in collection images, count:',
+      newImages.length,
+    );
+
+    // Check if there are any images with page_index values for debugging
+    const imagesWithIndices = newImages.filter((img) => img.page_index);
+    if (imagesWithIndices.length > 0) {
+      console.log(
+        '[DEBUG-PageList] Images with page indices:',
+        imagesWithIndices.slice(0, 3).map((img) => ({
+          id: img.id,
+          page_index: img.page_index,
+          page_type: img.page_type,
+        })),
+      );
+    }
+
+    // Add more detailed logging for reactivity debugging
+    console.log(
+      '[DEBUG-PageList] Collection images are now:',
+      JSON.stringify(
+        newImages.slice(0, 3).map((img) => ({
+          id: img.id,
+          page_index: img.page_index || 'none',
+          order: img.order,
+          timestamp: Date.now(), // Add timestamp to track when this occurs
+        })),
+      ),
+    );
+
+    // Refresh the virtual scroll
+    if (virtualScrollRef.value) {
+      console.log(
+        '[DEBUG-PageList] Refreshing virtual scroll due to image data changes',
+      );
+
+      // Wait for computed properties to update first
+      nextTick(() => {
+        virtualScrollRef.value?.reset();
+        console.log('[DEBUG-PageList] Virtual scroll reset complete');
+        nextTick(() => {
+          virtualScrollRef.value?.refresh();
+          console.log('[DEBUG-PageList] Virtual scroll refresh complete');
+        });
+      });
+    }
+  },
+  { deep: true },
+);
 </script>
 
 <template>
@@ -1267,6 +1394,8 @@ const handleDescriptionExpand = () => {
                   v-for="imageItem in item.images"
                   :key="`img-${imageItem.image.id}`"
                   :image="imageItem.image"
+                  :pageIndex="imageItem.image.page_index"
+                  :pageType="imageItem.image.page_type"
                   :isActive="imageItem.image.id === activeImageId"
                   :isSelected="
                     pageListStore.selectedImages.includes(imageItem.image.id)
@@ -1326,6 +1455,8 @@ const handleDescriptionExpand = () => {
                 <ImageThumbnail
                   :key="`img-${item.image.id}`"
                   :image="item.image"
+                  :pageIndex="item.image.page_index"
+                  :pageType="item.image.page_type"
                   :isActive="item.image.id === activeImageId"
                   :isSelected="
                     pageListStore.selectedImages.includes(item.image.id)
@@ -1394,7 +1525,7 @@ const handleDescriptionExpand = () => {
         @downloadSelected="pageListStore.downloadSelected"
         @changePageIndices="pageListStore.changePageIndices"
         @changePageType="pageListStore.changePageType"
-        @refreshData="pageListStore.refreshData"
+        @refreshData="handleBulkActionsRefreshData"
         :pageTypes="Object.values(PageType)"
         :layoutMode="props.layout"
         class="bulk-actions"

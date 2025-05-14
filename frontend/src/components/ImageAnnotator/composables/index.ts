@@ -5,6 +5,7 @@ export { useKonvaEventHandlers } from './useKonvaEventHandlers';
 export { useNavigationMode } from './useNavigationMode';
 export { useSynchronization } from './useSynchronization';
 export { useTransformerManagement } from './useTransformerManagement';
+export { useHistoryManagement } from './useHistoryManagement';
 
 // Export interfaces for TypeScript support
 export {

@@ -79,7 +79,9 @@ export const deleteDetection = async (
   detectionId: string,
 ): Promise<{ success: boolean; error: string }> => {
   try {
-    await axios.delete(`/detection/${detectionId}`);
+    await axios.delete(
+      `/detection/meta_element_detection_delete/${detectionId}`,
+    );
     return { success: true, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
@@ -96,11 +98,20 @@ export const updateImagePageIndex = async (
   pageIndex: string,
 ): Promise<{ success: boolean; error: string }> => {
   try {
+    console.log(
+      `[DEBUG-API] Updating page index for image ${imageId} to "${pageIndex}"`,
+    );
     await axios.post(`/image/update_page_index/${imageId}/${pageIndex}`);
+    console.log(
+      `[DEBUG-API] Successfully sent page index update for image ${imageId}`,
+    );
     return { success: true, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error updating page index for image ${imageId}:`, e);
+    console.error(
+      `[DEBUG-API] Error updating page index for image ${imageId}:`,
+      e,
+    );
     return { success: false, error };
   }
 };
@@ -184,5 +195,57 @@ export const getDetectionsForImage = async (
     const error = axiosErrorHandler(e);
     console.error(`Error fetching detections for image ${imageId}:`, e);
     return { data: null, error };
+  }
+};
+
+/**
+ * Verify page index update by fetching the image data
+ */
+export const verifyPageIndexUpdate = async (
+  imageId: string,
+  expectedPageIndex: string,
+): Promise<{
+  success: boolean;
+  actualPageIndex: string | null;
+  error: string;
+}> => {
+  try {
+    console.log(`[DEBUG-API] Verifying page index update for image ${imageId}`);
+    const imageResponse = await getImage(imageId);
+
+    if (imageResponse.error || !imageResponse.data) {
+      console.error(
+        `[DEBUG-API] Error fetching image ${imageId} to verify update:`,
+        imageResponse.error,
+      );
+      return {
+        success: false,
+        actualPageIndex: null,
+        error: imageResponse.error || 'Image not found',
+      };
+    }
+
+    const actualPageIndex = imageResponse.data.page_index || null;
+    const success = actualPageIndex === expectedPageIndex;
+
+    console.log(`[DEBUG-API] Page index verification for image ${imageId}:
+      - Expected: ${expectedPageIndex}
+      - Actual: ${actualPageIndex}
+      - Match: ${success ? 'YES' : 'NO'}`);
+
+    return {
+      success,
+      actualPageIndex,
+      error: success
+        ? ''
+        : `Page index mismatch: expected ${expectedPageIndex}, got ${actualPageIndex}`,
+    };
+  } catch (e) {
+    const error = axiosErrorHandler(e);
+    console.error(
+      `[DEBUG-API] Exception verifying page index for image ${imageId}:`,
+      e,
+    );
+    return { success: false, actualPageIndex: null, error };
   }
 };

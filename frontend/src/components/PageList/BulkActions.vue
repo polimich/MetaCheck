@@ -92,20 +92,87 @@ const selectedPageType = ref<string | { value: string; label: string }>('');
 const refreshData = async () => {
   if (refreshing.value) return;
 
+  console.log(
+    '[DEBUG-BulkActions] Starting refreshData to update UI with saved changes',
+  );
   refreshing.value = true;
+
   try {
-    await emit('refreshData');
-    $q.notify({
-      type: 'positive',
-      message: 'Page data refreshed',
-      timeout: 2000,
-    });
+    // Import the store directly to ensure we're using the right method
+    const { usePageListStore } = await import('src/stores/ui/pageListStore');
+    const pageListStore = usePageListStore();
+
+    // Log images with page indices before refresh
+    const { useCollection } = await import('src/stores/data/useCollection');
+    const collectionStore = useCollection();
+
+    console.log('[DEBUG-BulkActions] Current images before refresh:');
+    const imagesWithIndices = collectionStore.allImagesFlattened
+      .filter((img) => img.page_index)
+      .slice(0, 5)
+      .map((img) => ({
+        id: img.id,
+        page_index: img.page_index,
+      }));
+
+    console.log(
+      '[DEBUG-BulkActions] Images with page indices:',
+      JSON.stringify(imagesWithIndices),
+    );
+
+    console.log(
+      '[DEBUG-BulkActions] Calling refreshData on pageListStore directly',
+    );
+    // Call the store method directly instead of emitting an event
+    const result = await pageListStore.refreshData();
+
+    if (result?.error) {
+      console.error(
+        '[DEBUG-BulkActions] Error in pageListStore.refreshData:',
+        result.error,
+      );
+
+      // If direct refresh fails, try the event as backup
+      console.log(
+        '[DEBUG-BulkActions] Direct refresh failed, emitting refreshData event as backup',
+      );
+      emit('refreshData');
+    } else {
+      console.log(
+        '[DEBUG-BulkActions] PageListStore refreshData completed successfully',
+      );
+
+      // Also emit the event for backward compatibility
+      console.log(
+        '[DEBUG-BulkActions] Emitting refreshData event for backward compatibility',
+      );
+      emit('refreshData');
+
+      // Log images with page indices after refresh
+      const updatedImagesWithIndices = collectionStore.allImagesFlattened
+        .filter((img) => img.page_index)
+        .slice(0, 5)
+        .map((img) => ({
+          id: img.id,
+          page_index: img.page_index,
+        }));
+
+      console.log(
+        '[DEBUG-BulkActions] Images with page indices after refresh:',
+        JSON.stringify(updatedImagesWithIndices),
+      );
+
+      // Check if any updates were applied
+      const hasChanges =
+        JSON.stringify(imagesWithIndices) !==
+        JSON.stringify(updatedImagesWithIndices);
+      console.log(
+        `[DEBUG-BulkActions] Changes detected in page indices: ${hasChanges}`,
+      );
+    }
   } catch (error) {
-    $q.notify({
-      type: 'negative',
-      message: 'Error refreshing data',
-      timeout: 2000,
-    });
+    console.error('[DEBUG-BulkActions] Error during refreshData:', error);
+    emit('refreshData');
   } finally {
     refreshing.value = false;
   }
@@ -172,10 +239,14 @@ const change_page_indices = async (options: {
 }) => {
   if (!props.selectedImages.length) return;
 
+  console.log('[DEBUG] Starting change_page_indices with options:', options);
+  console.log('[DEBUG] Selected images:', props.selectedImages);
+
   const totalImages = props.selectedImages.length;
   let successCount = 0;
   let errorCount = 0;
   let errors: string[] = [];
+  let updatedImageIds: string[] = [];
 
   // Sort selected images by order if possible
   const selectedImageIds = [...props.selectedImages];
@@ -200,13 +271,23 @@ const change_page_indices = async (options: {
         pageIndex = `${options.prefix}${pageNumbers.join(options.separator)}${options.suffix}`;
       }
 
+      console.log(
+        `[DEBUG] Updating image ${imageId} with page index: ${pageIndex}`,
+      );
       const result = await updateImagePageIndex(imageId, pageIndex);
 
       if (result.success) {
         successCount++;
+        updatedImageIds.push(imageId);
+        console.log(
+          `[DEBUG] Successfully updated image ${imageId} with page index ${pageIndex}`,
+        );
       } else {
         errorCount++;
         errors.push(`Error updating image ${imageId}: ${result.error}`);
+        console.error(
+          `[DEBUG] Failed to update image ${imageId}: ${result.error}`,
+        );
       }
 
       // Increment by step * pagesPerImage for the next image
@@ -216,11 +297,15 @@ const change_page_indices = async (options: {
       errors.push(
         `Exception for image ${imageId}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      console.error(`[DEBUG] Exception updating image ${imageId}:`, error);
     }
   }
 
   // Display success message
   if (successCount > 0) {
+    console.log(
+      `[DEBUG] Successfully updated ${successCount} of ${totalImages} images with page indices`,
+    );
     $q.notify({
       type: 'positive',
       message: `Successfully updated ${successCount} of ${totalImages} images with page indices`,
@@ -230,7 +315,7 @@ const change_page_indices = async (options: {
 
   // Display error message if any
   if (errorCount > 0) {
-    console.error('Page index update errors:', errors);
+    console.error('[DEBUG] Page index update errors:', errors);
     $q.notify({
       type: 'negative',
       message: `Failed to update ${errorCount} of ${totalImages} images. See console for details.`,
@@ -238,8 +323,30 @@ const change_page_indices = async (options: {
     });
   }
 
-  // Refresh data to show updates
-  setTimeout(() => refreshData(), 1000);
+  console.log(
+    '[DEBUG] Page index updates completed. Calling refreshData in 1 second',
+  );
+  console.log('[DEBUG] Updated image IDs:', updatedImageIds);
+
+  // Need to ensure the data is refreshed properly
+  setTimeout(async () => {
+    console.log('[DEBUG] Calling refreshData to update UI with saved changes');
+
+    try {
+      // Import the store directly - this ensures we're using the latest version
+      const { usePageListStore } = await import('src/stores/ui/pageListStore');
+      const pageListStore = usePageListStore();
+
+      // Call the store method directly to perform a full refresh
+      await pageListStore.refreshData();
+      console.log('[DEBUG] PageListStore refreshData completed');
+
+      // Also emit the event for backward compatibility
+      emit('refreshData');
+    } catch (refreshError) {
+      console.error('[DEBUG] Error during refresh:', refreshError);
+    }
+  }, 1000);
 };
 
 // Form submission handlers

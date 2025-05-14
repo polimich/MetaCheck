@@ -686,83 +686,142 @@ export const useCollection = defineStore('collection', () => {
   // Toggle cache on/off
   const setDisableCache = (disabled: boolean) => {
     disableCache.value = disabled;
-    console.log(`[useCollection] Cache ${disabled ? 'disabled' : 'enabled'}`);
+    console.log(
+      `[DEBUG-Collection] Cache ${disabled ? 'disabled' : 'enabled'}`,
+    );
 
     // Reset state when disabling cache to ensure fresh data
     if (disabled) {
+      console.log('[DEBUG-Collection] Resetting state due to cache disabling');
       resetState();
+    }
+  };
+
+  // Reload the current collection - KEEP THIS VERSION
+  const reloadCollection = async () => {
+    console.log('[DEBUG-Collection] reloadCollection called');
+
+    if (collection.value?.id) {
+      // Temporarily disable cache to ensure fresh data
+      const originalCacheSetting = disableCache.value;
+      console.log(
+        `[DEBUG-Collection] Original cache setting: ${originalCacheSetting ? 'disabled' : 'enabled'}`,
+      );
+
+      // Force disable cache for this reload
+      if (!disableCache.value) {
+        console.log(
+          '[DEBUG-Collection] Temporarily disabling cache for reload',
+        );
+        disableCache.value = true;
+      }
+
+      // Reset the collection state to ensure fresh load
+      console.log(
+        `[DEBUG-Collection] Resetting state for collection reload: ${collection.value.id}`,
+      );
+      resetState();
+
+      try {
+        // Load the collection from the API
+        console.log(
+          `[DEBUG-Collection] Loading fresh data for collection: ${collection.value.id}`,
+        );
+        const result = await loadCollection(collection.value.id);
+
+        // Restore original cache setting
+        console.log(
+          `[DEBUG-Collection] Restoring cache setting to: ${originalCacheSetting ? 'disabled' : 'enabled'}`,
+        );
+        disableCache.value = originalCacheSetting;
+
+        // Log some sample data to verify reload
+        if (result.data) {
+          const totalImages = allImagesFlattened.value.length;
+          console.log(
+            `[DEBUG-Collection] Reload successful, collection has ${totalImages} images`,
+          );
+
+          // Log a sample of image data
+          if (totalImages > 0) {
+            const sampleImages = allImagesFlattened.value.slice(0, 5);
+            console.log(
+              '[DEBUG-Collection] Sample images after reload:',
+              sampleImages.map((img) => ({
+                id: img.id,
+                page_index: img.page_index,
+                page_type: img.page_type,
+              })),
+            );
+          }
+        } else {
+          console.error(`[DEBUG-Collection] Reload failed: ${result.error}`);
+        }
+
+        return result;
+      } catch (error) {
+        console.error(
+          '[DEBUG-Collection] Exception during collection reload:',
+          error,
+        );
+
+        // Restore original cache setting even if there's an error
+        console.log(
+          `[DEBUG-Collection] Restoring cache setting after error to: ${originalCacheSetting ? 'disabled' : 'enabled'}`,
+        );
+        disableCache.value = originalCacheSetting;
+
+        return {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    } else {
+      console.error('[DEBUG-Collection] No collection loaded to reload');
+      return { error: 'No collection loaded to reload' };
     }
   };
 
   const loadCollection = async (collectionId: string) => {
     // When cache is disabled, always reset state
     if (disableCache.value || collection.value?.id !== collectionId) {
+      console.log(
+        `[DEBUG-Collection] Resetting state for collection ${collectionId}`,
+      );
+      console.log(
+        `[DEBUG-Collection] disableCache: ${disableCache.value}, current collection: ${collection.value?.id}`,
+      );
       resetState();
     }
     setLoading(true);
     error.value = '';
 
+    console.log(
+      `[DEBUG-Collection] Starting API request to load collection ${collectionId}`,
+    );
     const requestPromise = new Promise<ApiResponse<CollectionHierarchical>>(
       async (resolve) => {
         try {
           const response =
             await collectionApi.getHierarchicalTree(collectionId);
+          console.log(
+            `[DEBUG-Collection] Received API response for collection ${collectionId}`,
+          );
+
           if (response.error) {
             error.value = response.error;
-            console.error(response.error);
+            console.error(`[DEBUG-Collection] API error: ${response.error}`);
             resolve({ error: response.error });
           } else if (response.data) {
             collection.value = response.data;
-            console.log('Hierarchical collection loaded:', collection.value);
-
-            // Log the hierarchical structure
-            if (collection.value.global_structure) {
-              console.log(
-                'Global structure:',
-                collection.value.global_structure,
-              );
-
-              // Log children if available
-              if (collection.value.global_structure.children) {
-                console.log(
-                  'Children count:',
-                  collection.value.global_structure.children.length,
-                );
-
-                if (collection.value.global_structure.children.length > 0) {
-                  console.log(
-                    'First child:',
-                    collection.value.global_structure.children[0],
-                  );
-
-                  // Log nested children if available
-                  const firstChild =
-                    collection.value.global_structure.children[0];
-                  if (firstChild.children && firstChild.children.length > 0) {
-                    console.log(
-                      'Nested children found:',
-                      firstChild.children.length,
-                    );
-                  }
-                }
-              }
-
-              // Log top-level images if available
-              if (
-                collection.value.global_structure.images &&
-                collection.value.global_structure.images.length > 0
-              ) {
-                console.log(
-                  'Top-level images found:',
-                  collection.value.global_structure.images.length,
-                );
-              }
-            }
+            console.log(
+              '[DEBUG-Collection] Hierarchical collection loaded:',
+              collection.value?.id,
+            );
 
             // Build the image location map after loading the collection
             imageLocationMap.value = buildImageLocationMap();
             console.log(
-              `[useCollection] Built image location map with ${imageLocationMap.value.size} entries`,
+              `[DEBUG-Collection] Built image location map with ${imageLocationMap.value.size} entries`,
             );
 
             loaded.value = true;
@@ -781,36 +840,46 @@ export const useCollection = defineStore('collection', () => {
               }
             }
 
+            console.log('[DEBUG-Collection] Loading meta roles for collection');
             const metaRolesResponse =
               await getMetaRolesForCollection(collectionId);
             if (metaRolesResponse.data && metaRolesResponse.data.length > 0) {
               collectionMetaRoles.value = metaRolesResponse.data;
               console.log(
-                `Loaded ${collectionMetaRoles.value.length} meta roles for collection ${collectionId}`,
+                `[DEBUG-Collection] Loaded ${collectionMetaRoles.value.length} meta roles for collection ${collectionId}`,
               );
             } else if (metaRolesResponse.error) {
               console.error(
-                `Failed to load meta roles for collection: ${metaRolesResponse.error}`,
+                `[DEBUG-Collection] Failed to load meta roles for collection: ${metaRolesResponse.error}`,
               );
             }
+
+            console.log(
+              '[DEBUG-Collection] Collection loading process complete',
+            );
             resolve({ data: response.data, error: undefined });
           } else {
             const errorMsg = 'No collection data received';
             error.value = errorMsg;
-            console.error(errorMsg);
+            console.error(`[DEBUG-Collection] ${errorMsg}`);
             resolve({ error: errorMsg });
           }
         } catch (e) {
           const errorMsg = 'Failed to load collection';
           error.value = errorMsg;
-          console.error(e);
+          console.error(
+            '[DEBUG-Collection] Exception during collection load:',
+            e,
+          );
           resolve({ error: errorMsg });
         } finally {
           setLoading(false);
+          console.log(
+            '[DEBUG-Collection] Collection loading process finished (success or failure)',
+          );
         }
       },
     );
-    console.log('requestPromise', requestPromise);
     return requestPromise;
   };
 
@@ -923,28 +992,32 @@ export const useCollection = defineStore('collection', () => {
     }
   };
 
-  // Reload the current collection
-  const reloadCollection = async () => {
-    if (collection.value?.id) {
-      return await loadCollection(collection.value.id);
-    } else {
-      console.error('No collection loaded to reload');
-      return { error: 'No collection loaded to reload' };
-    }
-  };
-
   // Check if the collection is loaded and ready to use
   const isCollectionReady = (collectionId: string): boolean => {
     // When cache is disabled, always return false to force reload
     if (disableCache.value) {
+      console.log(
+        `[DEBUG-Collection] Cache is disabled, forcing reload of collection ${collectionId}`,
+      );
       return false;
     }
 
-    return (
+    const isReady =
       loaded.value &&
       collection.value?.id === collectionId &&
-      allImagesFlattened.value.length > 0
+      allImagesFlattened.value.length > 0;
+
+    console.log(
+      `[DEBUG-Collection] Collection ${collectionId} ready check: ${isReady}`,
     );
+    console.log(`[DEBUG-Collection] - loaded: ${loaded.value}`);
+    console.log(
+      `[DEBUG-Collection] - current collection: ${collection.value?.id}`,
+    );
+    console.log(
+      `[DEBUG-Collection] - image count: ${allImagesFlattened.value.length}`,
+    );
+    return isReady;
   };
 
   // Wait for collection to be ready (useful for race conditions)
@@ -954,25 +1027,31 @@ export const useCollection = defineStore('collection', () => {
   ): Promise<boolean> => {
     // If collection is already ready, return immediately
     if (isCollectionReady(collectionId)) {
+      console.log(
+        `[DEBUG-Collection] Collection ${collectionId} is already ready`,
+      );
       return true;
     }
 
     // If collection is different or not loaded yet, load it
     if (!loaded.value || collection.value?.id !== collectionId) {
       console.log(
-        `[useCollection] Collection ${collectionId} not loaded, loading it now`,
+        `[DEBUG-Collection] Collection ${collectionId} not loaded, loading it now`,
       );
       await loadCollection(collectionId);
 
       // Check again after loading
       if (isCollectionReady(collectionId)) {
+        console.log(
+          `[DEBUG-Collection] Collection ${collectionId} is now ready after loading`,
+        );
         return true;
       }
     }
 
     // If still not ready, wait for it (images might still be processing)
     console.log(
-      `[useCollection] Waiting for collection ${collectionId} to be fully ready`,
+      `[DEBUG-Collection] Waiting for collection ${collectionId} to be fully ready`,
     );
     const startTime = Date.now();
 
@@ -981,13 +1060,13 @@ export const useCollection = defineStore('collection', () => {
         if (isCollectionReady(collectionId)) {
           clearInterval(checkInterval);
           console.log(
-            `[useCollection] Collection ${collectionId} is now ready`,
+            `[DEBUG-Collection] Collection ${collectionId} is now ready after waiting`,
           );
           resolve(true);
         } else if (Date.now() - startTime > maxWaitMs) {
           clearInterval(checkInterval);
           console.warn(
-            `[useCollection] Timed out waiting for collection ${collectionId} to be ready`,
+            `[DEBUG-Collection] Timed out waiting for collection ${collectionId} to be ready`,
           );
           resolve(false);
         }
@@ -1153,6 +1232,19 @@ export const useCollection = defineStore('collection', () => {
       return false;
     }
 
+    console.log(
+      `[DEBUG-Collection] Directly updating image ${imageId} with:`,
+      JSON.stringify(updatedImageData),
+    );
+    console.log(
+      '[DEBUG-Collection] Image location:',
+      JSON.stringify({
+        sectionId: location.sectionId,
+        index: location.index,
+        parentIds: location.parentIds,
+      }),
+    );
+
     try {
       // Get the section based on the location info
       let targetSection: MetaElementHierarchical | null = null;
@@ -1163,6 +1255,7 @@ export const useCollection = defineStore('collection', () => {
         collection.value?.global_structure
       ) {
         targetSection = collection.value.global_structure;
+        console.log('[DEBUG-Collection] Target is global section');
       }
       // Handle nested sections
       else if (collection.value?.global_structure) {
@@ -1201,6 +1294,9 @@ export const useCollection = defineStore('collection', () => {
         // Find the target section (the one containing our image)
         if (currentSection.id === location.sectionId) {
           targetSection = currentSection;
+          console.log(
+            `[DEBUG-Collection] Found target section: ${targetSection.id}`,
+          );
         } else if (
           currentSection.children &&
           Array.isArray(currentSection.children)
@@ -1210,6 +1306,9 @@ export const useCollection = defineStore('collection', () => {
           );
           if (foundSection) {
             targetSection = foundSection;
+            console.log(
+              `[DEBUG-Collection] Found target section in children: ${targetSection.id}`,
+            );
           }
         }
       }
@@ -1225,36 +1324,59 @@ export const useCollection = defineStore('collection', () => {
         // Get the current image to preserve required type fields
         const currentImage = targetSection.images[location.index];
 
-        // Important: We need to preserve the hierarchical structure of detections
-        // Update the image at the specified index while keeping the existing detections
+        console.log('[DEBUG-Collection] Current image data before update:', {
+          id: currentImage.id,
+          page_index: currentImage.page_index || '(none)',
+          page_type: currentImage.page_type || '(none)',
+        });
+
+        // Create new image object to ensure reactivity
         const updatedImage = {
-          ...currentImage, // Keep all existing properties, especially detections
+          ...currentImage, // Keep all existing properties
           ...updatedImageData, // Apply updates
           // Explicitly ensure detections are preserved with their hierarchical structure
           detections: currentImage.detections,
         };
 
-        // Assign the updated image to the correct position
-        targetSection.images[location.index] = updatedImage;
+        // Force reactive update by recreating the images array
+        targetSection.images = [
+          ...targetSection.images.slice(0, location.index),
+          updatedImage,
+          ...targetSection.images.slice(location.index + 1),
+        ];
 
-        // Also update the location map reference
+        // Update the location map reference
         location.image = {
           ...location.image,
           ...updatedImageData,
         };
 
         console.log(
-          `[useCollection] Directly updated image ${imageId} in collection structure`,
+          `[DEBUG-Collection] Successfully updated image ${imageId} in collection structure`,
+          {
+            id: updatedImage.id,
+            page_index: updatedImage.page_index || '(none)',
+            page_type: updatedImage.page_type || '(none)',
+            timestamp: Date.now(),
+          },
         );
+
+        // Force update of reactive properties for UI components to recognize the change
+        if (collection.value) {
+          // Recreate collection to ensure reactivity (Vue might not detect deep changes)
+          collection.value = { ...collection.value };
+          console.log('[DEBUG-Collection] Forced collection reactivity update');
+        }
+
         return true;
       } else {
         console.warn(
-          `[useCollection] Could not find valid target section or image for ${imageId}`,
+          `[DEBUG-Collection] Could not find valid target section or image for ${imageId}`,
         );
         return false;
       }
     } catch (error) {
-      console.error('[useCollection] Error updating image directly:', error);
+      console.error('[DEBUG-Collection] Error updating image directly:', error);
       return false;
     }
   };

@@ -6,6 +6,7 @@ import { useImageCanvas } from './useImageCanvas';
 import { useImage } from 'src/stores/data/useImage';
 import { useCollection } from 'src/stores/data/useCollection';
 import { DetectionType } from 'src/stores/data/types';
+import { useHistoryManagement } from './useHistoryManagement';
 
 // Helper function to convert coordinates to bbox string
 function objectToBbox(
@@ -15,192 +16,6 @@ function objectToBbox(
   height: number,
 ): string {
   return `${x},${y},${width},${height}`;
-}
-
-// --- History Management (Helper Composable) --- //
-/**
- * Manages the undo/redo state for annotations and selections.
- */
-function useHistoryManagement(
-  annotations: ReturnType<typeof ref<DetectionState[]>>,
-  selectedIds: ReturnType<typeof ref<Set<string>>>,
-) {
-  const undoStack = ref<
-    { annotations: DetectionState[]; selectedIds: Set<string> }[]
-  >([]);
-  const redoStack = ref<
-    { annotations: DetectionState[]; selectedIds: Set<string> }[]
-  >([]);
-
-  /** Saves the current annotation and selection state to the undo stack. */
-  function saveState() {
-    // Deep clone to prevent mutations affecting history
-    const currentAnnotations = annotations.value || []; // Handle potential undefined
-    const cloneAnnotations = currentAnnotations.map((a) => ({ ...a }));
-    undoStack.value.push({
-      annotations: cloneAnnotations,
-      selectedIds: new Set(selectedIds.value),
-    });
-    redoStack.value = []; // Clear redo stack on new action
-    console.log(
-      '[History] State saved. Undo:',
-      undoStack.value.length,
-      'Redo:',
-      redoStack.value.length,
-    );
-  }
-
-  /** Restores the previous state from the undo stack. */
-  function undo() {
-    if (undoStack.value.length === 0) return;
-    const prevState = undoStack.value.pop();
-    if (!prevState) return;
-
-    // Save current state to redo stack before reverting
-    const currentAnnotations = annotations.value || []; // Handle potential undefined
-    redoStack.value.push({
-      annotations: currentAnnotations.map((a) => ({ ...a })), // Clone current state
-      selectedIds: new Set(selectedIds.value),
-    });
-
-    // Check for newly created annotations that are being removed by this undo
-    // and handle them appropriately with the imageStore
-    const imageStore = useImage();
-    const currentIds = new Set(currentAnnotations.map((a) => a.id));
-    const prevIds = new Set(prevState.annotations.map((a) => a.id));
-
-    // Find IDs that exist in current but not in previous state (being removed by undo)
-    const removedIds = [...currentIds].filter((id) => !prevIds.has(id));
-
-    if (removedIds.length > 0) {
-      console.log(
-        '[History] Managing annotations removed by undo:',
-        removedIds,
-      );
-
-      // For each removed ID, either:
-      // 1. Remove from detectionsToAdd if it's not yet saved to backend
-      // 2. Add to detectionsToDelete if it's an existing annotation
-      removedIds.forEach((id) => {
-        // Find if this detection is in the detectionsToAdd array
-        const indexInToAdd = imageStore.detectionsToAdd.findIndex(
-          (d: DetectionType) => d.id === id,
-        );
-        if (indexInToAdd !== -1) {
-          // Simply remove from detectionsToAdd
-          console.log('[History] Removing from detectionsToAdd on undo:', id);
-          imageStore.detectionsToAdd.splice(indexInToAdd, 1);
-        } else {
-          // Add to detectionsToDelete if it's not already there
-          if (!imageStore.detectionsToDelete.includes(id)) {
-            console.log('[History] Adding to detectionsToDelete on undo:', id);
-            imageStore.detectionsToDelete.push(id);
-          }
-        }
-      });
-
-      console.log('[History] Updated store arrays for undo operation');
-    }
-
-    // Restore previous state
-    annotations.value = prevState.annotations;
-    selectedIds.value = prevState.selectedIds;
-    console.log(
-      '[History] Undo performed. Undo:',
-      undoStack.value.length,
-      'Redo:',
-      redoStack.value.length,
-    );
-  }
-
-  /** Restores the next state from the redo stack. */
-  function redo() {
-    if (redoStack.value.length === 0) return;
-    const nextState = redoStack.value.pop();
-    if (!nextState) return;
-
-    // Save current state to undo stack before restoring
-    const currentAnnotations = annotations.value || []; // Handle potential undefined
-    undoStack.value.push({
-      annotations: currentAnnotations.map((a) => ({ ...a })), // Clone current state
-      selectedIds: new Set(selectedIds.value),
-    });
-
-    // Check for annotations that will be added by this redo operation
-    const imageStore = useImage();
-    const currentIds = new Set(currentAnnotations.map((a) => a.id));
-    const nextIds = new Set(nextState.annotations.map((a) => a.id));
-
-    // Find IDs that exist in next state but not in current (being added by redo)
-    const addedIds = [...nextIds].filter((id) => !currentIds.has(id));
-
-    if (addedIds.length > 0) {
-      console.log('[History] Managing annotations re-added by redo:', addedIds);
-
-      // Find the annotations in the next state that need to be re-added to the store
-      const annotationsToAdd = nextState.annotations.filter((a) =>
-        addedIds.includes(a.id),
-      );
-
-      // Process each annotation being re-added
-      annotationsToAdd.forEach((annotation) => {
-        // Check if this ID is in detectionsToDelete
-        const indexInToDelete = imageStore.detectionsToDelete.indexOf(
-          annotation.id,
-        );
-        if (indexInToDelete !== -1) {
-          // Remove from deletionsToDelete since we're re-adding it
-          console.log(
-            '[History] Removing from detectionsToDelete on redo:',
-            annotation.id,
-          );
-          imageStore.detectionsToDelete.splice(indexInToDelete, 1);
-        }
-
-        // Add to detectionsToAdd if not already there
-        if (
-          !imageStore.detectionsToAdd.some(
-            (d: DetectionType) => d.id === annotation.id,
-          )
-        ) {
-          console.log(
-            '[History] Re-adding annotation to detectionsToAdd on redo:',
-            annotation.id,
-          );
-          // Need to create a proper detection object
-          imageStore.detectionsToAdd.push({
-            ...annotation,
-            image_id: annotation.image_id,
-            bbox: objectToBbox(
-              annotation.x,
-              annotation.y,
-              annotation.width,
-              annotation.height,
-            ),
-            created_date: annotation.created_date || new Date().toISOString(),
-            last_change: new Date().toISOString(),
-            last_access: new Date().toISOString(),
-            deleted: false,
-            loadingMetaRoles: false,
-          });
-        }
-      });
-
-      console.log('[History] Updated store arrays for redo operation');
-    }
-
-    // Restore next state
-    annotations.value = nextState.annotations;
-    selectedIds.value = nextState.selectedIds;
-    console.log(
-      '[History] Redo performed. Undo:',
-      undoStack.value.length,
-      'Redo:',
-      redoStack.value.length,
-    );
-  }
-
-  return { undoStack, redoStack, saveState, undo, redo };
 }
 
 // --- Annotation Normalization (Helper Composable) --- //
@@ -443,6 +258,27 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
           `[Annotations] Detection ${annotation.id} added to collection structure`,
         );
       }
+
+      // Also add to detectionsToAdd for backend persistence
+      if (
+        !imageStore.detectionsToAdd.some(
+          (d: DetectionType) => d.id === annotation.id,
+        )
+      ) {
+        imageStore.detectionsToAdd.push({
+          ...newDetection,
+          x: annotation.x,
+          y: annotation.y,
+          width: annotation.width,
+          height: annotation.height,
+          edited: true,
+          loadingMetaRoles: false,
+        });
+
+        console.log(
+          `[Annotations] Added detection ${annotation.id} to detectionsToAdd`,
+        );
+      }
     }
 
     selectAnnotation(annotation.id, false); // Select the new annotation
@@ -502,8 +338,91 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
     const annotation = annotations.value.find((a) => a.id === id);
     if (!annotation) return;
     saveState(); // Save state before move for undo
+
+    // Update local annotation position
     annotation.x += delta.x;
     annotation.y += delta.y;
+
+    // Get current image info
+    const currentImageId = imageStore.image?.id;
+    const selectedImageData = collectionStore.selectedImage;
+    const imageLocation = selectedImageData?.location;
+
+    // Update in collection if possible
+    if (currentImageId && imageLocation) {
+      // Create a proper detection update object with updated bbox
+      const detectionUpdate: Partial<DetectionType> = {
+        bbox: objectToBbox(
+          annotation.x,
+          annotation.y,
+          annotation.width,
+          annotation.height,
+        ),
+        last_change: new Date().toISOString(),
+      };
+
+      // Update in collection structure
+      const updated = collectionStore.modifyDetectionInImage(
+        currentImageId,
+        id,
+        detectionUpdate,
+        imageLocation,
+      );
+
+      if (updated) {
+        console.log(
+          `[Annotations] Updated moved detection ${id} in collection structure`,
+        );
+      }
+    }
+
+    // Update the corresponding detection in the store if it exists
+    const storeIndex = imageStore.detections.findIndex(
+      (d: DetectionType) => d.id === id,
+    );
+
+    if (storeIndex !== -1) {
+      // Update position and bbox, and mark as edited
+      Object.assign(imageStore.detections[storeIndex], {
+        x: annotation.x,
+        y: annotation.y,
+        bbox: objectToBbox(
+          annotation.x,
+          annotation.y,
+          annotation.width,
+          annotation.height,
+        ),
+        last_change: new Date().toISOString(),
+        edited: true, // Mark as edited to ensure it gets saved
+      });
+
+      console.log(`[Annotations] Updated detection ${id} in store after move`);
+    } else {
+      // Check if it's a new annotation that needs to be added to detectionsToAdd
+      const indexInToAdd = imageStore.detectionsToAdd.findIndex(
+        (d: DetectionType) => d.id === id,
+      );
+
+      if (indexInToAdd !== -1) {
+        // Update in detectionsToAdd
+        Object.assign(imageStore.detectionsToAdd[indexInToAdd], {
+          x: annotation.x,
+          y: annotation.y,
+          bbox: objectToBbox(
+            annotation.x,
+            annotation.y,
+            annotation.width,
+            annotation.height,
+          ),
+          last_change: new Date().toISOString(),
+        });
+
+        console.log(
+          `[Annotations] Updated moved detection ${id} in detectionsToAdd`,
+        );
+      }
+    }
+
     console.log(`[Annotations] Moved annotation ${id}`);
   }
 
@@ -560,7 +479,34 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
         height,
         bbox: objectToBbox(x, y, width, height),
         last_change: new Date().toISOString(),
+        edited: true, // Mark as edited to ensure it gets saved
       });
+
+      console.log(
+        `[Annotations] Updated detection ${id} in imageStore and marked as edited`,
+      );
+    } else {
+      // If not in main detections array, check if it's a new detection in detectionsToAdd
+      const indexInToAdd = imageStore.detectionsToAdd.findIndex(
+        (d: DetectionType) => d.id === id,
+      );
+
+      if (indexInToAdd !== -1) {
+        // Update in detectionsToAdd
+        const { x, y, width, height } = normalized;
+        Object.assign(imageStore.detectionsToAdd[indexInToAdd], {
+          x,
+          y,
+          width,
+          height,
+          bbox: objectToBbox(x, y, width, height),
+          last_change: new Date().toISOString(),
+        });
+
+        console.log(
+          `[Annotations] Updated dimensions for detection ${id} in detectionsToAdd`,
+        );
+      }
     }
 
     console.log(`[Annotations] Updated dimensions for annotation ${id}`);
@@ -625,6 +571,14 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
             console.log(
               `[Annotations] Detection ${id} directly deleted in collection structure`,
             );
+            // IMPORTANT: Add to imageStore.detectionsToDelete regardless of successful local deletion
+            // This ensures the backend API call will be made to actually delete from database
+            if (!imageStore.detectionsToDelete.includes(id)) {
+              console.log(
+                `[Annotations] Adding ${id} to detectionsToDelete for backend deletion`,
+              );
+              imageStore.detectionsToDelete.push(id);
+            }
           } else {
             // Only call deleteDetection again if the first attempt failed
             console.log(
@@ -690,7 +644,157 @@ export function useAnnotations(imageCanvas: ReturnType<typeof useImageCanvas>) {
       );
       saveState(); // Save state before applying meta for undo
       annotation.value = value;
-      // computed_type/display_type are set in ImageAnnotator
+      // Set computed_type/display_type if provided
+      if (metaRole) {
+        annotation.computed_type = metaRole;
+        annotation.computed_display_type = metaRole;
+      }
+
+      // Get current image info
+      const currentImageId = imageStore.image?.id;
+      const selectedImageData = collectionStore.selectedImage;
+      const imageLocation = selectedImageData?.location;
+
+      // Update in image store
+      // First check if it's in the main detections array
+      const storeIndex = imageStore.detections.findIndex(
+        (d: DetectionType) => d.id === annotation.id,
+      );
+
+      if (storeIndex !== -1) {
+        // Update metadata and mark as edited
+        Object.assign(imageStore.detections[storeIndex], {
+          value: value,
+          computed_type: annotation.computed_type || '',
+          computed_display_type: annotation.computed_display_type || '',
+          last_change: new Date().toISOString(),
+          annotated: true,
+          edited: true, // Mark as edited to ensure it gets saved
+        });
+
+        console.log(
+          `[Annotations] Updated metadata for detection ${annotation.id} in store`,
+        );
+
+        // Also update in collection if possible
+        if (currentImageId && imageLocation) {
+          const updatePayload: Partial<DetectionType> = {
+            value: value,
+            computed_type: annotation.computed_type || '',
+            computed_display_type: annotation.computed_display_type || '',
+            annotated: true,
+            last_change: new Date().toISOString(),
+          };
+
+          const updated = collectionStore.modifyDetectionInImage(
+            currentImageId,
+            annotation.id,
+            updatePayload,
+            imageLocation,
+          );
+
+          if (updated) {
+            console.log(
+              `[Annotations] Updated metadata in collection for detection ${annotation.id}`,
+            );
+          }
+        }
+      } else {
+        // If not in main detections, check if it's in detectionsToAdd
+        const indexInToAdd = imageStore.detectionsToAdd.findIndex(
+          (d: DetectionType) => d.id === annotation.id,
+        );
+
+        if (indexInToAdd !== -1) {
+          // Update in detectionsToAdd
+          Object.assign(imageStore.detectionsToAdd[indexInToAdd], {
+            value: value,
+            computed_type: annotation.computed_type || '',
+            computed_display_type: annotation.computed_display_type || '',
+            last_change: new Date().toISOString(),
+            annotated: true,
+          });
+
+          console.log(
+            `[Annotations] Updated metadata for detection ${annotation.id} in detectionsToAdd`,
+          );
+
+          // Also update in collection if possible
+          if (currentImageId && imageLocation) {
+            const addedToCollection = collectionStore.addDetectionToImage(
+              currentImageId,
+              {
+                ...imageStore.detectionsToAdd[indexInToAdd],
+                bbox: objectToBbox(
+                  annotation.x,
+                  annotation.y,
+                  annotation.width,
+                  annotation.height,
+                ),
+              },
+              imageLocation,
+            );
+
+            if (addedToCollection) {
+              console.log(
+                `[Annotations] Added detection ${annotation.id} with metadata to collection`,
+              );
+            }
+          }
+        } else {
+          // This is a completely new annotation that needs to be added to detectionsToAdd
+          console.log(
+            `[Annotations] Creating new detection entry for ${annotation.id} with metadata`,
+          );
+
+          if (currentImageId) {
+            const newDetection = {
+              id: annotation.id,
+              image_id: currentImageId,
+              bbox: objectToBbox(
+                annotation.x,
+                annotation.y,
+                annotation.width,
+                annotation.height,
+              ),
+              value: value,
+              confidence: annotation.confidence || 1.0,
+              annotated: true,
+              computed_color: annotation.computed_color || '#ff0000',
+              computed_type: annotation.computed_type || '',
+              computed_display_type: annotation.computed_display_type || '',
+              created_date: annotation.created_date || new Date().toISOString(),
+              last_change: new Date().toISOString(),
+              last_access: new Date().toISOString(),
+              deleted: false,
+              x: annotation.x,
+              y: annotation.y,
+              width: annotation.width,
+              height: annotation.height,
+              edited: true,
+              loadingMetaRoles: false,
+            };
+
+            // Add to detectionsToAdd
+            imageStore.detectionsToAdd.push(newDetection);
+
+            // Also add to collection if possible
+            if (imageLocation) {
+              const addedToCollection = collectionStore.addDetectionToImage(
+                currentImageId,
+                newDetection,
+                imageLocation,
+              );
+
+              if (addedToCollection) {
+                console.log(
+                  `[Annotations] Added new detection ${annotation.id} with metadata to collection`,
+                );
+              }
+            }
+          }
+        }
+      }
     } else {
       console.error(
         '[Annotations] Could not find annotation to confirm meta for ID:',

@@ -419,65 +419,12 @@ export const useImage = defineStore('image', () => {
     error.value = null;
 
     try {
-      // First, synchronize changes with the collection store for local state
-      const currentImageId = image.value?.id;
-      const location = imageLocation.value;
+      // First make all API calls and collect results before updating local state
 
-      // If we have access to the collection structure, update it directly
-      if (currentImageId && location) {
-        // Handle additions - update in collection store first
-        for (const detection of detectionsToAdd.value) {
-          console.log(
-            `[useImage] Adding detection ${detection.id} to collection structure`,
-          );
-          collectionStore.addDetectionToImage(
-            currentImageId,
-            detection,
-            location,
-          );
-        }
-
-        // Handle deletions - update in collection store first
-        for (const detectionId of detectionsToDelete.value) {
-          console.log(
-            `[useImage] Removing detection ${detectionId} from collection structure`,
-          );
-          collectionStore.deleteDetectionFromImage(
-            currentImageId,
-            detectionId,
-            location,
-          );
-        }
-
-        // Handle updates to existing detections
-        const detectionsToUpdate = detections.value.filter(
-          (d) => d.edited && !detectionsToAdd.value.some((a) => a.id === d.id),
-        );
-
-        for (const detection of detectionsToUpdate) {
-          console.log(
-            `[useImage] Updating detection ${detection.id} in collection structure`,
-          );
-          collectionStore.modifyDetectionInImage(
-            currentImageId,
-            detection.id,
-            {
-              bbox: detection.bbox,
-              value: detection.value,
-              annotated: detection.annotated,
-              confidence: detection.confidence,
-              computed_color: detection.computed_color,
-              computed_type: detection.computed_type,
-              computed_display_type: detection.computed_display_type,
-              last_change: new Date().toISOString(),
-            },
-            location,
-          );
-        }
-      }
-
-      // Handle additions
+      // Process additions - make API calls for new detections
+      const addResults = [];
       for (const detection of detectionsToAdd.value) {
+        console.log(`[useImage] Creating detection ${detection.id} via API`);
         const apiDetection = prepareDetectionForAPI(detection);
         const response = await createDetection(apiDetection);
 
@@ -487,28 +434,55 @@ export const useImage = defineStore('image', () => {
           isLoading.value = false;
           return { success: false, error: response.error };
         }
+
+        addResults.push({
+          detection,
+          response,
+        });
       }
 
-      // Handle deletions
+      // Process deletions - make API calls for deleted detections
+      const deleteResults = [];
       for (const detectionId of detectionsToDelete.value) {
-        const response = await apiDeleteDetection(detectionId);
+        console.log(
+          `[useImage] Deleting detection ${detectionId} via API at /detection/${detectionId}`,
+        );
 
-        if (response.error) {
+        try {
+          // Call the API to delete the detection from the database
+          const response = await apiDeleteDetection(detectionId);
+
+          if (response.error) {
+            console.error(
+              `[useImage] Error deleting detection: ${response.error}`,
+            );
+            error.value = `Error deleting detection: ${response.error}`;
+            isLoading.value = false;
+            return { success: false, error: response.error };
+          }
+
+          deleteResults.push({
+            detectionId,
+            response,
+          });
+        } catch (deleteError) {
           console.error(
-            `[useImage] Error deleting detection: ${response.error}`,
+            `[useImage] Exception deleting detection: ${deleteError}`,
           );
-          error.value = `Error deleting detection: ${response.error}`;
+          error.value = `Error deleting detection: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`;
           isLoading.value = false;
-          return { success: false, error: response.error };
+          return { success: false, error: error.value };
         }
       }
 
-      // Handle updates to existing detections
-      const detectionsToUpdate = detections.value.filter(
-        (d) => d.edited && !detectionsToAdd.value.some((a) => a.id === d.id),
-      );
+      // Process updates - make API calls for edited detections
+      const updateResults = [];
+      for (const detection of detections.value) {
+        // Only process detections that have been edited
+        if (!(detection as DetectionType & { edited?: boolean }).edited)
+          continue;
 
-      for (const detection of detectionsToUpdate) {
+        console.log(`[useImage] Updating detection ${detection.id} via API`);
         const apiDetection = prepareDetectionForAPI(detection);
 
         // Create a proper update payload with the required fields
@@ -535,14 +509,24 @@ export const useImage = defineStore('image', () => {
           isLoading.value = false;
           return { success: false, error: response.error };
         }
+
+        updateResults.push({
+          detection,
+          response,
+        });
       }
 
-      // Clear change tracking after successful save
+      // All API calls were successful, clear the tracking arrays
+      // but we won't update local state since ImageAnnotator will reload data
       detectionsToAdd.value = [];
       detectionsToDelete.value = [];
 
-      console.log('[useImage] All changes saved successfully');
+      // Reset edited flag for all detections
+      for (const detection of detections.value) {
+        (detection as DetectionType & { edited?: boolean }).edited = false;
+      }
 
+      console.log('[useImage] All changes saved successfully');
       isLoading.value = false;
       return { success: true };
     } catch (err) {

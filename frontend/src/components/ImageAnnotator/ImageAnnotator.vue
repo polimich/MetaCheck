@@ -438,28 +438,6 @@ function handleConfirmMeta(metaRole: string | null, value: string) {
       console.log(
         `[Annotator] New detection ${confirmedAnnotation.id} added to collection structure`,
       );
-
-      // Also add to detectionsToAdd for backend persistence
-      if (
-        !imageStore.detectionsToAdd.some(
-          (d: DetectionType) => d.id === confirmedAnnotation.id,
-        )
-      ) {
-        imageStore.detectionsToAdd.push({
-          ...storePayload,
-          image_id: currentImageId,
-          // Add required UI properties
-          x: confirmedAnnotation.x,
-          y: confirmedAnnotation.y,
-          width: confirmedAnnotation.width,
-          height: confirmedAnnotation.height,
-          edited: true,
-          loadingMetaRoles: false,
-        });
-        console.log(
-          `[Annotator] Detection ${confirmedAnnotation.id} added to detectionsToAdd for backend persistence`,
-        );
-      }
     } else {
       console.error(
         `[Annotator] Failed to add detection ${confirmedAnnotation.id} to collection structure`,
@@ -684,123 +662,183 @@ async function save() {
       '[Annotator] Ensuring we save the most recent annotations from history',
     );
 
+    // STEP 1: SYNC LOCAL ANNOTATIONS WITH STORE
     // We need to make sure any modified annotations from the current state are reflected in the image store
     const currentAnnotations = annotations.annotations.value;
-    if (currentAnnotations.length > 0) {
-      console.log(
-        '[Annotator] Syncing current annotations state with store before saving',
-      );
 
-      // For each annotation in our current state, update the corresponding detection in the store
-      currentAnnotations.forEach((annotation) => {
-        // Check if this annotation exists in the detections array
-        const existingDetection = imageStore.detections.find(
-          (d: DetectionType & { edited?: boolean }) => d.id === annotation.id,
+    // First create sets of IDs for comparison
+    const localAnnotationIds = new Set(currentAnnotations.map((a) => a.id));
+    const storeDetectionIds = new Set(
+      imageStore.detections.map((d: DetectionType) => d.id),
+    );
+
+    // Find annotations that exist locally but not in store (new additions)
+    const newAnnotationIds = [...localAnnotationIds].filter(
+      (id) => !storeDetectionIds.has(id),
+    );
+
+    // Find detections that exist in store but not locally (deletions)
+    const deletedDetectionIds = [...storeDetectionIds].filter(
+      (id) => !localAnnotationIds.has(id),
+    );
+
+    console.log(
+      `[Annotator] Found ${newAnnotationIds.length} new annotations to add`,
+    );
+    console.log(
+      `[Annotator] Found ${deletedDetectionIds.length} detections to delete`,
+    );
+
+    // STEP 2: HANDLE NEW ANNOTATIONS
+    newAnnotationIds.forEach((id) => {
+      const annotation = currentAnnotations.find((a) => a.id === id);
+      if (!annotation) return;
+
+      // Skip if already in detectionsToAdd
+      if (imageStore.detectionsToAdd.some((d: DetectionType) => d.id === id)) {
+        console.log(
+          `[Annotator] New annotation ${id} already in detectionsToAdd, updating`,
         );
-
-        if (existingDetection) {
-          // Update the existing detection with the current annotation values
-          console.log(
-            `[Annotator] Updating detection ${annotation.id} with current state`,
-          );
-
-          // Update coordinates and bbox
-          existingDetection.x = annotation.x;
-          existingDetection.y = annotation.y;
-          existingDetection.width = annotation.width;
-          existingDetection.height = annotation.height;
-          existingDetection.bbox = objectToBbox(
+        // Find and update it
+        const index = imageStore.detectionsToAdd.findIndex(
+          (d: DetectionType) => d.id === id,
+        );
+        if (index !== -1) {
+          Object.assign(imageStore.detectionsToAdd[index], {
+            x: annotation.x,
+            y: annotation.y,
+            width: annotation.width,
+            height: annotation.height,
+            bbox: objectToBbox(
+              annotation.x,
+              annotation.y,
+              annotation.width,
+              annotation.height,
+            ),
+            value: annotation.value || '',
+            last_change: new Date().toISOString(),
+          });
+        }
+      } else {
+        // Add to detectionsToAdd
+        console.log(
+          `[Annotator] Adding new annotation ${id} to detectionsToAdd`,
+        );
+        imageStore.detectionsToAdd.push({
+          ...annotation,
+          image_id: currentImageId,
+          bbox: objectToBbox(
             annotation.x,
             annotation.y,
             annotation.width,
             annotation.height,
+          ),
+          confidence: annotation.confidence || 1.0,
+          annotated: annotation.annotated || true,
+          created_date: annotation.created_date || new Date().toISOString(),
+          last_change: new Date().toISOString(),
+          last_access: new Date().toISOString(),
+          deleted: false,
+          loadingMetaRoles: false,
+          edited: true,
+        });
+      }
+    });
+
+    // STEP 3: HANDLE DELETED ANNOTATIONS
+    deletedDetectionIds.forEach((id) => {
+      // Skip if already in detectionsToDelete
+      if (imageStore.detectionsToDelete.includes(id)) {
+        console.log(
+          `[Annotator] Deleted annotation ${id} already in detectionsToDelete`,
+        );
+        return;
+      }
+
+      // Check if it's in detectionsToAdd - if so, just remove it from there
+      const indexInToAdd = imageStore.detectionsToAdd.findIndex(
+        (d: DetectionType) => d.id === id,
+      );
+      if (indexInToAdd !== -1) {
+        console.log(
+          `[Annotator] Removed ${id} from detectionsToAdd as it's been deleted`,
+        );
+        imageStore.detectionsToAdd.splice(indexInToAdd, 1);
+      } else {
+        // Add to detectionsToDelete
+        console.log(
+          `[Annotator] Adding deleted annotation ${id} to detectionsToDelete`,
+        );
+        imageStore.detectionsToDelete.push(id);
+      }
+    });
+
+    // STEP 4: HANDLE MODIFIED ANNOTATIONS (comparing coordinates)
+    currentAnnotations.forEach((localAnnotation) => {
+      // Skip new annotations we already processed
+      if (newAnnotationIds.includes(localAnnotation.id)) return;
+
+      // Find the corresponding store detection
+      const storeDetection = imageStore.detections.find(
+        (
+          d: DetectionType & {
+            x?: number;
+            y?: number;
+            width?: number;
+            height?: number;
+            edited?: boolean;
+          },
+        ) => d.id === localAnnotation.id,
+      );
+
+      if (storeDetection) {
+        // Check if coordinates have changed
+        const hasPositionChanged =
+          storeDetection.x !== localAnnotation.x ||
+          storeDetection.y !== localAnnotation.y ||
+          storeDetection.width !== localAnnotation.width ||
+          storeDetection.height !== localAnnotation.height;
+
+        const hasValueChanged =
+          storeDetection.value !== localAnnotation.value ||
+          storeDetection.computed_type !== localAnnotation.computed_type;
+
+        if (hasPositionChanged || hasValueChanged) {
+          console.log(
+            `[Annotator] Detected modified annotation ${localAnnotation.id}, updating store`,
           );
 
-          // Update other properties if they exist
-          if (annotation.value !== undefined)
-            existingDetection.value = annotation.value;
-          if (annotation.annotated !== undefined)
-            existingDetection.annotated = annotation.annotated;
-          if (annotation.computed_type !== undefined)
-            existingDetection.computed_type = annotation.computed_type;
-          if (annotation.computed_color !== undefined)
-            existingDetection.computed_color = annotation.computed_color;
-          if (annotation.computed_display_type !== undefined)
-            existingDetection.computed_display_type =
-              annotation.computed_display_type;
+          // Update coordinates and bbox
+          storeDetection.x = localAnnotation.x;
+          storeDetection.y = localAnnotation.y;
+          storeDetection.width = localAnnotation.width;
+          storeDetection.height = localAnnotation.height;
+          storeDetection.bbox = objectToBbox(
+            localAnnotation.x,
+            localAnnotation.y,
+            localAnnotation.width,
+            localAnnotation.height,
+          );
+
+          // Update other properties
+          if (localAnnotation.value !== undefined)
+            storeDetection.value = localAnnotation.value;
+          if (localAnnotation.annotated !== undefined)
+            storeDetection.annotated = localAnnotation.annotated;
+          if (localAnnotation.computed_type !== undefined)
+            storeDetection.computed_type = localAnnotation.computed_type;
+          if (localAnnotation.computed_color !== undefined)
+            storeDetection.computed_color = localAnnotation.computed_color;
+          if (localAnnotation.computed_display_type !== undefined)
+            storeDetection.computed_display_type =
+              localAnnotation.computed_display_type;
 
           // Mark as edited to ensure it gets updated
-          existingDetection.edited = true;
-          existingDetection.last_change = new Date().toISOString();
-        } else {
-          // This is a brand new annotation that's not yet in the store
-          // Check if it's in detectionsToAdd first
-          const inToAdd = imageStore.detectionsToAdd.some(
-            (d: DetectionType) => d.id === annotation.id,
-          );
-
-          if (!inToAdd) {
-            console.log(
-              `[Annotator] Adding new detection ${annotation.id} to store`,
-            );
-            // Add to detectionsToAdd for backend persistence
-            imageStore.detectionsToAdd.push({
-              ...annotation,
-              image_id: currentImageId,
-              bbox: objectToBbox(
-                annotation.x,
-                annotation.y,
-                annotation.width,
-                annotation.height,
-              ),
-              confidence: annotation.confidence || 1.0,
-              annotated: annotation.annotated || true,
-              created_date: annotation.created_date || new Date().toISOString(),
-              last_change: new Date().toISOString(),
-              last_access: new Date().toISOString(),
-              deleted: false,
-              loadingMetaRoles: false,
-              edited: true,
-            });
-          }
+          storeDetection.edited = true;
+          storeDetection.last_change = new Date().toISOString();
         }
-      });
-
-      // Now check for annotations that exist in the store but are deleted in our current state
-      // Get a set of all annotation IDs in the current state
-      const currentAnnotationIds = new Set(currentAnnotations.map((a) => a.id));
-
-      // Check store detections that are not in our current annotation set
-      imageStore.detections.forEach((detection: DetectionType) => {
-        if (!currentAnnotationIds.has(detection.id)) {
-          // This detection exists in the store but not in our current annotations
-          // It might have been deleted through undo/redo
-
-          // Skip if it's already in detectionsToDelete
-          if (imageStore.detectionsToDelete.includes(detection.id)) {
-            return;
-          }
-
-          // Check if it's in detectionsToAdd - if so, just remove it from there
-          const indexInToAdd = imageStore.detectionsToAdd.findIndex(
-            (d: DetectionType) => d.id === detection.id,
-          );
-
-          if (indexInToAdd !== -1) {
-            console.log(
-              `[Annotator] Removing detection ${detection.id} from detectionsToAdd`,
-            );
-            imageStore.detectionsToAdd.splice(indexInToAdd, 1);
-          } else {
-            // Add to detectionsToDelete
-            console.log(
-              `[Annotator] Adding detection ${detection.id} to detectionsToDelete`,
-            );
-            imageStore.detectionsToDelete.push(detection.id);
-          }
-        }
-      });
-    }
+      }
+    });
 
     // Perform a detailed check of changes
     const editedDetections = imageStore.detections.filter(
@@ -962,8 +1000,29 @@ async function save() {
           console.error('[Annotator] Error saving changes:', saveResult?.error);
         }
       } else {
-        // Save was successful
+        // Save was successful - reload the collection and image data from the server
         notificationStore.success('Annotations saved successfully');
+
+        console.log(
+          '[Annotator] Reloading collection and image data from the server',
+        );
+
+        try {
+          // Reload the collection data first
+          if (props.collectionId) {
+            await collectionStore.loadCollection(props.collectionId);
+          }
+
+          // Then force refresh the image data
+          await forceImageRefresh();
+
+          console.log('[Annotator] Data reloaded successfully from the server');
+        } catch (reloadError) {
+          console.error('[Annotator] Error reloading data:', reloadError);
+          notificationStore.warning(
+            'Changes saved, but failed to refresh data',
+          );
+        }
       }
     } else {
       notificationStore.info('No changes to save.');
@@ -1524,7 +1583,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  // Cleanup if necessary
+  // Clean up auto-save timer if exists
 });
 
 // Watch for the v-stage component ref to become available

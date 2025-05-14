@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch, onMounted, onUpdated } from 'vue';
 import { getPreviewImage } from 'src/utils/imageUtils';
 import ConfidenceIndicator from './ConfidenceIndicator.vue';
 import ConfidenceBadge from './ConfidenceBadge.vue';
 
-// Improved props structure with fewer props
+// Improved props structure with direct props for page_index and page_type
 const props = defineProps({
   image: {
     type: Object,
     required: true,
+  },
+  // Direct prop for page_index to improve reactivity
+  pageIndex: {
+    type: String,
+    default: null,
+  },
+  // Direct prop for page_type to improve reactivity
+  pageType: {
+    type: String,
+    default: null,
   },
   isActive: {
     type: Boolean,
@@ -54,7 +64,40 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['click', 'select']);
+// When image prop changes, trigger an update for the pageIndexKey to force re-render
+watch(
+  () => props.image,
+  (newImage) => {
+    console.log(
+      `[DEBUG-Thumbnail] Image ${newImage.id} updated, page_index from object: ${newImage.page_index}`,
+    );
+  },
+  { deep: true },
+);
+
+// Log when the direct pageIndex prop changes
+watch(
+  () => props.pageIndex,
+  (newPageIndex, oldPageIndex) => {
+    console.log(
+      `[DEBUG-Thumbnail] Direct pageIndex prop changed from "${oldPageIndex}" to "${newPageIndex}"`,
+    );
+  },
+  { immediate: true },
+);
+
+// Log when the direct pageType prop changes
+watch(
+  () => props.pageType,
+  (newPageType, oldPageType) => {
+    console.log(
+      `[DEBUG-Thumbnail] Direct pageType prop changed from "${oldPageType}" to "${newPageType}"`,
+    );
+  },
+  { immediate: true },
+);
+
+const emit = defineEmits(['click', 'select', 'description-expand']);
 
 // Track if details are shown
 const showDetails = ref(false);
@@ -84,6 +127,7 @@ function handleImageLoaded() {
 // Toggle details visibility
 function toggleDetails() {
   showDetails.value = !showDetails.value;
+  emit('description-expand', props.image.id, showDetails.value);
 }
 
 const thumbnailClass = computed(() => {
@@ -125,6 +169,88 @@ const getConfidenceColor = (confidence: number) => {
   return 'red-8';
 };
 
+// Use the direct pageIndex prop, fallback to image.page_index for backward compatibility
+const effectivePageIndex = computed(() => {
+  console.log(
+    `[DEBUG-Thumbnail] Computing effectivePageIndex for image ${props.image.id}:`,
+    `Direct prop: "${props.pageIndex}", From image object: "${props.image.page_index}"`,
+  );
+  // Prefer the direct prop if available
+  return props.pageIndex !== null ? props.pageIndex : props.image.page_index;
+});
+
+// Use the direct pageType prop, fallback to image.page_type for backward compatibility
+const effectivePageType = computed(() => {
+  console.log(
+    `[DEBUG-Thumbnail] Computing effectivePageType for image ${props.image.id}:`,
+    `Direct prop: "${props.pageType}", From image object: "${props.image.page_type}"`,
+  );
+  // Prefer the direct prop if available
+  return props.pageType !== null ? props.pageType : props.image.page_type;
+});
+
+// Create a more explicit reference for the badge to use, using timestamp to force reactivity
+const pageIndexWithTimestamp = computed(() => {
+  const result = {
+    index: effectivePageIndex.value,
+    timestamp: Date.now(),
+  };
+  console.log('[DEBUG-Thumbnail] pageIndexWithTimestamp updated:', result);
+  return result;
+});
+
+// Add a computed prop to force reactivity when updating
+const pageIndexKey = computed(() => {
+  const key = `${props.image.id}-${effectivePageIndex.value}`;
+  console.log(`[DEBUG-Thumbnail] pageIndexKey computed: ${key}`);
+  return key;
+});
+
+// Create a counter to force reactivity on deep changes
+const updateCounter = ref(0);
+
+// Log whenever the component receives new props
+watch(
+  () => props.image,
+  (newImage, oldImage) => {
+    console.log(`[DEBUG-Thumbnail] Image prop updated for ${newImage.id}:`);
+    console.log(`  - Old page_index: "${oldImage?.page_index}"`);
+    console.log(`  - New page_index: "${newImage.page_index}"`);
+
+    // Log reference equality check to detect if it's the same object or a new one
+    const isNewObject = newImage !== oldImage;
+    console.log(`  - Is new object reference: ${isNewObject}`);
+
+    // Log Vue's reactive state for debugging
+    console.log(
+      `  - Is new image reactive: ${newImage.__v_isReactive ? 'Yes' : 'No'}`,
+    );
+    console.log(
+      `  - Is old image reactive: ${oldImage?.__v_isReactive ? 'Yes' : 'No'}`,
+    );
+
+    // Print timestamp to correlate with other logs
+    console.log(`  - Update timestamp: ${Date.now()}`);
+  },
+  { deep: true, immediate: true },
+);
+
+// Increment counter to force badge update when either the direct prop or nested prop changes
+watch(
+  [() => props.pageIndex, () => props.image.page_index],
+  ([newDirectIndex, newNestedIndex], [oldDirectIndex, oldNestedIndex]) => {
+    updateCounter.value++;
+    console.log('[DEBUG-Thumbnail] Page index change detected:');
+    console.log(`  - Old direct prop: "${oldDirectIndex}"`);
+    console.log(`  - New direct prop: "${newDirectIndex}"`);
+    console.log(`  - Old nested prop: "${oldNestedIndex}"`);
+    console.log(`  - New nested prop: "${newNestedIndex}"`);
+    console.log(`  - Effective value: "${effectivePageIndex.value}"`);
+    console.log(`  - Counter: ${updateCounter.value}`);
+  },
+  { immediate: true },
+);
+
 // Use a tiny transparent placeholder image to prevent flashing
 const placeholderImage =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
@@ -141,6 +267,21 @@ const truncatedName = computed(() => {
     return name.substring(0, 17) + '...';
   }
   return name;
+});
+
+// Add lifecycle hooks to track component creation and updates
+onMounted(() => {
+  console.log(
+    `[DEBUG-Thumbnail] Component mounted for image ${props.image.id}:`,
+    `Direct pageIndex: "${props.pageIndex}", From image: "${props.image.page_index}"`,
+  );
+});
+
+onUpdated(() => {
+  console.log(
+    `[DEBUG-Thumbnail] Component updated for image ${props.image.id}:`,
+    `Direct pageIndex: "${props.pageIndex}", From image: "${props.image.page_index}"`,
+  );
 });
 </script>
 
@@ -197,13 +338,28 @@ const truncatedName = computed(() => {
 
           <!-- Page index badge - bottom right inside the image wrapper -->
           <q-badge
-            v-if="image.page_index"
+            v-if="effectivePageIndex"
+            :key="`${pageIndexKey}-${updateCounter}-${pageIndexWithTimestamp.timestamp}`"
             color="grey-9"
             class="page-index-badge"
+            @update="
+              console.log(
+                `[DEBUG-Thumbnail] Badge updated with pageIndex: ${effectivePageIndex}`,
+              )
+            "
           >
-            {{ image.page_index }}
+            <template
+              v-if="
+                (console.log(
+                  `[DEBUG-Thumbnail] Rendering badge with pageIndex: ${effectivePageIndex}`,
+                ),
+                true)
+              "
+            >
+              {{ effectivePageIndex }}
+            </template>
             <q-tooltip>
-              Page Number: {{ image.page_index }}
+              Page Number: {{ effectivePageIndex }}
               <div v-if="image.page_index_confidence">
                 Confidence: {{ formatConfidence(image.page_index_confidence) }}
               </div>
@@ -261,7 +417,12 @@ const truncatedName = computed(() => {
             <div class="col-6">
               <q-icon name="format_list_numbered" size="xs" class="q-mr-xs" />
               <span class="text-weight-medium">Page: </span>
-              <span class="q-ml-xs">{{ image.page_index || 'N/A' }}</span>
+              <span
+                class="q-ml-xs"
+                :key="`detail-page-${pageIndexWithTimestamp.timestamp}`"
+              >
+                {{ effectivePageIndex || 'N/A' }}
+              </span>
               <q-badge
                 v-if="image.page_index_confidence"
                 class="mini-badge q-ml-xs"
@@ -279,10 +440,10 @@ const truncatedName = computed(() => {
           </div>
 
           <!-- Page Type row -->
-          <div class="row q-mb-sm" v-if="image.page_type">
+          <div class="row q-mb-sm" v-if="effectivePageType">
             <q-icon name="category" size="xs" class="q-mr-xs" />
             <span class="text-weight-medium">Page Type: </span>
-            <span class="q-ml-xs">{{ image.page_type }}</span>
+            <span class="q-ml-xs">{{ effectivePageType }}</span>
             <q-badge
               v-if="image.page_type_confidence"
               class="mini-badge q-ml-xs"
