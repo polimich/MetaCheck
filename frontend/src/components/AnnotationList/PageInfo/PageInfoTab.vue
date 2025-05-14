@@ -15,7 +15,9 @@ const imageStore = useImage();
 // Local reactive values to track changes in the image prop
 const pageIndex = ref(props.image.page_index || '');
 const pageIndexConfidence = ref(props.image.page_index_confidence || 0);
-const pageType = ref(props.image.page_type || '');
+const pageType = ref<string | { value: string; label: string }>(
+  props.image.page_type || '',
+);
 const pageTypeConfidence = ref(props.image.page_type_confidence || 0);
 
 // Watch for changes to the image prop and update local values
@@ -30,6 +32,16 @@ watch(
   { immediate: true, deep: true },
 );
 
+// Helper to extract string value from potentially object-typed page type
+const getStringValue = (
+  value: string | { value: string; label: string },
+): string => {
+  if (typeof value === 'object' && value !== null && 'value' in value) {
+    return value.value;
+  }
+  return value as string;
+};
+
 // Check if we have page info to display
 const hasPageInfo = computed(() => {
   return !!pageIndex.value || !!pageType.value;
@@ -42,27 +54,32 @@ const handlePageInfoUpdate = async ({
   confidence,
 }: {
   type: 'page_index' | 'page_type';
-  value: string;
+  value: string | { value: string; label: string };
   confidence: number;
 }) => {
-  console.log(`Updating ${type} to: ${value} with confidence: ${confidence}`);
+  // Extract the string value if value is an object
+  const finalValue = getStringValue(value);
+
+  console.log(
+    `Updating ${type} to: ${finalValue} with confidence: ${confidence}`,
+  );
 
   // Update local values
   if (type === 'page_index') {
-    pageIndex.value = value;
+    pageIndex.value = finalValue;
     pageIndexConfidence.value = confidence;
   } else if (type === 'page_type') {
-    pageType.value = value;
+    pageType.value = finalValue;
     pageTypeConfidence.value = confidence;
   }
 
   // Update the image in the store
   if (imageStore.image) {
     if (type === 'page_index') {
-      imageStore.image.page_index = value;
+      imageStore.image.page_index = finalValue;
       imageStore.image.page_index_confidence = confidence;
     } else if (type === 'page_type') {
-      imageStore.image.page_type = value;
+      imageStore.image.page_type = finalValue;
       imageStore.image.page_type_confidence = confidence;
     }
 
@@ -116,7 +133,7 @@ const handleRefresh = async (imageId: string) => {
     <PageInfoItem
       v-if="pageType !== undefined"
       type="page_type"
-      :value="pageType"
+      :value="getStringValue(pageType)"
       :confidence="pageTypeConfidence"
       :imageId="image.id"
       :loading="loading"

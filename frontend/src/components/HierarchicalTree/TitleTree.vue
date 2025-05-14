@@ -505,11 +505,12 @@ onMounted(() => {
       v-for="(group, index) in fieldGroups"
       :key="index"
       :group="group"
-      :tree-object="tree"
+      :meta-element-object="tree"
       :has-critical="hasGroupCriticalConfidence(group)"
       :has-warning="hasGroupLowConfidence(group)"
       :has-values="hasGroupValues(group)"
       :default-open="hasGroupCriticalConfidence(group)"
+      :parent-id="tree.id"
       group-name="title-tree"
       @detection-click="navigateToDetection"
     />
@@ -537,7 +538,7 @@ onMounted(() => {
           <VolumeTree
             v-for="(volume, index) in tree.volumes"
             :key="index"
-            :tree="volume"
+            :volume="volume"
             class="volume-item"
             @critical-count-changed="updateVolumeCriticalCounts"
           />

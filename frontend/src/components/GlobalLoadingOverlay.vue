@@ -10,7 +10,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted, defineEmits } from 'vue';
+import { computed, ref, watch, onUnmounted } from 'vue';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { AppLoadingSplash } from './Skeletons';
 

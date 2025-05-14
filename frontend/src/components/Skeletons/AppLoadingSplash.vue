@@ -76,14 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  defineProps,
-  defineEmits,
-  ref,
-  onMounted,
-  watch,
-  onBeforeUnmount,
-} from 'vue';
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue';
 import { useLoadingState } from 'src/stores/app/loadingState';
 
 const props = defineProps({

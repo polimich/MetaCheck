@@ -14,8 +14,6 @@
     "build": "quasar build"
   },
   "dependencies": {
-    "@automapper/classes": "^8.8.1",
-    "@automapper/core": "^8.8.1",
     "@quasar/extras": "^1.16.4",
     "@types/uuid": "^10.0.0",
     "@vueuse/core": "^13.1.0",

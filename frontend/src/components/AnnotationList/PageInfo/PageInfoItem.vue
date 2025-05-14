@@ -11,6 +11,34 @@ import {
   updateImagePageType,
 } from 'src/api/imageApiService';
 import { useQuasar } from 'quasar';
+import { PageType } from 'src/stores/data/types/enum';
+
+// Create an array of page type options from the enum
+const pageTypeOptions = Object.values(PageType).map((value) => ({
+  label: value,
+  value: value,
+}));
+
+// Filter function for the q-select
+const filterPageTypes = (val: string, update: (fn: () => void) => void) => {
+  if (val === '') {
+    update(() => {
+      // Return all options when search is empty
+      pageTypeFilterOptions.value = pageTypeOptions;
+    });
+    return;
+  }
+
+  update(() => {
+    const needle = val.toLowerCase();
+    pageTypeFilterOptions.value = pageTypeOptions.filter(
+      (v) => v.label.toLowerCase().indexOf(needle) > -1,
+    );
+  });
+};
+
+// Ref to hold filtered options
+const pageTypeFilterOptions = ref(pageTypeOptions);
 
 const props = defineProps<{
   type: 'page_index' | 'page_type';
@@ -73,6 +101,9 @@ const displayInfo = computed(() => {
   }
 });
 
+// Determine if we should show the select instead of text input
+const shouldUseSelect = computed(() => props.type === 'page_type');
+
 // Handle value changes
 const handleValueChange = () => {
   isEdited.value = true;
@@ -99,8 +130,7 @@ const saveChanges = async () => {
     let error = '';
 
     if (props.type === 'page_index') {
-      const pageIndex = localValue.value;
-      error = await updateImagePageIndex(props.imageId, pageIndex);
+      error = await updateImagePageIndex(props.imageId, localValue.value);
     } else if (props.type === 'page_type') {
       console.log(
         `Calling updateImagePageType with imageId=${props.imageId}, pageType=${localValue.value}`,
@@ -162,9 +192,31 @@ const saveChanges = async () => {
           <q-icon :name="displayInfo.icon" color="primary" size="sm" />
         </div>
 
-        <!-- Value input -->
+        <!-- Value input - either text input or select based on type -->
         <div class="col">
+          <q-select
+            v-if="shouldUseSelect"
+            v-model="localValue"
+            :label="displayInfo.label"
+            :options="pageTypeFilterOptions"
+            dense
+            outlined
+            use-input
+            input-debounce="0"
+            @filter="filterPageTypes"
+            @update:model-value="handleValueChange"
+            hide-bottom-space
+          >
+            <template v-slot:no-option>
+              <q-item>
+                <q-item-section class="text-grey">
+                  No results found
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-select>
           <q-input
+            v-else
             v-model="localValue"
             :label="displayInfo.label"
             dense

@@ -1,6 +1,24 @@
 import { axios, axiosErrorHandler } from './index';
 import { DetectionState } from 'src/types/frontend-state/detection.state';
-import { DetectionType } from 'src/stores/data/types';
+import {
+  DetectionNewType,
+  DetectionType,
+  DetectionUpdateType,
+} from 'src/stores/data/types';
+import { createApiService } from './apiFactory';
+
+const crudDetectionApi = createApiService<
+  DetectionState,
+  DetectionNewType,
+  DetectionUpdateType
+>({
+  basePath: '/detection',
+  entityName: 'detection',
+});
+
+export const detectionApi = {
+  ...crudDetectionApi,
+};
 
 /**
  * Get a single detection by ID

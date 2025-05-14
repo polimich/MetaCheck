@@ -411,7 +411,7 @@ const truncatedName = computed(() => {
   }
 
   &.thumbnail-active {
-    border-color: var(--q-primary);
+    background-color: var(--q-primary);
     color: white;
 
     .image-wrapper {

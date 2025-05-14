@@ -8,7 +8,7 @@ import {
 } from 'src/types/data-access';
 import { getMetaRolesForCollection } from 'src/api/metaRoleApiService';
 import {
-  apiGetCollectionHierarchical,
+  collectionApi,
   getDetectionsForImage as apiGetDetectionsForImage,
 } from 'src/api';
 import { DetectionType } from './types';
@@ -89,6 +89,9 @@ export const useCollection = defineStore('collection', () => {
   const selectedImageId = ref<string>('');
   // Sorting and filtering state
   const currentSortOption = ref<SortOption>('order');
+
+  // Cache control flag - set to true to disable caching
+  const disableCache = ref(false);
 
   // Additional stats from original currentCollectionState
   const image_count = computed(() => collection.value?.image_count || 0);
@@ -668,7 +671,7 @@ export const useCollection = defineStore('collection', () => {
     sectionCache.value.clear();
   };
 
-  // Update resetState to clear section cache
+  // Reset state completely
   const resetState = () => {
     collection.value = undefined;
     collectionMetaRoles.value = [];
@@ -680,8 +683,20 @@ export const useCollection = defineStore('collection', () => {
     clearSectionCache();
   };
 
+  // Toggle cache on/off
+  const setDisableCache = (disabled: boolean) => {
+    disableCache.value = disabled;
+    console.log(`[useCollection] Cache ${disabled ? 'disabled' : 'enabled'}`);
+
+    // Reset state when disabling cache to ensure fresh data
+    if (disabled) {
+      resetState();
+    }
+  };
+
   const loadCollection = async (collectionId: string) => {
-    if (collection.value?.id !== collectionId) {
+    // When cache is disabled, always reset state
+    if (disableCache.value || collection.value?.id !== collectionId) {
       resetState();
     }
     setLoading(true);
@@ -690,7 +705,8 @@ export const useCollection = defineStore('collection', () => {
     const requestPromise = new Promise<ApiResponse<CollectionHierarchical>>(
       async (resolve) => {
         try {
-          const response = await apiGetCollectionHierarchical(collectionId);
+          const response =
+            await collectionApi.getHierarchicalTree(collectionId);
           if (response.error) {
             error.value = response.error;
             console.error(response.error);
@@ -919,6 +935,11 @@ export const useCollection = defineStore('collection', () => {
 
   // Check if the collection is loaded and ready to use
   const isCollectionReady = (collectionId: string): boolean => {
+    // When cache is disabled, always return false to force reload
+    if (disableCache.value) {
+      return false;
+    }
+
     return (
       loaded.value &&
       collection.value?.id === collectionId &&
@@ -1731,5 +1752,7 @@ export const useCollection = defineStore('collection', () => {
     modifyDetectionInImage,
     deleteDetectionFromImage,
     addDetectionToImage,
+    disableCache,
+    setDisableCache,
   };
 });

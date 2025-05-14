@@ -5,7 +5,7 @@ import {
   isMultiPartMonograph,
   useHierarchicalTree,
 } from 'src/stores';
-import { computed, watch, onMounted, defineEmits } from 'vue';
+import { computed, watch, onMounted } from 'vue';
 import MonographTree from './MonographTree.vue';
 import MultiPartMonographTree from './MultiPartMonographTree.vue';
 import { useCollection } from 'src/stores/data/useCollection';

@@ -2,7 +2,14 @@ import { defineStore, storeToRefs } from 'pinia';
 import { ref, computed, watchEffect } from 'vue';
 import { DetectionHierarchical } from 'src/types';
 import { useCollection } from './useCollection';
-import { getHierarchicalTree } from 'src/api';
+import {
+  findMetaRole,
+  getHierarchicalTree,
+  metaRoleDetectionApi,
+} from 'src/api';
+import { detectionApi } from 'src/api/detectionApiService';
+import { DetectionNewType, MetaRoleDetectionNew } from '..';
+import { v4 as uuidv4 } from 'uuid';
 
 export const useHierarchicalTree = defineStore('hierarchicalTree', () => {
   const tree = ref<HierarchicalTree | undefined>(undefined);
@@ -95,11 +102,62 @@ export const useHierarchicalTree = defineStore('hierarchicalTree', () => {
     }
   });
 
+  const addDetection = async (
+    detection: DetectionNewType,
+    meta_element_id: string,
+    meta_attribute_name: string,
+    meta_element_name: string,
+  ) => {
+    console.log(
+      `Adding detection with meta role ${meta_attribute_name} for meta element ${meta_element_name}`,
+    );
+
+    const meta_role_id = await findMetaRole(
+      meta_attribute_name,
+      meta_element_name,
+    );
+    if (meta_role_id.error) {
+      console.error(`Error finding meta role: ${meta_role_id.error}`);
+      return;
+    }
+    console.log(
+      'addDetectionWithMetaRole: ',
+      detection,
+      meta_element_id,
+      meta_role_id.data,
+    );
+    const response = await detectionApi.create(detection);
+    if (response.error) {
+      console.error(`Error adding detection: ${response.error}`);
+    }
+
+    const meta_role_detection_new: MetaRoleDetectionNew = {
+      id: uuidv4(),
+      meta_element_id,
+      meta_role_id: meta_role_id.data,
+      detection_id: detection.id,
+    };
+
+    const meta_role_detection = await metaRoleDetectionApi.create(
+      meta_role_detection_new,
+    );
+
+    if (meta_role_detection.error) {
+      console.error(
+        `Error adding meta role detection: ${meta_role_detection.error}`,
+      );
+    }
+
+    await collectionStore.reloadCollection();
+    await loadHierarchicalTree(collection.value?.id as string);
+  };
+
   return {
     tree: hierarchicalTree,
     loading,
     error,
     loadHierarchicalTree,
+    addDetection,
   };
 });
 

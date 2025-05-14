@@ -13,7 +13,7 @@ const { tree } = defineProps<{
 
 <template>
   <div class="monograph-tree">
-    <VolumeTree :tree="tree" />
+    <VolumeTree :volume="tree" />
   </div>
 </template>
 

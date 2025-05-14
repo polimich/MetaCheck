@@ -7,7 +7,6 @@ import {
   onMounted,
   onBeforeUnmount,
   shallowRef,
-  withDefaults,
   reactive,
   onActivated,
   onDeactivated,
@@ -21,6 +20,7 @@ import BulkActions from './BulkActions.vue';
 import { useCollection } from 'src/stores/data/useCollection';
 import { usePageListStore } from 'src/stores/ui/pageListStore';
 import { MetaElementHierarchical } from 'src/types/data-access';
+import { PageType } from 'src/stores/data/types/enum';
 
 // Define a more specific type for image data
 interface ImageData {
@@ -96,6 +96,7 @@ interface PageListProps {
   initialViewMode?: 'list-small' | 'list-large' | 'grid';
   gridColumns?: number;
   initialHierarchicalMode?: boolean;
+  disableCache?: boolean;
 }
 
 // Define props with defaults
@@ -106,6 +107,7 @@ const props = withDefaults(defineProps<PageListProps>(), {
   enableBulkActions: false,
   layout: 'sidebar',
   initialHierarchicalMode: true,
+  disableCache: false,
 });
 
 const emit = defineEmits<{
@@ -123,6 +125,12 @@ const pageListStore = usePageListStore();
 
 // Use shallowRef for complex objects that don't need deep reactivity
 const collectionStore = shallowRef(useCollection());
+
+// Apply cache settings
+if (props.disableCache) {
+  // Disable cache when the prop is set
+  collectionStore.value.setDisableCache(true);
+}
 
 // Define the correct type for Vue component ref callback
 type VNodeRef = ComponentPublicInstance | Element | null;
@@ -942,7 +950,6 @@ function setActiveThumbnailRef(el: VNodeRef) {
     activeThumbnailRef.value = null;
   }
 }
-
 // Image navigation with selection support
 function navigateToImage(imageId: string, shiftKey = false) {
   if (pageListStore.selectMode) {
@@ -977,6 +984,19 @@ watch(
     filteredImagesCache.clear();
   },
   { immediate: true },
+);
+
+// Also watch the disableCache prop
+watch(
+  () => props.disableCache,
+  (newValue) => {
+    collectionStore.value.setDisableCache(newValue);
+
+    // Force reload when cache setting changes
+    if (props.collectionId) {
+      loadCollection();
+    }
+  },
 );
 
 // Determine if the collection is empty
@@ -1372,6 +1392,10 @@ const handleDescriptionExpand = () => {
         @deselectAll="pageListStore.deselectAll"
         @markSelectedAsVerified="pageListStore.markSelectedAsVerified"
         @downloadSelected="pageListStore.downloadSelected"
+        @changePageIndices="pageListStore.changePageIndices"
+        @changePageType="pageListStore.changePageType"
+        @refreshData="pageListStore.refreshData"
+        :pageTypes="Object.values(PageType)"
         :layoutMode="props.layout"
         class="bulk-actions"
       >

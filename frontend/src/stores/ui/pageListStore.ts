@@ -5,6 +5,7 @@ import {
   SortOption as CollectionSortOption,
   HierarchicalImage,
 } from 'src/stores/data/useCollection';
+import { updateImagePageType, updateImagePageIndex } from 'src/api/imageApiNew';
 
 // Confidence thresholds as constants (not reactive)
 const LOW_CONFIDENCE_THRESHOLD = 0.7; // 70% confidence
@@ -539,6 +540,138 @@ export const usePageListStore = defineStore('pageList', () => {
     console.log('Download selected:', selectedImages.value);
   }
 
+  // Add a refresh function to reload data from API
+  async function refreshData() {
+    // Perform a collection reload to get fresh data from the server
+    try {
+      console.log('Reloading collection data from server...');
+      await collectionStore.reloadCollection();
+      console.log('Collection data refreshed');
+    } catch (error) {
+      console.error('Error refreshing collection data:', error);
+    }
+  }
+
+  // Change page type for all selected images
+  async function changePageType(pageType: string) {
+    console.log(
+      `Changing page type to ${pageType} for images:`,
+      selectedImages.value,
+    );
+
+    // Track successful and failed operations
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    // Process each selected image sequentially
+    for (const imageId of selectedImages.value) {
+      try {
+        // Call the API directly to update the page type
+        const result = await updateImagePageType(imageId, pageType);
+
+        if (result.success) {
+          results.success++;
+        } else {
+          results.failed++;
+          if (result.error) {
+            results.errors.push(`Image ${imageId}: ${result.error}`);
+          }
+        }
+      } catch (error) {
+        results.failed++;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        results.errors.push(`Image ${imageId}: ${errorMessage}`);
+      }
+    }
+
+    // Log the results
+    console.log(
+      `Page type update results: ${results.success} successful, ${results.failed} failed`,
+    );
+    if (results.errors.length > 0) {
+      console.error('Page type update errors:', results.errors);
+    }
+
+    // Clear selection after operation
+    deselectAll();
+    selectMode.value = false;
+
+    return results;
+  }
+
+  // Change page indices for all selected images
+  async function changePageIndices(options: {
+    prefix: string;
+    suffix: string;
+    startNumber: number;
+    endNumber: number;
+    step: number;
+    pagesPerImage: number;
+  }) {
+    console.log('Changing page indices with options:', options);
+
+    // Track successful and failed operations
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[],
+    };
+
+    // Get sorted selected images to ensure correct number assignment
+    const sortedImages = selectedImages.value
+      .map((id) => collectionStore.getImageById(id))
+      .filter((img) => img !== undefined)
+      .sort((a, b) => (a?.order || 0) - (b?.order || 0));
+
+    // Apply page indices
+    let currentNumber = options.startNumber;
+
+    for (const image of sortedImages) {
+      if (image) {
+        const pageIndex = `${options.prefix}${currentNumber}${options.suffix}`;
+        try {
+          // Call the API directly to update the page index
+          const result = await updateImagePageIndex(image.id, pageIndex);
+
+          if (result.success) {
+            results.success++;
+          } else {
+            results.failed++;
+            if (result.error) {
+              results.errors.push(`Image ${image.id}: ${result.error}`);
+            }
+          }
+        } catch (error) {
+          results.failed++;
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          results.errors.push(`Image ${image.id}: ${errorMessage}`);
+        }
+
+        // Increment by step * pagesPerImage
+        currentNumber += options.step * options.pagesPerImage;
+      }
+    }
+
+    // Log the results
+    console.log(
+      `Page index update results: ${results.success} successful, ${results.failed} failed`,
+    );
+    if (results.errors.length > 0) {
+      console.error('Page index update errors:', results.errors);
+    }
+
+    // Clear selection after operation
+    deselectAll();
+    selectMode.value = false;
+
+    return results;
+  }
+
   // Reset all filters
   function resetFilters() {
     sortBy.value = 'order';
@@ -654,9 +787,12 @@ export const usePageListStore = defineStore('pageList', () => {
     deselectAll,
     markSelectedAsVerified,
     downloadSelected,
+    changePageType,
+    changePageIndices,
     resetFilters,
     setLayout,
     filterImagesInSection,
+    refreshData,
 
     // Helper functions
     hasLowConfidenceDetections,

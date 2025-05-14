@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { HierarchialTreeVolumeType } from 'src/stores';
-import { computed, defineEmits, onMounted, watch } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useImage } from 'src/stores/data/useImage';
 import { useCollection } from 'src/stores/data/useCollection';
@@ -20,7 +20,7 @@ defineOptions({
 });
 
 const props = defineProps<{
-  tree: HierarchialTreeVolumeType;
+  volume: HierarchialTreeVolumeType;
 }>();
 
 // Get router for navigation
@@ -145,11 +145,11 @@ const fieldGroups = computed<FieldGroup[]>(() => [
 // Helper function to check if field has a value, supporting both camelCase and dot notation
 const hasValue = (field: FieldItem): boolean => {
   // Check camelCase version
-  const camelValue = props.tree[field.key];
+  const camelValue = props.volume[field.key];
   // Check dot notation version (e.g., 'volume.title' instead of 'title')
   const dotKey =
     `volume.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeVolumeType;
-  const dotValue = props.tree[dotKey];
+  const dotValue = props.volume[dotKey];
 
   // Use whichever version has a value
   const value = camelValue || dotValue;
@@ -166,11 +166,11 @@ const hasValue = (field: FieldItem): boolean => {
 // Helper function to get field value, supporting both camelCase and dot notation
 const getFieldValue = (field: FieldItem): string => {
   // Check camelCase version
-  const camelValue = props.tree[field.key];
+  const camelValue = props.volume[field.key];
   // Check dot notation version (e.g., 'volume.title' instead of 'title')
   const dotKey =
     `volume.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeVolumeType;
-  const dotValue = props.tree[dotKey];
+  const dotValue = props.volume[dotKey];
 
   // Use whichever version has a value
   const value = camelValue || dotValue;
@@ -187,11 +187,11 @@ const getFieldValue = (field: FieldItem): string => {
 // Helper function to get average confidence for a field, supporting both camelCase and dot notation
 const getFieldConfidence = (field: FieldItem): number => {
   // Check camelCase version
-  const camelValue = props.tree[field.key];
+  const camelValue = props.volume[field.key];
   // Check dot notation version (e.g., 'volume.title' instead of 'title')
   const dotKey =
     `volume.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeVolumeType;
-  const dotValue = props.tree[dotKey];
+  const dotValue = props.volume[dotKey];
 
   // Use whichever version has a value
   const value = camelValue || dotValue;
@@ -280,9 +280,9 @@ const handleDetectionClick = (detection: DetectionItem) => {
 const emitCriticalCount = () => {
   // Generate a unique ID for the volume
   const volumeId =
-    props.tree.title?.value ||
-    props.tree.partNumber?.value ||
-    props.tree.partName?.value ||
+    props.volume.title?.value ||
+    props.volume.partNumber?.value ||
+    props.volume.partName?.value ||
     'unknown';
 
   // Emit the count of critical fields for this volume
@@ -345,7 +345,7 @@ watch(
       v-for="(group, index) in fieldGroups"
       :key="index"
       :group="group"
-      :tree-object="tree"
+      :meta-element-object="volume"
       :has-critical="hasGroupCriticalConfidence(group)"
       :has-warning="hasGroupLowConfidence(group)"
       :has-values="hasGroupValues(group)"

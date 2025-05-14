@@ -1,5 +1,34 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useQuasar } from 'quasar';
+import { PageType } from 'src/stores/data/types/enum';
+
+// Create page type options from the enum
+const pageTypeOptions = Object.values(PageType).map((value) => ({
+  label: value,
+  value: value,
+}));
+
+// Filter function for the page type select
+const filterPageTypes = (val: string, update: (fn: () => void) => void) => {
+  if (val === '') {
+    update(() => {
+      // Return all options when search is empty
+      pageTypeFilterOptions.value = pageTypeOptions;
+    });
+    return;
+  }
+
+  update(() => {
+    const needle = val.toLowerCase();
+    pageTypeFilterOptions.value = pageTypeOptions.filter(
+      (v) => v.label.toLowerCase().indexOf(needle) > -1,
+    );
+  });
+};
+
+// Ref to hold filtered options
+const pageTypeFilterOptions = ref(pageTypeOptions);
 
 const props = defineProps({
   selectMode: {
@@ -28,11 +57,20 @@ const emit = defineEmits([
   'downloadSelected',
   'changePageIndices',
   'changePageType',
+  'refreshData',
 ]);
 
 // Dialog states
 const indexDialogOpen = ref(false);
 const pageTypeDialogOpen = ref(false);
+
+// Loading states
+const loadingPageIndex = ref(false);
+const loadingPageType = ref(false);
+const refreshing = ref(false);
+
+// Quasar for notifications
+const $q = useQuasar();
 
 // Page index form data
 const pageIndexForm = ref({
@@ -45,24 +83,109 @@ const pageIndexForm = ref({
 });
 
 // Selected page type
-const selectedPageType = ref('');
+const selectedPageType = ref<string | { value: string; label: string }>('');
 
-// Form submission handlers
-const submitPageIndexChange = () => {
-  emit('changePageIndices', {
-    prefix: pageIndexForm.value.prefix,
-    suffix: pageIndexForm.value.suffix,
-    startNumber: pageIndexForm.value.startNumber,
-    endNumber: pageIndexForm.value.endNumber || props.selectedImages.length,
-    step: pageIndexForm.value.step,
-    pagesPerImage: pageIndexForm.value.pagesPerImage,
-  });
-  indexDialogOpen.value = false;
+// Helper function to refresh data
+const refreshData = async () => {
+  if (refreshing.value) return;
+
+  refreshing.value = true;
+  try {
+    await emit('refreshData');
+    $q.notify({
+      type: 'positive',
+      message: 'Page data refreshed',
+      timeout: 2000,
+    });
+  } catch (error) {
+    $q.notify({
+      type: 'negative',
+      message: 'Error refreshing data',
+      timeout: 2000,
+    });
+  } finally {
+    refreshing.value = false;
+  }
 };
 
-const submitPageTypeChange = () => {
-  emit('changePageType', selectedPageType.value);
-  pageTypeDialogOpen.value = false;
+// Form submission handlers
+const submitPageIndexChange = async () => {
+  if (loadingPageIndex.value) return;
+
+  loadingPageIndex.value = true;
+
+  try {
+    // Emit the event but don't use the return value from emit
+    emit('changePageIndices', {
+      prefix: pageIndexForm.value.prefix,
+      suffix: pageIndexForm.value.suffix,
+      startNumber: pageIndexForm.value.startNumber,
+      endNumber: pageIndexForm.value.endNumber || props.selectedImages.length,
+      step: pageIndexForm.value.step,
+      pagesPerImage: pageIndexForm.value.pagesPerImage,
+    });
+
+    // Show a simple success notification
+    $q.notify({
+      type: 'positive',
+      message: 'Page indices update in progress',
+      timeout: 2000,
+    });
+
+    // Refresh data after updating
+    setTimeout(() => refreshData(), 1000);
+  } catch (error) {
+    $q.notify({
+      type: 'negative',
+      message: `Error updating page indices: ${error instanceof Error ? error.message : String(error)}`,
+      timeout: 3000,
+    });
+  } finally {
+    loadingPageIndex.value = false;
+    indexDialogOpen.value = false;
+  }
+};
+
+const submitPageTypeChange = async () => {
+  if (loadingPageType.value || !selectedPageType.value) return;
+
+  loadingPageType.value = true;
+
+  try {
+    // Extract the string value if we have an object
+    let pageTypeValue = selectedPageType.value;
+
+    // If we have an object with a value property, use just the string value
+    if (
+      typeof pageTypeValue === 'object' &&
+      pageTypeValue !== null &&
+      'value' in pageTypeValue
+    ) {
+      pageTypeValue = pageTypeValue.value;
+    }
+
+    // Emit the event with just the string value
+    emit('changePageType', pageTypeValue);
+
+    // Show a simple success notification
+    $q.notify({
+      type: 'positive',
+      message: 'Page types update in progress',
+      timeout: 2000,
+    });
+
+    // Refresh data after updating
+    setTimeout(() => refreshData(), 1000);
+  } catch (error) {
+    $q.notify({
+      type: 'negative',
+      message: `Error updating page types: ${error instanceof Error ? error.message : String(error)}`,
+      timeout: 3000,
+    });
+  } finally {
+    loadingPageType.value = false;
+    pageTypeDialogOpen.value = false;
+  }
 };
 
 // Using props directly to avoid linter errors
@@ -140,6 +263,7 @@ console.log('Select mode is:', props.selectMode);
           icon="123"
           color="primary"
           @click="indexDialogOpen = true"
+          :loading="loadingPageIndex"
         >
           <q-tooltip>Change page indices</q-tooltip>
         </q-btn>
@@ -151,8 +275,21 @@ console.log('Select mode is:', props.selectMode);
           icon="category"
           color="primary"
           @click="pageTypeDialogOpen = true"
+          :loading="loadingPageType"
         >
           <q-tooltip>Change page type</q-tooltip>
+        </q-btn>
+
+        <!-- Refresh button -->
+        <q-btn
+          flat
+          round
+          icon="refresh"
+          color="primary"
+          @click="refreshData"
+          :loading="refreshing"
+        >
+          <q-tooltip>Refresh data from server</q-tooltip>
         </q-btn>
       </template>
 
@@ -175,7 +312,7 @@ console.log('Select mode is:', props.selectMode);
         </q-card-section>
 
         <q-card-section>
-          <q-form @submit="submitPageIndexChange">
+          <q-form @submit.prevent="submitPageIndexChange">
             <div class="row q-col-gutter-md">
               <div class="col-6">
                 <q-input
@@ -244,7 +381,13 @@ console.log('Select mode is:', props.selectMode);
             <div class="row q-mt-md">
               <q-space />
               <q-btn label="Cancel" color="grey" flat v-close-popup />
-              <q-btn label="Apply" type="submit" color="primary" />
+              <q-btn
+                label="Apply"
+                type="submit"
+                color="primary"
+                :loading="loadingPageIndex"
+                :disable="loadingPageIndex"
+              />
             </div>
           </q-form>
         </q-card-section>
@@ -259,22 +402,37 @@ console.log('Select mode is:', props.selectMode);
         </q-card-section>
 
         <q-card-section>
-          <q-form @submit="submitPageTypeChange">
+          <q-form @submit.prevent="submitPageTypeChange">
             <q-select
               v-model="selectedPageType"
-              :options="pageTypes"
+              :options="pageTypeFilterOptions"
               label="Page Type"
               outlined
               dense
-              emit-value
-              map-options
+              use-input
+              input-debounce="0"
+              @filter="filterPageTypes"
               :rules="[(val) => !!val || 'Please select a page type']"
-            />
+            >
+              <template v-slot:no-option>
+                <q-item>
+                  <q-item-section class="text-grey">
+                    No results found
+                  </q-item-section>
+                </q-item>
+              </template>
+            </q-select>
 
             <div class="row q-mt-md">
               <q-space />
               <q-btn label="Cancel" color="grey" flat v-close-popup />
-              <q-btn label="Apply" type="submit" color="primary" />
+              <q-btn
+                label="Apply"
+                type="submit"
+                color="primary"
+                :loading="loadingPageType"
+                :disable="loadingPageType || !selectedPageType"
+              />
             </div>
           </q-form>
         </q-card-section>

@@ -84,3 +84,25 @@ export const getMetaRolesForCollection = async (
     return { data: [], error: errorMessage };
   }
 };
+
+export const findMetaRole = async (
+  meta_attribute_name: string,
+  meta_element_name: string,
+): Promise<{
+  data: string;
+  error: string;
+}> => {
+  try {
+    const { data } = await axios.get<string>(
+      `/meta_role/find/${meta_attribute_name}/${meta_element_name}`,
+    );
+    return { data, error: '' };
+  } catch (error) {
+    const errorMessage = axiosErrorHandler(error);
+    console.error(
+      `API Error in findMetaRole for ${meta_attribute_name} and ${meta_element_name}:`,
+      errorMessage,
+    );
+    return { data: '', error: errorMessage };
+  }
+};
