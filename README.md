@@ -109,6 +109,27 @@ When the frontend is running you can access it:
 
 ## Environment Variables
 
+The following environment variables can be configured to customize MetaCheck's behavior, see `backend/metacheck_common/config.py`:
+
+| Variable                 | Description                       | Default Value                                                  |
+| ------------------------ | --------------------------------- | -------------------------------------------------------------- |
+| BASE_DIR                 | Base directory for all data       | ./metacheck_data                                               |
+| ADMIN_SERVER_NAME        | Name for the admin server         | MetaCheck                                                      |
+| SERVER_NAME              | Name for the main server          | MetaCheck                                                      |
+| MODE                     | Application mode                  | server                                                         |
+| DATABASE_URL             | PostgreSQL connection string      | postgresql+asyncpg://postgres:pass@localhost:5432/metacheck_db |
+| APP_URL_ROOT             | Root URL path for the application | /                                                              |
+| IMAGE_UPLOADED_DIR       | Directory for uploaded images     | {BASE_DIR}/server/image_uploaded                               |
+| IMAGE_PREVIEW_DIR        | Directory for image previews      | {BASE_DIR}/server/image_preview                                |
+| IMAGE_PREVIEW_RESOLUTION | Resolution for preview images     | 70000                                                          |
+| WORKING_DIR              | Temporary working directory       | /tmp/metacheck.{MODE}                                          |
+| PRODUCTION               | Production mode flag              | False                                                          |
+| LOGGING_CONSOLE_LEVEL    | Console logging level             | INFO                                                           |
+| LOGGING_FILE_LEVEL       | File logging level                | INFO                                                           |
+| LOGGING_DIR              | Directory for log files           | {BASE_DIR}/{MODE}/logs                                         |
+
+# License
+
 MIT License
 
 Copyright (c) [2025] [Michael Polívka]
