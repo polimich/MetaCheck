@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { ref, computed, watch, Ref } from 'vue';
 import { DetectionState } from 'src/types/frontend-state';
 
@@ -40,8 +43,6 @@ export function useAnnotationFilters(detections: Ref<DetectionState[]>) {
 
     // Skip filtering if no detections
     if (result.length === 0) return [];
-
-    console.log(`Filtering ${result.length} detections`);
 
     // Filter by verification status
     if (filterVerification.value !== 'all') {
@@ -102,7 +103,6 @@ export function useAnnotationFilters(detections: Ref<DetectionState[]>) {
         break;
     }
 
-    console.log(`Filtered to ${result.length} detections`);
     return result;
   });
 

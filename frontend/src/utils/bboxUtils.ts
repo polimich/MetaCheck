@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 /**
  * Utility functions for handling bounding box formats
  */

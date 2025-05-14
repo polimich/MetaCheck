@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 export type BaseEntityType = {
   id: string;
   created_date: string;

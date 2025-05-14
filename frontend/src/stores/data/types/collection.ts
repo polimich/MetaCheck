@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { WorkState } from 'src/types';
 import { BaseType } from './base';
 import { MetaElementType } from './meta_element';

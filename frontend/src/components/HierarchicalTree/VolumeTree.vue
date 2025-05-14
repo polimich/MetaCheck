@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { HierarchialTreeVolumeType } from 'src/stores';
 import { computed, onMounted, watch } from 'vue';
@@ -144,14 +147,11 @@ const fieldGroups = computed<FieldGroup[]>(() => [
 
 // Helper function to check if field has a value, supporting both camelCase and dot notation
 const hasValue = (field: FieldItem): boolean => {
-  // Check camelCase version
   const camelValue = props.volume[field.key];
-  // Check dot notation version (e.g., 'volume.title' instead of 'title')
   const dotKey =
     `volume.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeVolumeType;
   const dotValue = props.volume[dotKey];
 
-  // Use whichever version has a value
   const value = camelValue || dotValue;
 
   if (!value) return false;
@@ -165,14 +165,11 @@ const hasValue = (field: FieldItem): boolean => {
 
 // Helper function to get field value, supporting both camelCase and dot notation
 const getFieldValue = (field: FieldItem): string => {
-  // Check camelCase version
   const camelValue = props.volume[field.key];
-  // Check dot notation version (e.g., 'volume.title' instead of 'title')
   const dotKey =
     `volume.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeVolumeType;
   const dotValue = props.volume[dotKey];
 
-  // Use whichever version has a value
   const value = camelValue || dotValue;
 
   if (!value) return '';
@@ -186,14 +183,11 @@ const getFieldValue = (field: FieldItem): string => {
 
 // Helper function to get average confidence for a field, supporting both camelCase and dot notation
 const getFieldConfidence = (field: FieldItem): number => {
-  // Check camelCase version
   const camelValue = props.volume[field.key];
-  // Check dot notation version (e.g., 'volume.title' instead of 'title')
   const dotKey =
     `volume.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeVolumeType;
   const dotValue = props.volume[dotKey];
 
-  // Use whichever version has a value
   const value = camelValue || dotValue;
 
   if (!value) return 1;
@@ -265,14 +259,6 @@ const criticalFieldsCount = computed((): number => {
 
 // Function to handle detection click
 const handleDetectionClick = (detection: DetectionItem) => {
-  console.log('[TREE-DEBUG] VolumeTree: handleDetectionClick received event', {
-    detection,
-    hasRouter: !!router,
-    hasStores: {
-      imageStore: !!imageStore,
-      collectionStore: !!collectionStore,
-    },
-  });
   navigateToDetectionUtil(detection, router, collectionStore, imageStore);
 };
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 // Define props directly without assigning to a variable
 defineProps({
   image: {

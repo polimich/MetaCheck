@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 defineOptions({
   name: 'ErrorNotFoundPage',
 });

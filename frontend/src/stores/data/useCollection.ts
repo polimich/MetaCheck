@@ -411,11 +411,6 @@ export const useCollection = defineStore('collection', () => {
 
     // Use the image location map to efficiently find the image
     const location = imageLocationMap.value.get(selectedImageId.value);
-    console.log(
-      '[useCollection] selectedImage',
-      selectedImageId.value,
-      location,
-    );
     if (!location) return undefined;
 
     // Return the image directly from the collection global structure
@@ -471,36 +466,21 @@ export const useCollection = defineStore('collection', () => {
     detectionId: string,
     providedLocation?: ImageLocation,
   ): boolean => {
-    const startTime = performance.now();
-    console.time(`deleteDetection:${detectionId}`);
-
     // Fast path: we need imageId, detectionId and a valid collection
     if (!imageId || !detectionId || !collection.value) {
-      console.timeEnd(`deleteDetection:${detectionId}`);
       return false;
     }
 
     // Fast path: Direct access via provided location
-    const locationLookupStart = performance.now();
+
     const location = providedLocation || imageLocationMap.value.get(imageId);
-    const locationLookupTime = performance.now() - locationLookupStart;
-    console.log(
-      `[PERF] Location lookup took: ${locationLookupTime.toFixed(2)}ms`,
-    );
 
     if (!location) {
-      console.log(`[PERF] Failed to find location for image ${imageId}`);
-      console.timeEnd(`deleteDetection:${detectionId}`);
       return false;
     }
 
     try {
-      console.log(
-        `[PERF] Using location: section=${location.sectionId}, index=${location.index}, path=${location.parentIds.join('/')}`,
-      );
-
       // Direct access to the image using its location
-      const imageAccessStart = performance.now();
       let image: HierarchicalImage | undefined;
 
       // Global images are directly accessible
@@ -509,30 +489,21 @@ export const useCollection = defineStore('collection', () => {
         collection.value.global_structure?.images
       ) {
         image = collection.value.global_structure.images[location.index];
-        console.log('[PERF] Global section direct access path');
       }
       // Section images require one-step section lookup
       else {
-        console.log(`[PERF] Looking up section: ${location.sectionId}`);
-        const sectionLookupStart = performance.now();
-
         // Check section cache first
         let section: HierarchicalSection | undefined;
 
         // Use cached section if available to avoid repeated searches
         if (sectionCache.value.has(location.sectionId)) {
           section = sectionCache.value.get(location.sectionId);
-          console.log('[PERF] Using cached section');
         } else {
           // If section isn't cached, find it and cache for future use
           const sections = hierarchicalSections.value;
-          console.log(`[PERF] Total sections to search: ${sections.length}`);
 
           // Build cache for all sections if we have a large collection
           if (sections.length > 100 && sectionCache.value.size === 0) {
-            console.log('[PERF] Building full section cache');
-            const cacheBuildStart = performance.now();
-
             // Add all sections to cache
             for (const s of sections) {
               if (!sectionCache.value.has(s.section.id)) {
@@ -540,9 +511,6 @@ export const useCollection = defineStore('collection', () => {
               }
             }
 
-            console.log(
-              `[PERF] Built section cache with ${sectionCache.value.size} entries in ${(performance.now() - cacheBuildStart).toFixed(2)}ms`,
-            );
             section = sectionCache.value.get(location.sectionId);
           } else {
             // For smaller collections or if cache is already built
@@ -555,64 +523,32 @@ export const useCollection = defineStore('collection', () => {
           }
         }
 
-        console.log(
-          `[PERF] Section lookup took: ${(performance.now() - sectionLookupStart).toFixed(2)}ms`,
-        );
-        console.log(`[PERF] Section found: ${!!section}`);
-
         // Access the image directly if section exists
         if (section?.section.images) {
           const imageArraySize = section.section.images.length;
-          console.log(
-            `[PERF] Section has ${imageArraySize} images, accessing index ${location.index}`,
-          );
 
           if (location.index >= 0 && location.index < imageArraySize) {
             image = section.section.images[location.index];
-          } else {
-            console.log(
-              `[PERF] Image index ${location.index} is out of bounds (0-${imageArraySize - 1})`,
-            );
           }
         }
       }
 
-      const imageAccessTime = performance.now() - imageAccessStart;
-      console.log(`[PERF] Image access took: ${imageAccessTime.toFixed(2)}ms`);
-
       // Fast failure if image not found
       if (!image) {
-        console.log('[PERF] Image not found with the provided location');
-        console.timeEnd(`deleteDetection:${detectionId}`);
         return false;
       }
 
       if (!image.detections) {
-        console.log('[PERF] Image has no detections array');
-        console.timeEnd(`deleteDetection:${detectionId}`);
         return false;
       }
 
-      // Log detection array details
-      console.log(`[PERF] Image has ${image.detections.length} detections`);
-
       // Direct access to the detection
-      const detectionLookupStart = performance.now();
+
       const detectionIndex = image.detections.findIndex(
         (d) => d.id === detectionId,
       );
-      const detectionLookupTime = performance.now() - detectionLookupStart;
-      console.log(
-        `[PERF] Detection lookup took: ${detectionLookupTime.toFixed(2)}ms, found at index: ${detectionIndex}`,
-      );
 
       if (detectionIndex === -1) {
-        console.log(
-          `[PERF] Detection ${detectionId} not found in image - likely already deleted`,
-        );
-        console.timeEnd(`deleteDetection:${detectionId}`);
-        // Return true to prevent retry attempts if the detection is already gone
-        // This helps with the double-deletion pattern observed in the logs
         return true;
       }
 
@@ -620,11 +556,8 @@ export const useCollection = defineStore('collection', () => {
       const wasAnnotated = image.detections[detectionIndex].annotated;
 
       // Fast array removal
-      const spliceStart = performance.now();
+
       image.detections.splice(detectionIndex, 1);
-      console.log(
-        `[PERF] Array splice took: ${(performance.now() - spliceStart).toFixed(2)}ms`,
-      );
 
       // Direct property updates - no heavy calculations
       image.detection_count = image.detections.length;
@@ -649,19 +582,13 @@ export const useCollection = defineStore('collection', () => {
         }
       }
 
-      const totalTime = performance.now() - startTime;
-      console.log(`[PERF] Total deletion time: ${totalTime.toFixed(2)}ms`);
-      console.timeEnd(`deleteDetection:${detectionId}`);
       return true;
     } catch (error) {
       console.error(
         '[useCollection] Fast-path detection delete failed:',
         error,
       );
-      console.log(
-        `[PERF] Function failed after ${(performance.now() - startTime).toFixed(2)}ms`,
-      );
-      console.timeEnd(`deleteDetection:${detectionId}`);
+
       return false;
     }
   };
@@ -1828,6 +1755,54 @@ export const useCollection = defineStore('collection', () => {
     return false;
   };
 
+  // Function to export collection data as a JSON file
+  const exportCollectionAsJson = () => {
+    if (!collection.value) {
+      console.error('[useCollection] Cannot export: No collection loaded');
+      return false;
+    }
+
+    try {
+      // Create a simplified export object with basic collection info
+      const exportData = {
+        id: collection.value.id,
+        name: collection.value.name,
+        description: collection.value.description || '',
+        image_count: image_count.value,
+        detection_count: detection_count.value,
+        annotated_detection_count: annotated_detection_count.value,
+        message:
+          'This is a temporary export implementation for collection: ' +
+          collection.value.name,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Convert to JSON with nice formatting
+      const jsonData = JSON.stringify(exportData, null, 2);
+
+      // Create a blob and download link
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      // Create and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${collection.value.name}.json`;
+      a.click();
+
+      // Clean up
+      URL.revokeObjectURL(url);
+
+      console.log(
+        `[useCollection] Successfully exported collection ${collection.value.id}`,
+      );
+      return true;
+    } catch (error) {
+      console.error('[useCollection] Error exporting collection:', error);
+      return false;
+    }
+  };
+
   return {
     collection,
     collectionMetaRoles,
@@ -1876,5 +1851,6 @@ export const useCollection = defineStore('collection', () => {
     addDetectionToImage,
     disableCache,
     setDisableCache,
+    exportCollectionAsJson,
   };
 });

@@ -25,6 +25,7 @@
 </template>
 
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 defineProps({
   message: {
     type: String,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import { ref, onMounted } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'vue-router';
@@ -62,7 +63,7 @@ onMounted(() => {
 
 const { collectionsGetter, loading } = storeToRefs(collectionsStore);
 
-// Compute a thumbnail for each collection (placeholder logic)
+// Compute a thumbnail for each collection
 const getCollectionThumbnail = (collection: CollectionType) => {
   // Use the first letter of the collection name for a color
   const letter = collection.name.charAt(0).toUpperCase();
@@ -155,23 +156,21 @@ const handleResetImport = () => {
 };
 
 const onRowClick = (_evt: Event, row: CollectionType) => {
-  // 1. Use the loadingState store to show global loading overlay IMMEDIATELY
+  // Use the loadingState store to show global loading overlay
   loadingState.startLoading('navigatingToCollection', 'Loading collection...');
 
-  // 2. Force the UI to fully update by using a small timeout
-  //    This ensures the loading state is fully rendered before navigation
+  // Ensure loading state is rendered before navigation
   setTimeout(() => {
-    // 3. Then navigate to the collection detail page
+    // Navigate to the collection detail page
     router
       .push({
         name: 'collection',
         params: { collectionId: row.id },
       })
-      .catch((error) => {
-        console.error('Navigation error:', error);
+      .catch(() => {
         loadingState.stopLoading('navigatingToCollection');
       });
-  }, 50); // Small timeout to ensure loading state is fully rendered
+  }, 50);
 };
 </script>
 

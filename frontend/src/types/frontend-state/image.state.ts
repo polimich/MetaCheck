@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseState } from 'src/types/frontend-state/base.state.ts';
 import { DetectionState } from 'src/types/frontend-state/detection.state.ts';
 import { MetaElementState } from './meta_element.state';

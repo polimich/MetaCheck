@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import FieldItem from './FieldItem.vue';
@@ -99,16 +102,11 @@ const hasValue = (field: FieldItem): boolean => {
 
 // Handle detection click
 const handleDetectionClick = (detection: DetectionItem) => {
-  console.log(
-    '[EVENT-DEBUG] FieldGroup received click from FieldItem',
-    detection,
-  );
   emit('detectionClick', detection);
 };
 
 // Handle empty field click
 const handleEmptyFieldClick = (field: FieldItem) => {
-  console.log('[EVENT-DEBUG] Empty field clicked', field);
   currentField.value = field;
   inputValue.value = '';
   showInputDialog.value = true;
@@ -123,92 +121,47 @@ const handleSaveValue = async () => {
 
   isSaving.value = true;
 
-  // Get the meta_element ID from the tree object
   const metaElementId = props.metaElementObject.id as string;
-  // Convert camelCase to snake_case
   const camelToSnake = (str: string) =>
     str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
   const attributeName = camelToSnake(currentField.value.key);
-  const parentId = props.metaElementObject.id as string;
-  // Convert meta element type to lowercase for API
   const metaElementName = (
     props.metaElementObject.type as string
   ).toLowerCase();
 
-  console.log('[EVENT-DEBUG] Saving value for field', {
-    field: currentField.value,
-    value: inputValue.value,
-    metaElementId,
-    attributeName,
-    parentId,
-    metaElementName,
-  });
-
   try {
-    // Get the current image ID from the image store
     const imageId = imageStore.currentImageId;
 
     if (!imageId) {
-      console.error('[EVENT-DEBUG] No current image ID available');
       notificationStore.error('Cannot add detection: No image is selected');
+      isSaving.value = false;
+      showInputDialog.value = false;
       return;
     }
 
-    // Create a new detection
     const newDetection = {
       id: uuidv4(),
       image_id: imageId,
-      bbox: '0,0,100,100', // Default or empty bbox
+      bbox: '0,0,100,100',
       value: inputValue.value,
-      confidence: 1, // High confidence since it's manually added
+      confidence: 1,
     };
 
-    console.log(
-      '[EVENT-DEBUG] Adding detection with image_id:',
-      imageId,
-      'for meta_element_id:',
-      metaElementId,
-      'attribute:',
-      attributeName,
-      'parent:',
-      parentId,
-    );
-
-    // TODO: The current API doesn't support directly connecting detections to meta_elements
-    // with specific attribute roles when creating them. This would require extending the API
-    // to accept meta_element_id and attributeName/meta_role parameters.
-    //
-    // Next steps to fully implement this feature:
-    // 1. Create a backend API endpoint that can create a detection and link it to a meta_element
-    //    with a specific meta_role in one operation
-    // 2. Extend the detectionApi.create method to accept meta_element_id and meta_role_id parameters
-    // 3. Update the useHierarchicalTree.addDetection method to pass these parameters to the API
-    // 4. Add a mapping from field key (attributeName) to meta_role_id - this might require
-    //    fetching the available meta_roles from the backend
-
-    // Call the store's addDetection method
-    await hierarchicalTreeStore.addDetection(
+    const success = await hierarchicalTreeStore.addDetection(
       newDetection,
       metaElementId,
       attributeName,
       metaElementName,
     );
 
-    console.log(
-      '[EVENT-DEBUG] Successfully added detection',
-      newDetection,
-      'for meta_element_id:',
-      metaElementId,
-      'attribute:',
-      attributeName,
-      'parent:',
-      parentId,
-      'metaElementName:',
-      metaElementName,
-    );
-    notificationStore.success(`Successfully added ${currentField.value.label}`);
+    if (success) {
+      notificationStore.success(
+        `Successfully added ${currentField.value.label}`,
+      );
+    } else {
+      notificationStore.error(`Failed to add ${currentField.value.label}`);
+    }
   } catch (error) {
-    console.error('[EVENT-DEBUG] Error adding detection:', error);
     notificationStore.error(
       `Failed to add detection: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );

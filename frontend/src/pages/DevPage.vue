@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import { useHierarchicalTree } from 'src/stores';
 import { onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';

@@ -14,6 +14,8 @@ import { computed, ref, watch, onUnmounted } from 'vue';
 import { useLoadingState } from 'src/stores/app/loadingState';
 import { AppLoadingSplash } from './Skeletons';
 
+// @author Michael Polívka (xpoliv07)
+
 defineOptions({
   name: 'GlobalLoadingOverlay',
 });

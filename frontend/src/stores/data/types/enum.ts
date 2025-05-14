@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 export enum PageType {
   ABSTRACT = 'Abstract',
   ADVERTISEMENT = 'Advertisement',

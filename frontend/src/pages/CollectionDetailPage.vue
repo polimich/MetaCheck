@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
+
 import { useRoute, useRouter } from 'vue-router';
 import { ref, watch, onMounted } from 'vue';
 import { useLoadingState } from 'src/stores/app/loadingState';
@@ -14,7 +16,7 @@ defineOptions({
 
 const route = useRoute();
 const router = useRouter();
-const collectionStore = useCollection(); // Add the hierarchical collection store
+const collectionStore = useCollection();
 const loadingState = useLoadingState();
 const collectionId = ref(route.params.collectionId as string);
 
@@ -58,42 +60,7 @@ const loadCurrentCollection = async () => {
   loadingState.setComponentLoading(componentId, true);
 
   try {
-    // Load both the flat view collection data and the hierarchical collection data
-    const [hierarchicalResult] = await Promise.all([
-      collectionStore.loadCollection(collectionId.value),
-    ]);
-
-    console.log('Loaded hierarchical collection:', hierarchicalResult);
-
-    // Log detailed information about the hierarchical structure
-    if (collectionStore.collection?.global_structure) {
-      console.log('Global structure found');
-      console.log(
-        'Global structure ID:',
-        collectionStore.collection.global_structure.id,
-      );
-
-      if (collectionStore.collection.global_structure.children) {
-        console.log(
-          'Children count:',
-          collectionStore.collection.global_structure.children.length,
-        );
-        console.log(
-          'First child:',
-          collectionStore.collection.global_structure.children[0],
-        );
-      } else {
-        console.log('No children in global structure');
-      }
-    } else {
-      console.log('No global structure in collection');
-    }
-
-    // Log meta elements sections
-    console.log(
-      'Hierarchical meta elements:',
-      collectionStore.metaElementSections.length,
-    );
+    await collectionStore.loadCollection(collectionId.value);
   } catch (error) {
     console.error('Error loading collection:', error);
   } finally {
@@ -103,13 +70,12 @@ const loadCurrentCollection = async () => {
 
 // Handle image selection
 const handleSelectImage = (imageId: string) => {
-  // 1. Start loading state IMMEDIATELY
+  // Start loading state
   loadingState.startLoading('navigatingToImage', 'Preparing image...');
 
-  // 2. Force the UI to fully update by using a small timeout instead of nextTick
-  //    This ensures the loading state is fully rendered before navigation
+  // Ensure loading state is rendered before navigation
   setTimeout(() => {
-    // 3. Then navigate to the image detail page
+    // Navigate to the image detail page
     router
       .push({
         name: 'image',
@@ -122,7 +88,7 @@ const handleSelectImage = (imageId: string) => {
         console.error('Navigation error:', error);
         loadingState.stopLoading('navigatingToImage');
       });
-  }, 50); // Small timeout to ensure loading state is fully rendered
+  }, 50);
 };
 
 // Handle view mode changes with string parameter type to match PageList emit type

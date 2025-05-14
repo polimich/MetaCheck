@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 defineProps({
   rows: {
     type: Number,

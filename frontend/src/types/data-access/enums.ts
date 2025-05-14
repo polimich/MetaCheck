@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 export enum WorkState {
   NEW = 'new',
   IN_PROGRESS = 'in_progress',

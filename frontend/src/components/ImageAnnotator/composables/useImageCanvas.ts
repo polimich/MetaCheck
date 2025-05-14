@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { Vector2d } from 'konva/lib/types';
 

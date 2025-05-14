@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { ref, watch, nextTick, Ref } from 'vue';
 import { Layer } from 'konva/lib/Layer';
 import { Transformer } from 'konva/lib/shapes/Transformer';
@@ -34,10 +35,6 @@ export function useTransformerManagement(
   // Update transformer to reflect selected annotations
   const updateTransformer = () => {
     const currentSelectedIds = selectedIds.value || new Set<string>();
-    console.log(
-      '[useTransformerManagement] updateTransformer called, selected IDs:',
-      Array.from(currentSelectedIds),
-    );
 
     const selectedNodes: Array<Shape | Group> = [];
 
@@ -45,23 +42,13 @@ export function useTransformerManagement(
       const layer = konvaLayer.value;
       currentSelectedIds.forEach((id) => {
         const node = layer.findOne(`#${id}`) as Shape | Group | null;
-        console.log(
-          `[useTransformerManagement] Looking for node #${id}:`,
-          node ? 'found' : 'not found',
-        );
         if (node) {
           selectedNodes.push(node);
         }
       });
     }
 
-    console.log(
-      '[useTransformerManagement] Selected nodes count:',
-      selectedNodes.length,
-    );
-
     if (!transformer.value && konvaLayer.value) {
-      console.log('[useTransformerManagement] Creating new transformer');
       transformer.value = new Transformer({
         nodes: selectedNodes,
         keepRatio: false,
@@ -82,41 +69,26 @@ export function useTransformerManagement(
         anchorStroke: '#0077ff',
         anchorFill: '#ffffff',
         anchorSize: 10,
-        boundBoxFunc: transformerBoundBoxFunc, // Use the function defined in this composable
+        boundBoxFunc: transformerBoundBoxFunc,
       });
 
       const layer = konvaLayer.value;
       if (layer && transformer.value) {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error - Konva type mismatch for adding Transformer to Layer
+        // @ts-expect-error
         layer.add(transformer.value);
-        console.log('[useTransformerManagement] Transformer added to layer');
-      } else {
-        console.log(
-          '[useTransformerManagement] Layer or Transformer not found, cannot add transformer',
-        );
       }
     } else if (transformer.value) {
-      console.log(
-        '[useTransformerManagement] Updating existing transformer with nodes:',
-        selectedNodes.length,
-      );
       transformer.value.nodes(selectedNodes);
     }
 
     konvaLayer.value?.batchDraw();
-    console.log('[useTransformerManagement] Layer batch draw triggered');
   };
 
   // Watch for changes in selected annotations and update the transformer
   watch(
     selectedIds,
-    (newSelectedIdsValue) => {
-      const newSelectedIds = newSelectedIdsValue || new Set<string>();
-      console.log(
-        '[useTransformerManagement] Selection changed, new selection:',
-        Array.from(newSelectedIds),
-      );
+    () => {
       nextTick(() => {
         updateTransformer();
       });

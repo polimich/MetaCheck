@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { watch, toRef, ref } from 'vue';
 import { DetectionState } from 'src/types/frontend-state';

@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseType } from './base';
 
 export type DetectionNewType = {

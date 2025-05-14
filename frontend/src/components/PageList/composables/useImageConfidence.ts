@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { useCollection } from 'src/stores/data/useCollection';
 
 export function useImageConfidence() {

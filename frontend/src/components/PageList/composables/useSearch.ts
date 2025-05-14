@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { computed } from 'vue';
 
 /**

@@ -1,3 +1,7 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
+
 // Format confidence as percentage
 export const getConfidencePercent = (confidence: number): number => {
   return Math.round((confidence || 0) * 100);

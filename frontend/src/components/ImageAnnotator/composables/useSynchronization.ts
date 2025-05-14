@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { ref, computed } from 'vue';
 import { DetectionState } from 'src/types';
 import { useImage } from 'src/stores';
@@ -14,21 +15,17 @@ export interface ImageAnnotatorInstance {
  * Composable for synchronizing interactions between ImageAnnotator and other components
  */
 export function useSynchronization() {
-  // Store for the annotator instance reference
   const annotatorRef = ref<ImageAnnotatorInstance | null>(null);
   const imageStore = useImage();
 
-  // Track if synchronization is active
   const isSyncActive = ref(true);
 
-  // Whether we have a valid annotator reference
   const hasAnnotator = computed(() => !!annotatorRef.value);
 
   /**
    * Set the annotator reference from the parent component
    */
   function setAnnotatorRef(ref: ImageAnnotatorInstance) {
-    console.log('Synchronization: Annotator ref registered');
     annotatorRef.value = ref;
   }
 
@@ -43,7 +40,6 @@ export function useSynchronization() {
       return;
     }
 
-    console.log(`Synchronization: Scrolling to annotation ${detection.id}`);
     annotatorRef.value.scrollToAnnotation(detection);
   }
 
@@ -58,18 +54,12 @@ export function useSynchronization() {
       return;
     }
 
-    console.log(`Synchronization: Selecting annotation ${detection.id}`);
-
-    // Temporarily disable synchronization to prevent feedback loops
     isSyncActive.value = false;
 
-    // First update the store
     imageStore.selectDetection(detection.id);
 
-    // Then update the annotator
     annotatorRef.value.handleSelectAnnotation(detection.id);
 
-    // Re-enable synchronization
     setTimeout(() => {
       isSyncActive.value = true;
     }, 50);
@@ -81,18 +71,13 @@ export function useSynchronization() {
   function syncSelectionFromAnnotator(detectionId: string) {
     if (!isSyncActive.value) return;
 
-    console.log(
-      `Synchronization: Syncing selection from annotator: ${detectionId}`,
-    );
     imageStore.selectDetection(detectionId);
   }
 
   return {
-    // State
     annotatorRef,
     hasAnnotator,
 
-    // Methods
     setAnnotatorRef,
     handleScrollToAnnotation,
     handleSelectAnnotation,

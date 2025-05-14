@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { HierarchialTreeMultiPartMonograph } from 'src/stores';
 import TitleTree from './TitleTree.vue';

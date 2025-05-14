@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { ref } from 'vue';
 import { useCollection } from 'src/stores/data/useCollection';
 
@@ -77,7 +78,7 @@ export function useImageSelection() {
 
   function markSelectedAsVerified() {
     // Implement this function to mark selected images as verified
-    console.log('Mark as verified:', selectedImages.value);
+
     // After processing, you might want to:
     deselectAll();
     selectMode.value = false;
@@ -85,7 +86,6 @@ export function useImageSelection() {
 
   function downloadSelected() {
     // Implement this function to download selected images
-    console.log('Download:', selectedImages.value);
   }
 
   return {

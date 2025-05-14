@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseEntityType } from 'src/types/data-access/base.da.ts';
 import { ImageDA } from 'src/types/data-access/image.da.ts';
 import { WorkState } from 'src/types/data-access/enums.ts';

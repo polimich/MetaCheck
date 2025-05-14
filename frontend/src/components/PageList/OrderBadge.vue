@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 defineProps({
   order: {
     type: Number,

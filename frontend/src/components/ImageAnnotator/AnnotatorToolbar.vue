@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import type { NavigationModeType } from './composables/useNavigationMode';
 
 // Props for actions and state passed from the parent

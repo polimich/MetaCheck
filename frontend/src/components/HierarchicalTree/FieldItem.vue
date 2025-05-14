@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { computed } from 'vue';
 import {
@@ -37,13 +40,7 @@ const iconColorClass = computed(() => {
 });
 
 const handleClick = () => {
-  console.log('[EVENT-DEBUG] FieldItem clicked', {
-    detection: props.detection,
-    isClickable: props.clickable,
-  });
-
   if (props.clickable) {
-    console.log('[EVENT-DEBUG] FieldItem emitting click event');
     emit('click', props.detection);
   }
 };

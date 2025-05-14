@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 
 // Define NavigationMode type for better type safety
@@ -70,7 +71,6 @@ export function useNavigationMode() {
       previousMode.value = mode.value;
     }
     mode.value = newMode;
-    console.log(`Mode set to: ${mode.value}`);
   }
 
   // Toggle between modes
@@ -82,7 +82,6 @@ export function useNavigationMode() {
   function startSpacebarPan() {
     if (isSpacebarPanning.value || mode.value === 'drag') return;
 
-    console.log('Starting spacebar pan');
     previousMode.value = mode.value;
     isSpacebarPanning.value = true;
     mode.value = 'drag';
@@ -92,7 +91,6 @@ export function useNavigationMode() {
   function stopSpacebarPan() {
     if (!isSpacebarPanning.value) return;
 
-    console.log('Stopping spacebar pan, returning to:', previousMode.value);
     isSpacebarPanning.value = false;
     mode.value = previousMode.value;
   }

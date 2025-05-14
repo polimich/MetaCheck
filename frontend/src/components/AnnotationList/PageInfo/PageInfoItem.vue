@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useLoadingState } from 'src/stores/app/loadingState';
@@ -132,9 +135,6 @@ const saveChanges = async () => {
     if (props.type === 'page_index') {
       error = await updateImagePageIndex(props.imageId, localValue.value);
     } else if (props.type === 'page_type') {
-      console.log(
-        `Calling updateImagePageType with imageId=${props.imageId}, pageType=${localValue.value}`,
-      );
       error = await updateImagePageType(props.imageId, localValue.value);
     }
 

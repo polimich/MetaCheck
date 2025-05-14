@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import {
   computed,
   ref,
@@ -631,8 +632,7 @@ async function loadImageData() {
     annotations.loadAnnotations([]);
   } finally {
     // End transition immediately
-    isTransitioning.value = false;
-    previousImageUrl.value = null;
+    clearTransition();
   }
 }
 
@@ -1800,9 +1800,6 @@ watch(
             @dragstart="konvaEventHandlers?.handleRectDragStart"
             @click="konvaEventHandlers?.handleRectClick"
           />
-
-          <!-- Transformer is managed internally by useTransformerManagement -->
-          <!-- No need for v-transformer here -->
         </v-layer>
       </v-stage>
 
@@ -1910,9 +1907,9 @@ watch(
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.9); /* Completely transparent */
+  background-color: rgba(255, 255, 255, 0.9);
   z-index: 5;
-  pointer-events: none; /* Allow clicks to pass through */
+  pointer-events: none;
   animation: pulseSpinner 1.5s infinite ease-in-out;
 }
 

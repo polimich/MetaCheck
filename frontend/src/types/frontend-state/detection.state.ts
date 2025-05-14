@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseState } from 'src/types/frontend-state/base.state.ts';
 import { v4 as uuidv4 } from 'uuid';
 import { ImageState } from '..';

@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { axios, axiosErrorHandler } from './index';
 import { ImageNewType } from 'src/stores';
 import { MetaRoleDA, MetaRoleOption, ImageDA } from 'src/types';
@@ -95,7 +98,6 @@ export const getImageById = async (
     return { data, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error fetching image ${imageId}:`, e);
     return { data: null, error };
   }
 };
@@ -125,9 +127,6 @@ export const updateImagePageType = async (
   pageType: string,
 ): Promise<string> => {
   try {
-    console.log(
-      `Calling updateImagePageType with imageId=${imageId}, pageType=${pageType}`,
-    );
     await axios.post(`/image/update_page_type/${imageId}/${pageType}`);
     return '';
   } catch (e) {

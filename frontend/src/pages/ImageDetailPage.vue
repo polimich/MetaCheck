@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import { AnnotationList, PageList, ImageAnnotator } from 'components';
 import { useRoute, useRouter } from 'vue-router';
 import { ref, onMounted, watch, computed } from 'vue';
@@ -145,12 +146,8 @@ const loadCollectionData = async (collectionId: string) => {
   try {
     const isReady = await collectionStore.waitForCollectionReady(collectionId);
     if (!isReady) {
-      console.warn(
-        `Collection ${collectionId} failed to be fully ready within the timeout period`,
-      );
     }
   } catch (error) {
-    console.error('Error loading collection:', error);
     notificationStore.error('Error loading collection data');
   } finally {
     loadingState.setComponentLoading(loadingKey, false);
@@ -380,10 +377,6 @@ const saveDetections = async () => {
 
 // Add this to the script section at an appropriate location
 const handleHierarchicalTreeClick = (event: MouseEvent) => {
-  console.log(
-    '[EVENT-DEBUG] HierarchicalTree click event captured in ImageDetailPage',
-  );
-
   // Find the clicked element
   const target = event.target as HTMLElement;
   const clickableItem = target.closest('.clickable-item');
@@ -394,11 +387,6 @@ const handleHierarchicalTreeClick = (event: MouseEvent) => {
     const imageId = clickableItem.getAttribute('data-image-id');
 
     if (detectionId && imageId) {
-      console.log('[EVENT-DEBUG] Found detection data in clicks', {
-        detectionId,
-        imageId,
-      });
-
       // If this is a different image, navigate to it
       if (imageId !== imageStore.currentImageId) {
         // Update route if different from current route params
@@ -411,7 +399,6 @@ const handleHierarchicalTreeClick = (event: MouseEvent) => {
       // Select the detection after a short delay to ensure image is loaded
       setTimeout(() => {
         try {
-          console.log(`[EVENT-DEBUG] Selecting detection ${detectionId}`);
           imageStore.selectDetection(detectionId);
         } catch (err) {
           console.error('[EVENT-DEBUG] Error selecting detection:', err);
@@ -420,6 +407,30 @@ const handleHierarchicalTreeClick = (event: MouseEvent) => {
     }
   }
 };
+
+// Add loading state tracking
+const isReloading = ref(false);
+
+// Watch for collection loading state
+watch(
+  () => collectionStore.loading,
+  (newLoading) => {
+    isReloading.value = newLoading;
+  },
+);
+
+// Watch for collection changes
+watch(
+  () => collectionStore.collection,
+  async (newCollection) => {
+    if (newCollection && collectionId.value) {
+      // Ensure collection is fully ready
+
+      await collectionStore.waitForCollectionReady(collectionId.value);
+      isReloading.value = false;
+    }
+  },
+);
 </script>
 
 <template>
@@ -431,6 +442,12 @@ const handleHierarchicalTreeClick = (event: MouseEvent) => {
     >
       <q-spinner color="primary" size="3em" />
       <div class="text-subtitle1 q-mt-sm">{{ loadingMessage }}</div>
+    </div>
+
+    <!-- Collection reloading overlay -->
+    <div v-if="isReloading" class="loading-overlay">
+      <q-spinner color="primary" size="3em" />
+      <div class="text-subtitle1 q-mt-sm">Reloading data...</div>
     </div>
 
     <div class="row no-wrap app-container">

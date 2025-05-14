@@ -1,3 +1,7 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
+
 // Utility functions for Hierarchical Tree components
 import { Router } from 'vue-router';
 import { useCollection } from 'src/stores/data/useCollection';
@@ -61,93 +65,38 @@ export const navigateToDetection = (
   collectionStore: ReturnType<typeof useCollection>,
   imageStore: ReturnType<typeof useImage>,
 ) => {
-  console.log('[NAVIGATION DEBUG] Starting navigation attempt', {
-    detectionId: detection.id,
-    imageId: detection.imageId,
-    currentRoute: router.currentRoute.value.fullPath,
-    currentImageId: imageStore.currentImageId,
-  });
-
   if (!detection.id || !detection.imageId) {
-    console.error(
-      '[NAVIGATION DEBUG] Cannot navigate: Missing detection id or imageId',
-      detection,
-    );
     return;
   }
 
-  // Get the current collection ID from the store
   const collectionId = collectionStore.collection?.id;
-  console.log('[NAVIGATION DEBUG] Collection ID from store:', collectionId);
-
   if (!collectionId) {
-    console.error(
-      '[NAVIGATION DEBUG] Cannot navigate: No collection ID available',
-    );
     return;
   }
 
   try {
-    // First select the image in the collection store
-    console.log(
-      '[NAVIGATION DEBUG] Selecting image in collection store:',
-      detection.imageId,
-    );
     collectionStore.selectImage(detection.imageId);
-    console.log('[NAVIGATION DEBUG] After selecting image in collection store');
 
-    // Check if we're already on the target image
     const currentRoute = router.currentRoute.value;
     const targetRoute = `/collections/${collectionId}/${detection.imageId}`;
     const alreadyOnTargetRoute =
       currentRoute.params.collectionId === collectionId &&
       currentRoute.params.imageId === detection.imageId;
 
-    console.log('[NAVIGATION DEBUG] Navigation info:', {
-      currentPath: currentRoute.fullPath,
-      targetRoute,
-      alreadyOnTargetRoute,
-      currentParams: currentRoute.params,
-    });
-
     if (alreadyOnTargetRoute) {
-      console.log(
-        '[NAVIGATION DEBUG] Already on target route, selecting detection directly',
-      );
-      // If already on the correct image, just select the detection directly
       imageStore.selectDetection(detection.id);
     } else {
-      // Navigate to the correct route: /collections/:collectionId/:imageId
-      console.log('[NAVIGATION DEBUG] Navigating to route:', targetRoute);
       router.push(targetRoute);
-
-      // Set a timeout to ensure the image is loaded before selecting the detection
-      console.log('[NAVIGATION DEBUG] Setting timeout for detection selection');
       setTimeout(() => {
         try {
-          // Select the detection in the image store
-          console.log(
-            '[NAVIGATION DEBUG] Timeout callback executing - selecting detection:',
-            detection.id,
-          );
           imageStore.selectDetection(detection.id);
-          console.log('[NAVIGATION DEBUG] After selecting detection');
         } catch (err) {
-          console.error(
-            '[NAVIGATION DEBUG] Error selecting detection after navigation:',
-            err,
-          );
+          // Silent fail - detection selection will be retried on route change
         }
-      }, 1000); // Increased timeout to give more time for image loading
+      }, 1000);
     }
   } catch (err) {
-    console.error('[NAVIGATION DEBUG] Error during detection navigation:', err);
-    // Try again with just the navigation as a fallback
     const targetRoute = `/collections/${collectionId}/${detection.imageId}`;
-    console.log(
-      '[NAVIGATION DEBUG] Attempting fallback navigation to:',
-      targetRoute,
-    );
     router.push(targetRoute);
   }
 };

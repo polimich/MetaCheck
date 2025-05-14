@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { route } from 'quasar/wrappers';
 import {
   createMemoryHistory,

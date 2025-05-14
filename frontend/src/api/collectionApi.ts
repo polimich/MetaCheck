@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { createApiService } from './apiFactory';
 import { axios, axiosErrorHandler } from './index';
 import {

@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 export * from './collection';
 export * from './image';
 export * from './detection';

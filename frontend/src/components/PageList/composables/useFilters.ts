@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { ref, computed } from 'vue';
 import {
   HierarchicalImage,

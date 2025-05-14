@@ -108,48 +108,68 @@ export const useHierarchicalTree = defineStore('hierarchicalTree', () => {
     meta_attribute_name: string,
     meta_element_name: string,
   ) => {
-    console.log(
-      `Adding detection with meta role ${meta_attribute_name} for meta element ${meta_element_name}`,
-    );
-
-    const meta_role_id = await findMetaRole(
-      meta_attribute_name,
-      meta_element_name,
-    );
-    if (meta_role_id.error) {
-      console.error(`Error finding meta role: ${meta_role_id.error}`);
-      return;
-    }
-    console.log(
-      'addDetectionWithMetaRole: ',
-      detection,
-      meta_element_id,
-      meta_role_id.data,
-    );
-    const response = await detectionApi.create(detection);
-    if (response.error) {
-      console.error(`Error adding detection: ${response.error}`);
-    }
-
-    const meta_role_detection_new: MetaRoleDetectionNew = {
-      id: uuidv4(),
-      meta_element_id,
-      meta_role_id: meta_role_id.data,
-      detection_id: detection.id,
-    };
-
-    const meta_role_detection = await metaRoleDetectionApi.create(
-      meta_role_detection_new,
-    );
-
-    if (meta_role_detection.error) {
-      console.error(
-        `Error adding meta role detection: ${meta_role_detection.error}`,
+    try {
+      console.log(
+        `Adding detection with meta role ${meta_attribute_name} for meta element ${meta_element_name}`,
       );
-    }
 
-    await collectionStore.reloadCollection();
-    await loadHierarchicalTree(collection.value?.id as string);
+      const meta_role_id = await findMetaRole(
+        meta_attribute_name,
+        meta_element_name,
+      );
+      if (meta_role_id.error) {
+        console.error(`Error finding meta role: ${meta_role_id.error}`);
+        return false;
+      }
+      console.log(
+        'addDetectionWithMetaRole: ',
+        detection,
+        meta_element_id,
+        meta_role_id.data,
+      );
+      const response = await detectionApi.create(detection);
+      if (response.error) {
+        console.error(`Error adding detection: ${response.error}`);
+        return false;
+      }
+
+      const meta_role_detection_new: MetaRoleDetectionNew = {
+        id: uuidv4(),
+        meta_element_id,
+        meta_role_id: meta_role_id.data,
+        detection_id: detection.id,
+      };
+
+      const meta_role_detection = await metaRoleDetectionApi.create(
+        meta_role_detection_new,
+      );
+
+      if (meta_role_detection.error) {
+        console.error(
+          `Error adding meta role detection: ${meta_role_detection.error}`,
+        );
+        return false;
+      }
+
+      // Get the current collection ID before reload
+      const currentCollectionId = collection.value?.id;
+      if (!currentCollectionId) {
+        console.error('No collection ID available for reload');
+        return false;
+      }
+
+      // Reload collection and wait for it to be ready
+      await collectionStore.reloadCollection();
+      await collectionStore.waitForCollectionReady(currentCollectionId);
+
+      // Reload hierarchical tree after collection is ready
+      await loadHierarchicalTree(currentCollectionId);
+
+      return true;
+    } catch (error) {
+      console.error('Error in addDetection:', error);
+      return false;
+    }
   };
 
   return {

@@ -1,3 +1,7 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ * Generic API factory that creates standardized API methods for any entity
+ */
 import { axios, axiosErrorHandler } from './index';
 
 /**
@@ -25,7 +29,6 @@ export function createApiService<Entity, EntityNew, EntityUpdate>({
    */
   const getAll = async (): Promise<ApiResponse<Entity[]>> => {
     try {
-      console.log(`API: Fetching all ${entityName}s`);
       const { data } = await axios.get<unknown>(`${basePath}`);
 
       // Process response if needed
@@ -35,7 +38,6 @@ export function createApiService<Entity, EntityNew, EntityUpdate>({
 
       return { data: processedData as Entity[], error: '' };
     } catch (error) {
-      // Show notification for this error since it's a critical operation
       const errorMessage = axiosErrorHandler(error, undefined, true);
       return { data: [] as Entity[], error: errorMessage };
     }
@@ -46,12 +48,10 @@ export function createApiService<Entity, EntityNew, EntityUpdate>({
    */
   const getById = async (id: string): Promise<ApiResponse<Entity>> => {
     if (!id) {
-      console.error(`No ${entityName} ID provided`);
       return { data: null, error: `No ${entityName} ID provided` };
     }
 
     try {
-      console.log(`API: Fetching ${entityName} ${id}`);
       const { data } = await axios.get<unknown>(`${basePath}/${id}`);
 
       // Process response if needed
@@ -59,7 +59,6 @@ export function createApiService<Entity, EntityNew, EntityUpdate>({
         ? customResponseHandler(data)
         : data;
 
-      console.log(`API: Successfully fetched ${entityName} ${id}`);
       return { data: processedData as Entity, error: '' };
     } catch (e) {
       const errorMessage = axiosErrorHandler(e, undefined, true);
@@ -75,7 +74,6 @@ export function createApiService<Entity, EntityNew, EntityUpdate>({
   ): Promise<{ id?: string; error: string }> => {
     try {
       const { data } = await axios.post<{ id: string }>(basePath, entity);
-      console.log(`API: Created ${entityName} with ID ${data.id}`);
       return { id: data.id, error: '' };
     } catch (error) {
       return { error: axiosErrorHandler(error) };

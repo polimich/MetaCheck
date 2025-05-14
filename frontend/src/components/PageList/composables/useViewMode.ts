@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { computed, ref, watch } from 'vue';
 
 type ViewMode = 'list-small' | 'list-large' | 'grid';

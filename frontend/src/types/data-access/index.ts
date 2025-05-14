@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 export * from './base.da.ts';
 export * from './image.da.ts';
 export * from './detection.da.ts';

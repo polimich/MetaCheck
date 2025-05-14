@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import { useCollection } from 'src/stores/data/useCollection';
 import { useImage } from 'src/stores';
 import { useLoadingState } from 'src/stores/app/loadingState';
@@ -45,7 +46,6 @@ const checkConnection = async (): Promise<boolean> => {
 
     retryCount.value++;
     connectionError.value = `Connection attempt ${retryCount.value}/${maxRetries} failed: ${error}`;
-    console.warn(connectionError.value);
 
     if (retryCount.value < maxRetries) {
       // Wait before retrying (exponential backoff)

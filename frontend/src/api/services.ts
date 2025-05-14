@@ -1,3 +1,7 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
+
 // Export all services by API endpoint
 export * from './imageApiService';
 export * from './collectionApiService';

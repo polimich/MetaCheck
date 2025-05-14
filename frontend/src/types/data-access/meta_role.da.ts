@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseEntityType as Base } from './base.da';
 
 export type MetaRoleDA = Base & {

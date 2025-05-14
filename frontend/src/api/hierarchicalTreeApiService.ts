@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { axios } from 'src/api';
 import { HierarchicalTree } from 'src/stores';
 import { ApiResponse } from 'src/types';
@@ -16,7 +19,6 @@ export const getHierarchicalTree = async (
     );
     return { data: response.data, error: undefined };
   } catch (error) {
-    console.error('Error fetching hierarchical tree:', error);
     return {
       error: error instanceof Error ? error.message : 'Unknown error',
       data: undefined,

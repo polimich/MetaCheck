@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import {
@@ -96,7 +97,6 @@ export const usePageListStore = defineStore('pageList', () => {
   const debouncedProcessFilters = debounceOperation(() => {
     // This is intentionally empty - just updating the timestamp
     // will trigger the computed to recalculate
-    console.log('Processed filter changes at', new Date().toISOString());
   }, 200);
 
   // Watch for filter changes
@@ -316,12 +316,9 @@ export const usePageListStore = defineStore('pageList', () => {
       return filterCache.get(cacheKey) as HierarchicalImage[];
     }
 
-    console.time('filter-operation');
-
     // Get all images from the hierarchical structure
     let images = collectionStore.allImagesFlattened;
     if (!images.length) {
-      console.timeEnd('filter-operation');
       filterCache.set(cacheKey, []);
       return [];
     }
@@ -382,7 +379,6 @@ export const usePageListStore = defineStore('pageList', () => {
       filterCache.delete(keys[0]);
     }
 
-    console.timeEnd('filter-operation');
     return result;
   });
 
@@ -534,159 +530,71 @@ export const usePageListStore = defineStore('pageList', () => {
 
   // Mark selected images as verified (placeholder implementation)
   function markSelectedAsVerified() {
-    console.log('Mark as verified:', selectedImages.value);
     deselectAll();
     selectMode.value = false;
   }
 
   // Download selected images (placeholder implementation)
   function downloadSelected() {
-    console.log('Download selected:', selectedImages.value);
+    // Implementation handled by UI components
   }
 
   // Add a refresh function to reload data from API
   async function refreshData() {
     // Perform a collection reload to get fresh data from the server
     try {
-      console.log(
-        '[DEBUG-PageListStore] Starting refreshData() - reloading collection data',
-      );
-
-      // Get the current collection ID BEFORE any changes to cache settings
+      // Get the current collection ID
       const collectionId = collectionStore.collection?.id;
 
       if (!collectionId) {
-        console.error(
-          '[DEBUG-PageListStore] No collection ID available for refresh',
-        );
         return { error: 'No collection ID available' };
       }
 
-      // Sample some images before refresh to compare after
-      const sampleImagesBefore = collectionStore.allImagesFlattened
-        .filter((img) => img.page_index)
-        .slice(0, 3)
-        .map((img) => ({
-          id: img.id,
-          page_index: img.page_index || '(none)',
-          timestamp: Date.now(),
-        }));
-
-      console.log(
-        '[DEBUG-PageListStore] Images before refresh:',
-        JSON.stringify(sampleImagesBefore),
-      );
-      console.log('[DEBUG-PageListStore] Refreshing collection:', collectionId);
-
       // Temporarily disable cache to ensure fresh data
       const wasCacheDisabled = collectionStore.disableCache;
-
-      console.log(
-        '[DEBUG-PageListStore] Current cache setting:',
-        wasCacheDisabled ? 'disabled' : 'enabled',
-      );
-      console.log(
-        '[DEBUG-PageListStore] Temporarily disabling cache to ensure fresh data',
-      );
-
       collectionStore.setDisableCache(true);
 
       try {
         // Force reload the collection
-        console.log(
-          `[DEBUG-PageListStore] Calling reloadCollection() for ${collectionId}`,
-        );
         await collectionStore.reloadCollection();
-
-        // Check if the images actually changed
-        const sampleImagesAfter = collectionStore.allImagesFlattened
-          .filter((img) => img.page_index)
-          .slice(0, 3)
-          .map((img) => ({
-            id: img.id,
-            page_index: img.page_index || '(none)',
-            timestamp: Date.now(),
-          }));
-
-        console.log(
-          '[DEBUG-PageListStore] Images after refresh:',
-          JSON.stringify(sampleImagesAfter),
-        );
-
-        // Compare the before and after samples
-        const changed =
-          JSON.stringify(sampleImagesBefore.map((i) => i.page_index)) !==
-          JSON.stringify(sampleImagesAfter.map((i) => i.page_index));
-
-        console.log(
-          `[DEBUG-PageListStore] Images changed during refresh: ${changed}`,
-        );
-
-        console.log('[DEBUG-PageListStore] Collection reload completed');
 
         // Restore cache setting if needed
         if (!wasCacheDisabled) {
-          console.log(
-            '[DEBUG-PageListStore] Restoring cache setting to enabled',
-          );
           collectionStore.setDisableCache(wasCacheDisabled);
         }
 
         // Verify updates were actually loaded
         await verifyLocalUpdates(collectionId);
 
-        console.log('[DEBUG-PageListStore] Refresh operation complete');
         return { success: true };
       } catch (error) {
-        console.error(
-          `[DEBUG-PageListStore] Error reloading collection: ${error}`,
-        );
         return {
           error: `Failed to reload collection: ${error}`,
         };
       }
     } catch (error) {
-      console.error(`[DEBUG-PageListStore] Error in refreshData: ${error}`);
       return { error: `${error}` };
     }
   }
 
   // Helper function to verify updates directly from API
   async function verifyLocalUpdates(collectionId: string) {
-    console.log(
-      `[DEBUG-PageListStore] Verifying updates for collection: ${collectionId}`,
-    );
-
     // Get a sample of images that might have page indices
     const imagesToCheck = collectionStore.allImagesFlattened
       .filter((img) => img.page_index)
       .slice(0, 5);
 
     if (imagesToCheck.length === 0) {
-      console.log('[DEBUG-PageListStore] No images to verify in local data');
       return;
     }
-
-    console.log(
-      '[DEBUG-PageListStore] Verifying local updates for images:',
-      imagesToCheck.map((img) => ({
-        id: img.id,
-        page_index: img.page_index,
-      })),
-    );
 
     // If the collection store doesn't have the correct collection loaded,
     // try to reload it first
     if (collectionStore.collection?.id !== collectionId) {
-      console.log(
-        `[DEBUG-PageListStore] Loading collection ${collectionId} for verification`,
-      );
       try {
         await collectionStore.loadCollection(collectionId);
       } catch (error) {
-        console.error(
-          `[DEBUG-PageListStore] Error loading collection for verification: ${error}`,
-        );
+        // Handle error silently
       }
     }
 
@@ -697,35 +605,21 @@ export const usePageListStore = defineStore('pageList', () => {
           img.id,
           img.page_index || '',
         );
-        console.log(
-          `[DEBUG-PageListStore] API verification for ${img.id}: ${verification.success ? 'Success' : 'Failed'}`,
-        );
 
         // If local data is out of sync with server, update it
         if (!verification.success && verification.actualPageIndex !== null) {
-          console.log(
-            `[DEBUG-PageListStore] Updating local image data from API: ${img.id} -> ${verification.actualPageIndex}`,
-          );
           collectionStore.updateImageDirectly(img.id, {
             page_index: verification.actualPageIndex,
           });
         }
       } catch (error) {
-        console.error(
-          `[DEBUG-PageListStore] Error verifying image ${img.id}:`,
-          error,
-        );
+        // Handle error silently
       }
     }
   }
 
   // Change page type for all selected images
   async function changePageType(pageType: string) {
-    console.log(
-      `Changing page type to ${pageType} for images:`,
-      selectedImages.value,
-    );
-
     // Track successful and failed operations
     const results = {
       success: 0,
@@ -755,14 +649,6 @@ export const usePageListStore = defineStore('pageList', () => {
       }
     }
 
-    // Log the results
-    console.log(
-      `Page type update results: ${results.success} successful, ${results.failed} failed`,
-    );
-    if (results.errors.length > 0) {
-      console.error('Page type update errors:', results.errors);
-    }
-
     // Clear selection after operation
     deselectAll();
     selectMode.value = false;
@@ -779,15 +665,6 @@ export const usePageListStore = defineStore('pageList', () => {
     step: number;
     pagesPerImage: number;
   }) {
-    console.log(
-      '[DEBUG-PageListStore] Changing page indices with options:',
-      options,
-    );
-    console.log(
-      '[DEBUG-PageListStore] Selected images count:',
-      selectedImages.value.length,
-    );
-
     // Track successful and failed operations
     const results = {
       success: 0,
@@ -802,15 +679,6 @@ export const usePageListStore = defineStore('pageList', () => {
       .filter((img) => img !== undefined)
       .sort((a, b) => (a?.order || 0) - (b?.order || 0));
 
-    console.log(
-      '[DEBUG-PageListStore] Sorted images for processing:',
-      sortedImages.map((img) => ({
-        id: img?.id,
-        order: img?.order,
-        current_page_index: img?.page_index,
-      })),
-    );
-
     // Apply page indices
     let currentNumber = options.startNumber;
 
@@ -818,74 +686,44 @@ export const usePageListStore = defineStore('pageList', () => {
       if (image) {
         const pageIndex = `${options.prefix}${currentNumber}${options.suffix}`;
         try {
-          console.log(
-            `[DEBUG-PageListStore] Updating image ${image.id} with page index: ${pageIndex}`,
-          );
-
           // Call the API directly to update the page index
           const result = await updateImagePageIndex(image.id, pageIndex);
 
           if (result.success) {
             results.success++;
             results.updatedImageIds.push(image.id);
-            console.log(
-              `[DEBUG-PageListStore] Successfully updated image ${image.id} with page index ${pageIndex}`,
-            );
 
-            // Verify the update by fetching the image data from the server
-            console.log(
-              `[DEBUG-PageListStore] Verifying page index update for image ${image.id}`,
-            );
             try {
+              // Verify the update by fetching the image data from the server
               const verification = await verifyPageIndexUpdate(
                 image.id,
                 pageIndex,
               );
-              console.log(
-                `[DEBUG-PageListStore] Verification result for ${image.id}: ${verification.success ? 'Success' : 'Failed'}`,
-              );
 
-              if (!verification.success) {
-                console.error(
-                  `[DEBUG-PageListStore] Verification failed: ${verification.error}`,
-                );
+              // If verification failed, but we have the actual page index
+              if (
+                !verification.success &&
+                verification.actualPageIndex !== null
+              ) {
+                // Try to update the image directly in the collection
+                collectionStore.updateImageDirectly(image.id, {
+                  page_index: verification.actualPageIndex,
+                  page_index_confidence: 1.0, // Set high confidence as it's manually set
+                });
+              } else if (verification.success) {
+                // Try to update the image directly in the collection
+                collectionStore.updateImageDirectly(image.id, {
+                  page_index: pageIndex,
+                  page_index_confidence: 1.0, // Set high confidence as it's manually set
+                });
               }
             } catch (verifyError) {
-              console.error(
-                `[DEBUG-PageListStore] Error during verification: ${verifyError}`,
-              );
-            }
-
-            // Try to directly update the image in the store
-            const currentImage = collectionStore.getImageById(image.id);
-            if (currentImage) {
-              console.log(
-                `[DEBUG-PageListStore] Current page_index before update: ${currentImage.page_index}`,
-              );
-
-              // Try to update the image directly in the collection
-              const updated = collectionStore.updateImageDirectly(image.id, {
-                page_index: pageIndex,
-                page_index_confidence: 1.0, // Set high confidence as it's manually set
-              });
-
-              console.log(
-                `[DEBUG-PageListStore] Direct update of image in collection: ${updated ? 'Success' : 'Failed'}`,
-              );
-
-              // Verify the update in the store
-              const updatedImage = collectionStore.getImageById(image.id);
-              console.log(
-                `[DEBUG-PageListStore] Updated page_index after direct update: ${updatedImage?.page_index}`,
-              );
+              // Handle verification error silently
             }
           } else {
             results.failed++;
             if (result.error) {
               results.errors.push(`Image ${image.id}: ${result.error}`);
-              console.error(
-                `[DEBUG-PageListStore] Failed to update image ${image.id}: ${result.error}`,
-              );
             }
           }
         } catch (error) {
@@ -893,10 +731,6 @@ export const usePageListStore = defineStore('pageList', () => {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
           results.errors.push(`Image ${image.id}: ${errorMessage}`);
-          console.error(
-            `[DEBUG-PageListStore] Exception updating image ${image.id}:`,
-            error,
-          );
         }
 
         // Increment by step * pagesPerImage
@@ -904,28 +738,8 @@ export const usePageListStore = defineStore('pageList', () => {
       }
     }
 
-    // Log the results
-    console.log(
-      `[DEBUG-PageListStore] Page index update results: ${results.success} successful, ${results.failed} failed`,
-    );
-    if (results.errors.length > 0) {
-      console.error(
-        '[DEBUG-PageListStore] Page index update errors:',
-        results.errors,
-      );
-    }
-
-    // Log the updated image IDs
-    console.log(
-      '[DEBUG-PageListStore] Updated image IDs:',
-      results.updatedImageIds,
-    );
-
     // Check if we need to refresh data to reflect changes
     if (results.success > 0) {
-      console.log(
-        '[DEBUG-PageListStore] Will refresh data after page index updates',
-      );
       // Use setTimeout to ensure the API has time to process the updates
       setTimeout(() => refreshData(), 500);
     }
@@ -1014,7 +828,6 @@ export const usePageListStore = defineStore('pageList', () => {
   watch(
     sortBy,
     (newSortValue) => {
-      console.log(`PageListStore: Setting sort to ${newSortValue}`);
       collectionStore.setSortOption(newSortValue);
     },
     { immediate: true },

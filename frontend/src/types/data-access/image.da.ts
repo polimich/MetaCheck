@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseEntityType } from 'src/types/data-access/base.da.ts';
 import { DetectionDA } from 'src/types/data-access/detection.da.ts';
 import { MetaElementDA } from './meta_element.da';

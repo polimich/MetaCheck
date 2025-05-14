@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 export { default as axios } from './axios.ts';
 export * from './helpers.ts';
 export * from './collectionApi.ts';

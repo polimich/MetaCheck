@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { z } from 'zod';
 import { WorkState } from '../data-access';
 import { META_ELEMENT_TYPES } from '../frontend-state';

@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 const imagePreviewUrl = import.meta.env.VITE_API_URL + '/image/preview/';
 const imageRasterUrl = import.meta.env.VITE_API_URL + '/image/raster/';
 

@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseState } from 'src/types/frontend-state/base.state.ts';
 import { MetaElementAttributes } from 'src/types/data-access/meta_element.da.ts';
 

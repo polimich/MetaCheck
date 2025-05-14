@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { axios, axiosErrorHandler } from './index';
 import {
   CollectionType,
@@ -20,7 +23,6 @@ import { normalizeBbox } from 'src/utils/bboxUtils';
  */
 const handleZodError = (error: unknown, entityName: string): string => {
   if (error instanceof z.ZodError) {
-    console.error(`Invalid ${entityName} data received:`, error.errors);
     return `Invalid ${entityName} data received from server`;
   }
   return '';
@@ -42,7 +44,6 @@ const normalizeBboxInCollection = (
     if (image.detections) {
       for (const detection of image.detections) {
         // Empty, null, or undefined bboxes are valid for page number detections
-        // normalizeBbox handles these cases and returns null
         detection.bbox = normalizeBbox(detection.bbox);
       }
     }
@@ -59,9 +60,7 @@ export const getCollections = async (): Promise<{
   error: string;
 }> => {
   try {
-    console.log('API: Fetching all collections');
     const { data } = await axios.get<CollectionType[]>('collection');
-    console.log('API: Collections:', data);
 
     // Validate the response data
     try {
@@ -69,11 +68,9 @@ export const getCollections = async (): Promise<{
       return { data: validatedData as unknown as CollectionType[], error: '' };
     } catch (validationError) {
       const errorMessage = handleZodError(validationError, 'collections');
-      console.error('Validation error:', validationError);
       return { data: [], error: errorMessage || 'Data validation failed' };
     }
   } catch (error) {
-    // Show notification for this error since it's a critical operation
     const errorMessage = axiosErrorHandler(error, undefined, true);
     return { data: [], error: errorMessage };
   }
@@ -86,7 +83,6 @@ export const getCollection = async (
   collectionId: string,
 ): Promise<{ data: CollectionType | null; error: string }> => {
   if (!collectionId) {
-    console.error('No collection ID provided');
     return { data: null, error: 'No collection ID provided' };
   }
 
@@ -96,31 +92,26 @@ export const getCollection = async (
       collectionId,
     )
   ) {
-    console.error(`Invalid collection ID format: ${collectionId}`);
     return { data: null, error: 'Invalid collection ID format' };
   }
 
   try {
-    console.log(`API: Fetching collection ${collectionId}`);
     const { data } = await axios.get<CollectionType>(
       `/collection/${collectionId}`,
     );
 
     // Normalize bbox formats before validation
     const normalizedData = normalizeBboxInCollection(data);
-    console.log('normalizedData', normalizedData);
+
     // Validate the response data
     try {
       const validatedData = CollectionSchema.parse(normalizedData);
-      console.log(`API: Successfully fetched collection ${collectionId}`);
       return { data: validatedData as unknown as CollectionType, error: '' };
     } catch (validationError) {
       const errorMessage = handleZodError(validationError, 'collection');
-      console.error('Validation error:', validationError);
       return { data: null, error: errorMessage || 'Data validation failed' };
     }
   } catch (e) {
-    // Show notification for this error since it's a critical operation
     const errorMessage = axiosErrorHandler(e, undefined, true);
     return { data: null, error: errorMessage };
   }
@@ -141,11 +132,7 @@ export const addCollection = async (
       return errorMessage || 'Invalid collection data';
     }
 
-    const { data } = await axios.post<{ id: string }>(
-      '/collection',
-      collection,
-    );
-    console.log(`API: Created collection with ID ${data.id}`);
+    await axios.post<{ id: string }>('/collection', collection);
     return '';
   } catch (error) {
     return axiosErrorHandler(error);
@@ -154,7 +141,6 @@ export const addCollection = async (
 
 /**
  * Edit an existing collection
- * @returns Error message if there's an error, empty string if successful
  */
 export const editCollection = async (
   collection: CollectionUpdateDA,
@@ -177,7 +163,6 @@ export const editCollection = async (
 
 /**
  * Delete a collection
- * @returns Error message if there's an error, empty string if successful
  */
 export const deleteCollection = async (
   collectionId: string,
@@ -207,7 +192,6 @@ export const getCollectionImages = async (
       return { data: validatedData as unknown as ImageDA[], error: '' };
     } catch (validationError) {
       const errorMessage = handleZodError(validationError, 'images');
-      console.error('Validation error:', validationError);
       return { data: [], error: errorMessage || 'Data validation failed' };
     }
   } catch (error) {
@@ -218,7 +202,6 @@ export const getCollectionImages = async (
 
 /**
  * Import a collection from a YOLO format file
- * @returns Error message if there's an error, empty string if successful
  */
 export const importCollection = async (file: File): Promise<string> => {
   try {
@@ -242,12 +225,8 @@ export const getCollectionHierarchical = async (
   collectionId: string,
 ): Promise<{ data: CollectionType | null; error: string }> => {
   try {
-    console.log(`API: Fetching hierarchical collection ${collectionId}`);
     const { data } = await axios.get<CollectionType>(
       `/collection/${collectionId}/hierarchical`,
-    );
-    console.log(
-      `API: Successfully fetched hierarchical collection ${collectionId}`,
     );
     return { data, error: '' };
   } catch (error) {
@@ -266,7 +245,6 @@ export const getCollectionAvailable = async (): Promise<{
   error: string;
 }> => {
   try {
-    console.log('API: Fetching available collections');
     const { data } = await axios.get<CollectionType[]>('collection/available');
 
     // Validate the response data
@@ -275,7 +253,6 @@ export const getCollectionAvailable = async (): Promise<{
       return { data: validatedData as unknown as CollectionType[], error: '' };
     } catch (validationError) {
       const errorMessage = handleZodError(validationError, 'collections');
-      console.error('Validation error:', validationError);
       return { data: [], error: errorMessage || 'Data validation failed' };
     }
   } catch (error) {

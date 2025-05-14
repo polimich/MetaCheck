@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import {
   HierarchialTreeTitleType,
@@ -125,14 +128,11 @@ const fieldGroups = computed<FieldGroup[]>(() => [
 
 // Helper function to get field value, supporting both camelCase and dot notation
 const getFieldValue = (field: FieldItem): string => {
-  // Check camelCase version
   const camelValue = tree[field.key];
-  // Check dot notation version (e.g., 'title.title' instead of 'title')
   const dotKey =
     `title.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeTitleType;
   const dotValue = tree[dotKey];
 
-  // Use whichever version has a value
   const value = camelValue || dotValue;
 
   if (!value) return '';
@@ -146,14 +146,11 @@ const getFieldValue = (field: FieldItem): string => {
 
 // Helper function to check if field has a value, supporting both camelCase and dot notation
 const hasValue = (field: FieldItem): boolean => {
-  // Check camelCase version
   const camelValue = tree[field.key];
-  // Check dot notation version (e.g., 'title.title' instead of 'title')
   const dotKey =
     `title.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeTitleType;
   const dotValue = tree[dotKey];
 
-  // Use whichever version has a value
   const value = camelValue || dotValue;
 
   if (!value) return false;
@@ -167,14 +164,11 @@ const hasValue = (field: FieldItem): boolean => {
 
 // Helper function to get average confidence for a field, supporting both camelCase and dot notation
 const getFieldConfidence = (field: FieldItem): number => {
-  // Check camelCase version
   const camelValue = tree[field.key];
-  // Check dot notation version (e.g., 'title.title' instead of 'title')
   const dotKey =
     `title.${field.key.replace(/([A-Z])/g, '_$1').toLowerCase()}` as keyof HierarchialTreeTitleType;
   const dotValue = tree[dotKey];
 
-  // Use whichever version has a value
   const value = camelValue || dotValue;
 
   if (!value) return 1;
@@ -235,14 +229,6 @@ const hasGroupLowConfidence = (group: FieldGroup): boolean => {
 
 // Function to navigate to detection with debug logs
 const navigateToDetection = (detection: DetectionItem) => {
-  console.log('[EVENT-DEBUG] TitleTree navigateToDetection called', {
-    detection,
-    hasRouter: !!router,
-    routerCurrentRoute: router?.currentRoute.value.fullPath,
-    hasCollectionStore: !!collectionStore,
-    hasImageStore: !!imageStore,
-  });
-
   navigateToDetectionUtil(detection, router, collectionStore, imageStore);
 };
 
@@ -261,7 +247,6 @@ const criticalFieldsCount = computed((): number => {
 const hasVolumeCriticalConfidence = (
   volume: HierarchialTreeVolumeType,
 ): boolean => {
-  // Check volume title
   if (
     volume.title &&
     getDetectionConfidence(volume.title) < CONFIDENCE_THRESHOLD_LOW
@@ -269,7 +254,6 @@ const hasVolumeCriticalConfidence = (
     return true;
   }
 
-  // Check basic fields
   const basicFields = [
     'dateIssued',
     'subTitle',
@@ -288,7 +272,6 @@ const hasVolumeCriticalConfidence = (
     }
   }
 
-  // Check array fields
   const arrayFields = [
     'publisher',
     'manufacturePublisher',
@@ -321,7 +304,6 @@ const hasVolumeCriticalConfidence = (
 const hasVolumeLowConfidence = (volume: HierarchialTreeVolumeType): boolean => {
   if (hasVolumeCriticalConfidence(volume)) return true;
 
-  // Check volume title
   if (
     volume.title &&
     getDetectionConfidence(volume.title) < CONFIDENCE_THRESHOLD_MEDIUM
@@ -329,7 +311,6 @@ const hasVolumeLowConfidence = (volume: HierarchialTreeVolumeType): boolean => {
     return true;
   }
 
-  // Check basic fields
   const basicFields = [
     'dateIssued',
     'subTitle',
@@ -348,7 +329,6 @@ const hasVolumeLowConfidence = (volume: HierarchialTreeVolumeType): boolean => {
     }
   }
 
-  // Check array fields
   const arrayFields = [
     'publisher',
     'manufacturePublisher',
@@ -412,51 +392,24 @@ const updateVolumeCriticalCounts = (volumeId: string, count: number) => {
 
 // Add this after computed properties but before the navigateToDetection function
 onMounted(() => {
-  console.log('[EVENT-DEBUG] TitleTree component mounted');
-
-  // Add debug info about volumes
-  console.log('[VOLUMES-DEBUG] TitleTree volumes:', {
-    hasVolumes: !!tree.volumes && tree.volumes.length > 0,
-    volumesCount: tree.volumes?.length || 0,
-    volumes: tree.volumes?.map((v) => ({
-      id: v.id,
-      title: v.title ? getDetectionValue(v.title) : 'Untitled',
-    })),
-  });
-
-  // Add a direct click handler for detection items
   const titleTree = document.querySelector('.title-tree');
   if (titleTree) {
     titleTree.addEventListener('click', (event) => {
-      // Find the closest clickable element
       const target = event.target as HTMLElement;
       const clickableItem = target.closest('.clickable-item');
 
       if (clickableItem) {
-        console.log(
-          '[EVENT-DEBUG] TitleTree direct click on clickable item',
-          clickableItem,
-        );
-
-        // Try to extract detection info from data attributes
-        // This is a fallback approach when event bubbling fails
         const detectionId = clickableItem.getAttribute('data-detection-id');
         const imageId = clickableItem.getAttribute('data-image-id');
 
         if (detectionId && imageId) {
-          console.log('[EVENT-DEBUG] Found detection data in DOM attributes', {
-            detectionId,
-            imageId,
-          });
-
           const detection: DetectionItem = {
             id: detectionId,
             imageId: imageId,
             value: clickableItem.textContent?.trim() || '',
-            confidence: 1, // Default confidence if not available
+            confidence: 1,
           };
 
-          // Navigate using the detection
           navigateToDetection(detection);
         }
       }

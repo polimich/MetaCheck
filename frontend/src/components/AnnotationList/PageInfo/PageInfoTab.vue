@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { ImageState } from 'src/types/frontend-state';

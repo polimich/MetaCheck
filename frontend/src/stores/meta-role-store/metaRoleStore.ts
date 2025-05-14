@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { defineStore } from 'pinia';
 import { MetaRoleState } from 'src/types/frontend-state/meta_role.state';
 import { ref, computed } from 'vue';
@@ -46,9 +47,6 @@ export const useMetaRoleStore = defineStore('metaRole', () => {
         if (Array.isArray(parsedRoles) && parsedRoles.length > 0) {
           metaRoles.value = parsedRoles;
           loaded.value = true;
-          console.log(
-            `Restored ${metaRoles.value.length} meta roles from localStorage`,
-          );
           return;
         }
       }
@@ -66,7 +64,6 @@ export const useMetaRoleStore = defineStore('metaRole', () => {
     if (metaRoles.value.length > 0) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(metaRoles.value));
-        console.log('Persisted meta role state');
       } catch (e) {
         console.error('Error persisting meta role state:', e);
       }
@@ -75,7 +72,6 @@ export const useMetaRoleStore = defineStore('metaRole', () => {
 
   const loadMetaRoles = async () => {
     if (loaded.value && metaRoles.value.length > 0) {
-      console.log('Meta roles already loaded, using cached data');
       return;
     }
 
@@ -90,7 +86,6 @@ export const useMetaRoleStore = defineStore('metaRole', () => {
         metaRoles.value = response.data;
         loaded.value = true;
         persistState();
-        console.log(`Loaded ${metaRoles.value.length} meta roles`);
       }
     } catch (e) {
       error.value = 'Failed to load meta roles';

@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { DetectionType } from './detection';
 import { MetaElementType } from './meta_element';
 import { BaseType } from './base';

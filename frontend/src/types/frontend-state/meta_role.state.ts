@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { BaseState } from './base.state';
 
 export type MetaRoleState = BaseState & {

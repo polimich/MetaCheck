@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import axios from 'axios';
 
 // Axios instance for API requests

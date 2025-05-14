@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import { useViewMode, useGridColumns, useFilters } from './composables';
 import { computed, watch, ref } from 'vue';
 import { useDebounceFn } from '@vueuse/core';

@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { DetectionState, ImageState } from 'src/types/frontend-state';

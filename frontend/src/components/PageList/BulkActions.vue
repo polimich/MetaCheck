@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { PageType } from 'src/stores/data/types/enum';
@@ -92,9 +93,6 @@ const selectedPageType = ref<string | { value: string; label: string }>('');
 const refreshData = async () => {
   if (refreshing.value) return;
 
-  console.log(
-    '[DEBUG-BulkActions] Starting refreshData to update UI with saved changes',
-  );
   refreshing.value = true;
 
   try {
@@ -106,7 +104,6 @@ const refreshData = async () => {
     const { useCollection } = await import('src/stores/data/useCollection');
     const collectionStore = useCollection();
 
-    console.log('[DEBUG-BulkActions] Current images before refresh:');
     const imagesWithIndices = collectionStore.allImagesFlattened
       .filter((img) => img.page_index)
       .slice(0, 5)
@@ -115,14 +112,6 @@ const refreshData = async () => {
         page_index: img.page_index,
       }));
 
-    console.log(
-      '[DEBUG-BulkActions] Images with page indices:',
-      JSON.stringify(imagesWithIndices),
-    );
-
-    console.log(
-      '[DEBUG-BulkActions] Calling refreshData on pageListStore directly',
-    );
     // Call the store method directly instead of emitting an event
     const result = await pageListStore.refreshData();
 
@@ -156,11 +145,6 @@ const refreshData = async () => {
           id: img.id,
           page_index: img.page_index,
         }));
-
-      console.log(
-        '[DEBUG-BulkActions] Images with page indices after refresh:',
-        JSON.stringify(updatedImagesWithIndices),
-      );
 
       // Check if any updates were applied
       const hasChanges =

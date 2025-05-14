@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
+
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useCollection } from 'src/stores/data/useCollection';
@@ -39,7 +41,6 @@ function navigateToCollections() {
       loadingState.currentOperation &&
       loadingState.currentOperation.startsWith('navigating')
     ) {
-      console.log('Navigation already in progress, ignoring request');
       return;
     }
 
@@ -58,7 +59,6 @@ function navigateToCollections() {
           setTimeout(() => {
             // Fallback in case the router's afterEach doesn't handle it
             if (loadingState.currentOperation === 'navigatingToCollections') {
-              console.log('Fallback: manually stopping navigation loading');
               loadingState.stopLoading('navigatingToCollections');
             }
           }, 1500);
@@ -153,6 +153,24 @@ function navigateToCollection() {
             {{ 'Image: ' + currentImageName }}
           </q-btn>
         </div>
+
+        <!-- Spacer to push elements to the right -->
+        <q-space />
+
+        <!-- Export Button (Visible on Collection or Image pages) -->
+        <q-btn
+          v-if="isOnCollectionPage || isOnImageDetailPage"
+          flat
+          dense
+          icon="download"
+          label="Export"
+          @click="
+            () => {
+              // Call the collection store's export function
+              collectionStore.exportCollectionAsJson();
+            }
+          "
+        />
       </q-toolbar>
     </q-header>
 

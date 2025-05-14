@@ -119,7 +119,6 @@ onMounted(() => {
   // Auto-timeout after 30 seconds to prevent stuck loaders
   cancelTimeout.value = window.setTimeout(() => {
     if (!props.error && loadingState.isLoading) {
-      console.warn('Loading timeout reached - clearing loading state');
       loadingState.clearAllLoadingStates();
       hasSlowConnection.value = false;
     }

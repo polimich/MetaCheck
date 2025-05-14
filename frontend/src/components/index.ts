@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 export * from './NavLink';
 export * from './AnnotationList';
 export * from './PageList';

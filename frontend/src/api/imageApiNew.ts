@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { axios, axiosErrorHandler } from './index';
 import {
   DetectionType,
@@ -17,7 +20,6 @@ export const getImage = async (
     return { data, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error fetching image ${imageId}:`, e);
     return { data: null, error };
   }
 };
@@ -35,7 +37,6 @@ export const getImagesForCollection = async (
     return { data, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error fetching images for collection ${collectionId}:`, e);
     return { data: null, error };
   }
 };
@@ -51,7 +52,6 @@ export const createDetection = async (
     return { data, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error('Error creating detection:', e);
     return { data: null, error };
   }
 };
@@ -67,7 +67,6 @@ export const updateDetection = async (
     return { data, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error updating detection ${detection.id}:`, e);
     return { data: null, error };
   }
 };
@@ -85,7 +84,6 @@ export const deleteDetection = async (
     return { success: true, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error deleting detection ${detectionId}:`, e);
     return { success: false, error };
   }
 };
@@ -98,20 +96,10 @@ export const updateImagePageIndex = async (
   pageIndex: string,
 ): Promise<{ success: boolean; error: string }> => {
   try {
-    console.log(
-      `[DEBUG-API] Updating page index for image ${imageId} to "${pageIndex}"`,
-    );
     await axios.post(`/image/update_page_index/${imageId}/${pageIndex}`);
-    console.log(
-      `[DEBUG-API] Successfully sent page index update for image ${imageId}`,
-    );
     return { success: true, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(
-      `[DEBUG-API] Error updating page index for image ${imageId}:`,
-      e,
-    );
     return { success: false, error };
   }
 };
@@ -128,7 +116,6 @@ export const updateImagePageType = async (
     return { success: true, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error updating page type for image ${imageId}:`, e);
     return { success: false, error };
   }
 };
@@ -144,7 +131,6 @@ export const updateImage = async (
     return { data, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error updating image ${image.id}:`, e);
     return { data: null, error };
   }
 };
@@ -158,24 +144,12 @@ export const updateDetectionWithMetaRole = async (
   value: string,
 ): Promise<{ success: boolean; error: string }> => {
   try {
-    console.log(
-      `API: Updating detection ${detectionId} with meta role ${metaRoleId}`,
-    );
-
     await axios.post(
       `/detection/update_detection_meta_role/${detectionId}/${metaRoleId}/${value}`,
-    );
-
-    console.log(
-      `API: Successfully updated detection ${detectionId} with meta role`,
     );
     return { success: true, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(
-      `API Error in updateDetectionWithMetaRole for detection ${detectionId}, meta role ${metaRoleId}:`,
-      error,
-    );
     return { success: false, error };
   }
 };
@@ -193,7 +167,6 @@ export const getDetectionsForImage = async (
     return { data, error: '' };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(`Error fetching detections for image ${imageId}:`, e);
     return { data: null, error };
   }
 };
@@ -210,14 +183,9 @@ export const verifyPageIndexUpdate = async (
   error: string;
 }> => {
   try {
-    console.log(`[DEBUG-API] Verifying page index update for image ${imageId}`);
     const imageResponse = await getImage(imageId);
 
     if (imageResponse.error || !imageResponse.data) {
-      console.error(
-        `[DEBUG-API] Error fetching image ${imageId} to verify update:`,
-        imageResponse.error,
-      );
       return {
         success: false,
         actualPageIndex: null,
@@ -228,11 +196,6 @@ export const verifyPageIndexUpdate = async (
     const actualPageIndex = imageResponse.data.page_index || null;
     const success = actualPageIndex === expectedPageIndex;
 
-    console.log(`[DEBUG-API] Page index verification for image ${imageId}:
-      - Expected: ${expectedPageIndex}
-      - Actual: ${actualPageIndex}
-      - Match: ${success ? 'YES' : 'NO'}`);
-
     return {
       success,
       actualPageIndex,
@@ -242,10 +205,6 @@ export const verifyPageIndexUpdate = async (
     };
   } catch (e) {
     const error = axiosErrorHandler(e);
-    console.error(
-      `[DEBUG-API] Exception verifying page index for image ${imageId}:`,
-      e,
-    );
     return { success: false, actualPageIndex: null, error };
   }
 };

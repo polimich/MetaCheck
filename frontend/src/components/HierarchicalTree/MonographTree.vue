@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import { HierarchialTreeMonograph } from 'src/stores';
 import VolumeTree from './VolumeTree.vue';

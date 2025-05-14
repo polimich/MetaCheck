@@ -1,3 +1,4 @@
+// @author Michael Polívka (xpoliv07)
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { useLoadingState } from './loadingState';

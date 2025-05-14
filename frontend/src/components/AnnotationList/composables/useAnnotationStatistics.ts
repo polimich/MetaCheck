@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { computed, Ref } from 'vue';
 import { DetectionState } from 'src/types/frontend-state';
 

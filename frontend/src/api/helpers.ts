@@ -1,3 +1,7 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ * Enhanced error handler for API requests that provides detailed error information
+ */
 import { useQuasar } from 'quasar';
 import axios, { AxiosError } from 'axios';
 
@@ -29,7 +33,6 @@ export function axiosErrorHandler(
 
   if (error === null || error === undefined) {
     errorMessage = 'Unrecoverable error!! Error is null or undefined!';
-    console.error(errorMessage);
     if (customHandler) customHandler(error);
     return errorMessage;
   }
@@ -43,16 +46,13 @@ export function axiosErrorHandler(
     if (error.code === 'ERR_NETWORK') {
       errorMessage =
         'Network error: Unable to connect to the server. Please check your internet connection.';
-      console.error('Connection problems..', error);
       notificationTimeout = 0; // No timeout for connection errors
     } else if (error.code === 'ERR_CANCELED') {
       errorMessage = 'Request was cancelled';
-      console.warn('Connection canceled..', error);
       notificationType = 'warning';
     } else if (error.code === 'ECONNABORTED') {
       errorMessage =
         'Request timeout: The server took too long to respond. Please try again later.';
-      console.error('Connection timed out..', error);
     }
 
     // Response exists - server responded with an error
@@ -87,7 +87,6 @@ export function axiosErrorHandler(
       // Handle specific status codes
       switch (statusCode) {
         case 400:
-          console.error('Bad request:', errorMessage, response.data);
           if (!errorMessage || errorMessage === 'An unknown error occurred') {
             errorMessage =
               'Invalid request. Please check your data and try again.';
@@ -95,32 +94,25 @@ export function axiosErrorHandler(
           notificationType = 'warning';
           break;
         case 401:
-          console.error('Unauthorized:', errorMessage);
           errorMessage = 'You are not authorized. Please log in again.';
-          // You could trigger a logout or redirect to login here
           break;
         case 403:
-          console.error('Forbidden:', errorMessage);
           errorMessage = 'You do not have permission to perform this action.';
           break;
         case 404:
-          console.error('Not found:', errorMessage);
           errorMessage =
             'The requested resource does not exist or has been moved.';
           notificationType = 'warning';
           break;
         case 408:
-          console.error('Request timeout:', errorMessage);
           errorMessage = 'Request timed out. Please try again.';
           break;
         case 409:
-          console.error('Conflict:', errorMessage);
           errorMessage =
             'This operation resulted in a conflict. Please refresh and try again.';
           notificationType = 'warning';
           break;
         case 422:
-          console.error('Validation error:', errorMessage, response.data);
           if (!errorMessage || errorMessage === 'An unknown error occurred') {
             errorMessage =
               'Validation failed. Please check your input and try again.';
@@ -128,25 +120,20 @@ export function axiosErrorHandler(
           notificationType = 'warning';
           break;
         case 429:
-          console.error('Too many requests:', errorMessage);
           errorMessage = 'Too many requests. Please try again later.';
           break;
         case 500:
-          console.error('Server error:', errorMessage);
           errorMessage =
             'Server error. Please try again later or contact support.';
           break;
         case 502:
-          console.error('Bad gateway:', errorMessage);
           errorMessage = 'Server is unavailable. Please try again later.';
           break;
         case 503:
-          console.error('Service unavailable:', errorMessage);
           errorMessage =
             'Service is temporarily unavailable. Please try again later.';
           break;
         default:
-          console.error(`Unexpected status (${statusCode}):`, errorMessage);
           if (!errorMessage || errorMessage === 'An unknown error occurred') {
             errorMessage = `Unexpected error (${statusCode}). Please try again or contact support.`;
           }
@@ -154,26 +141,22 @@ export function axiosErrorHandler(
     }
     // No response - request was made but no response received
     else if (request) {
-      console.error('No response from server:', error);
       errorMessage =
         'No response received from the server. Please check your connection and try again.';
       notificationTimeout = 0; // No timeout for connection errors
     }
     // Something happened in setting up the request that triggered an Error
     else if (config) {
-      console.error('Request configuration error:', error);
       errorMessage =
         'Error in request configuration. Please try again or contact support.';
     }
   }
   // Not an Axios error
   else if (error instanceof Error) {
-    console.error('JavaScript error:', error);
     errorMessage = error.message || 'An application error occurred';
   }
   // Unknown error type
   else {
-    console.error('Unknown error type:', error);
     try {
       errorMessage = error as string;
     } catch (e) {
@@ -205,7 +188,7 @@ export function axiosErrorHandler(
             : undefined,
       });
     } catch (e) {
-      console.error('Error showing notification:', e);
+      // Error showing notification
     }
   }
 

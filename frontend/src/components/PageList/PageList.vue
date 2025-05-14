@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// @author Michael Polívka (xpoliv07)
 import {
   ref,
   computed,
@@ -170,7 +171,6 @@ function debouncedScrollRefresh() {
 
   scrollDebounceTimeout = window.setTimeout(() => {
     if (virtualScrollRef.value) {
-      console.log('Refreshing virtual scroll');
       // Refresh all items to account for size changes
       virtualScrollRef.value.reset();
       nextTick(() => {
@@ -436,7 +436,7 @@ const isFilterProcessing = ref(false);
 // Watch for filter changes to clear cache
 watch(filterCacheKey, () => {
   // Clear the entire cache when filters change
-  console.log('Filter or sort changed, clearing cache');
+
   filteredImagesCache.clear();
 
   // Debounce filter processing to prevent UI jank
@@ -451,10 +451,10 @@ watch(filterCacheKey, () => {
 // Add specific watch for sort changes to ensure updating
 watch(
   () => pageListStore.sortBy,
-  (newSortValue) => {
-    console.log('Sort changed to:', newSortValue);
+  () => {
     // Clear the cache to force refiltering
     filteredImagesCache.clear();
+    // No need to refetch, filteredImagesComputed reactive will handle it
   },
 );
 
@@ -462,11 +462,6 @@ watch(
 watch(
   () => pageListStore.selectedImages,
   () => {
-    console.log(
-      'Selection changed:',
-      pageListStore.selectedImages.length,
-      'images selected',
-    );
     // No need to invalidate cache for selection changes
   },
   { deep: true },
@@ -476,7 +471,6 @@ watch(
 watch(
   () => props.collectionId,
   () => {
-    console.log('Collection changed, clearing cache');
     filteredImagesCache.clear();
   },
 );
@@ -484,9 +478,7 @@ watch(
 // Watch for select mode changes to ensure UI updates
 watch(
   () => pageListStore.selectMode,
-  (newValue) => {
-    console.log('Select mode changed:', newValue);
-  },
+  () => {},
 );
 
 // Watch for view mode changes to update virtual scroll item size
@@ -751,18 +743,13 @@ function findDetailedImagePosition(imageId: string): {
 // Optimized function to scroll to active image
 const scrollToActiveImage = async () => {
   if (!activeImageId.value || !virtualScrollRef.value) {
-    console.log('Cannot scroll: missing active image ID or virtual scroll ref');
     return;
   }
 
-  console.log('Attempting to scroll to active image:', activeImageId.value);
-
   // Find the complete section hierarchy for this image
   const hierarchy = findImageHierarchy(activeImageId.value);
-  console.log('Image hierarchy:', hierarchy);
 
   if (hierarchy.length === 0) {
-    console.warn('Could not find image in any section');
     return;
   }
 
@@ -811,11 +798,9 @@ const scrollToActiveImage = async () => {
         activeImageId.value,
       );
       if (retryIndex !== -1) {
-        console.log('Found active image after retry at index:', retryIndex);
         virtualScrollRef.value?.scrollTo(retryIndex);
         debouncedScrollRefresh();
       } else {
-        console.error('Failed to find active image after retry');
       }
     }, 300);
   }
@@ -990,16 +975,10 @@ watch(
 watch(
   () => props.disableCache,
   (newValue) => {
-    console.log(
-      `[DEBUG-PageList] disableCache changed to ${newValue}, updating collectionStore setting`,
-    );
     collectionStore.value.setDisableCache(newValue);
 
     // Force reload when cache setting changes
     if (props.collectionId) {
-      console.log(
-        '[DEBUG-PageList] Forcing collection reload due to cache setting change',
-      );
       loadCollection();
     }
   },
@@ -1015,49 +994,27 @@ const isCollectionEmpty = computed(() => {
 async function loadCollection() {
   if (!props.collectionId) return;
 
-  console.log(
-    `[DEBUG-PageList] LoadCollection called for collection: ${props.collectionId}`,
-  );
-
   // More comprehensive cache check with logging
   if (collectionStore.value.isCollectionReady(props.collectionId)) {
-    console.log(
-      `[DEBUG-PageList] Collection ${props.collectionId} already loaded and ready, using cached data.`,
-    );
     return;
   }
 
   if (collectionStore.value.loading) {
-    console.log(
-      `[DEBUG-PageList] Collection ${props.collectionId} is currently loading, waiting...`,
-    );
     // Wait for the collection to be ready instead of returning
     await collectionStore.value.waitForCollectionReady(props.collectionId);
     return;
   }
 
-  console.log(`[DEBUG-PageList] Loading collection ${props.collectionId}`);
   try {
     // Use the waitForCollectionReady that includes loading if needed
     const ready = await collectionStore.value.waitForCollectionReady(
       props.collectionId,
     );
-    console.log(`[DEBUG-PageList] Collection ready result: ${ready}`);
+
     if (!ready) {
-      console.warn(
-        `[DEBUG-PageList] Collection ${props.collectionId} failed to fully load within the timeout period`,
-      );
     } else {
-      console.log(
-        `[DEBUG-PageList] Collection ${props.collectionId} loaded successfully`,
-      );
     }
-  } catch (error) {
-    console.error(
-      `[DEBUG-PageList] Error loading collection ${props.collectionId}:`,
-      error,
-    );
-  }
+  } catch (error) {}
 }
 
 // Update grid columns CSS variable when it changes
@@ -1081,57 +1038,40 @@ const handleDescriptionExpand = () => {
 
 // Update an existing function where refreshData is likely to be handled
 function handleBulkActionsRefreshData() {
-  console.log('[DEBUG-PageList] Handling refreshData event from BulkActions');
-
   // Safety check - make sure we have a collection ID
   if (!props.collectionId) {
-    console.error(
-      '[DEBUG-PageList] Cannot refresh - no collection ID available',
-    );
     return;
   }
 
   // Save the collection ID for later use
   const collectionIdToRefresh = props.collectionId;
-  console.log(
-    `[DEBUG-PageList] Will refresh collection: ${collectionIdToRefresh}`,
-  );
 
   // Force a fresh load of the collection data
   const originalCacheState = collectionStore.value.disableCache;
 
   // Temporarily disable caching to ensure we get fresh data
   collectionStore.value.setDisableCache(true);
-  console.log('[DEBUG-PageList] Temporarily disabled cache to force refresh');
-
-  console.log('[DEBUG-PageList] Reloading collection to get latest data');
 
   // Use loadCollection with explicit ID instead of reloadCollection
   collectionStore.value
     .loadCollection(collectionIdToRefresh)
     .then(() => {
-      console.log('[DEBUG-PageList] Collection reloaded after bulk action');
-
       // Re-enable cache after loading if it was previously enabled
       if (!originalCacheState) {
-        console.log('[DEBUG-PageList] Restoring cache setting');
         collectionStore.value.setDisableCache(originalCacheState);
       }
 
       // Force the virtual scroll to refresh
       if (virtualScrollRef.value) {
-        console.log('[DEBUG-PageList] Forcing virtual scroll refresh');
         nextTick(() => {
           virtualScrollRef.value?.refresh();
         });
       }
     })
     .catch((error) => {
-      console.error('[DEBUG-PageList] Error reloading collection:', error);
-
+      console.error('Error in handleBulkActionsRefreshData:', error);
       // Always restore cache setting even on error
       if (!originalCacheState) {
-        console.log('[DEBUG-PageList] Restoring cache setting after error');
         collectionStore.value.setDisableCache(originalCacheState);
       }
     });
@@ -1141,22 +1081,14 @@ function handleBulkActionsRefreshData() {
 watch(
   () => collectionStore.value.allImagesFlattened,
   (newImages) => {
-    console.log(
-      '[DEBUG-PageList] Detected change in collection images, count:',
-      newImages.length,
-    );
-
     // Check if there are any images with page_index values for debugging
     const imagesWithIndices = newImages.filter((img) => img.page_index);
     if (imagesWithIndices.length > 0) {
-      console.log(
-        '[DEBUG-PageList] Images with page indices:',
-        imagesWithIndices.slice(0, 3).map((img) => ({
-          id: img.id,
-          page_index: img.page_index,
-          page_type: img.page_type,
-        })),
-      );
+      imagesWithIndices.slice(0, 3).map((img) => ({
+        id: img.id,
+        page_index: img.page_index,
+        page_type: img.page_type,
+      }));
     }
 
     // Add more detailed logging for reactivity debugging
@@ -1174,17 +1106,12 @@ watch(
 
     // Refresh the virtual scroll
     if (virtualScrollRef.value) {
-      console.log(
-        '[DEBUG-PageList] Refreshing virtual scroll due to image data changes',
-      );
-
       // Wait for computed properties to update first
       nextTick(() => {
         virtualScrollRef.value?.reset();
-        console.log('[DEBUG-PageList] Virtual scroll reset complete');
+
         nextTick(() => {
           virtualScrollRef.value?.refresh();
-          console.log('[DEBUG-PageList] Virtual scroll refresh complete');
         });
       });
     }

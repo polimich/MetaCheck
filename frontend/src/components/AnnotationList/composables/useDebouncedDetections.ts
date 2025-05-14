@@ -1,3 +1,6 @@
+/**
+ * @author Michael Polívka (xpoliv07)
+ */
 import { ref, watch, Ref } from 'vue';
 import { DetectionState } from 'src/types/frontend-state';
 
@@ -18,16 +21,10 @@ export function useDebouncedDetections(detections: Ref<DetectionState[]>) {
     if (Math.abs(debouncedDetections.value.length - newDetections.length) > 2) {
       // Immediate update for large changes
       debouncedDetections.value = [...newDetections];
-      console.log(
-        `Immediate update: ${debouncedDetections.value.length} detections`,
-      );
     } else {
       // Debounced update for small changes
       debounceTimeout = window.setTimeout(() => {
         debouncedDetections.value = [...newDetections];
-        console.log(
-          `Debounced update: ${debouncedDetections.value.length} detections`,
-        );
         debounceTimeout = null;
       }, 300); // 300ms debounce
     }

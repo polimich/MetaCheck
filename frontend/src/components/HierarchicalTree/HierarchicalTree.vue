@@ -1,3 +1,6 @@
+<!--
+@author Michael Polívka (xpoliv07)
+-->
 <script setup lang="ts">
 import {
   HierarchicalTree,
@@ -32,40 +35,19 @@ const { tree: storeTree, loading, error } = storeToRefs(hierarchicalTreeStore);
 
 // If a tree prop is passed, use that, otherwise use the store
 const activeTree = computed(() => props.tree || storeTree.value);
-// Add debugging logs
-console.log('[HIERARCHICAL-TREE-DEBUG] Component initialized');
 
 onMounted(() => {
-  console.log('[HIERARCHICAL-TREE-DEBUG] Component mounted', {
-    hasTree: !!activeTree.value,
-    treeType: activeTree.value?.type,
-    collectionId: collection.value?.id,
-  });
-
-  // Load the tree for the current collection if not already loaded
   if (collection.value?.id && !storeTree.value) {
     hierarchicalTreeStore.loadHierarchicalTree(collection.value.id);
   }
 
-  // Add a global click event listener for debugging and event handling
   const treeContainer = document.querySelector('.hierarchical-tree');
   if (treeContainer) {
     treeContainer.addEventListener('click', (event) => {
-      console.log(
-        '[HIERARCHICAL-TREE-DEBUG] Click detected in tree container',
-        {
-          target: event.target,
-          eventPath: event.composedPath().slice(0, 5), // Get the first 5 elements in the path
-        },
-      );
-
-      // Find if click was on a clickable item
       const target = event.target as HTMLElement;
       const clickableItem = target.closest('.clickable-item');
 
       if (clickableItem) {
-        console.log('[HIERARCHICAL-TREE-DEBUG] Click was on a clickable item');
-        // Emit click event to parent component
         emit('click', event as MouseEvent);
       }
     });
@@ -73,26 +55,9 @@ onMounted(() => {
 });
 
 watch(
-  () => activeTree.value,
-  (newTree, oldTree) => {
-    console.log('[HIERARCHICAL-TREE-DEBUG] Tree changed', {
-      hasNewTree: !!newTree,
-      hasOldTree: !!oldTree,
-      newTreeType: newTree?.type,
-      oldTreeType: oldTree?.type,
-    });
-  },
-  { immediate: true },
-);
-
-// Watch for collection changes
-watch(
   () => collection.value?.id,
   (newId, oldId) => {
     if (newId && newId !== oldId) {
-      console.log(
-        `[HIERARCHICAL-TREE-DEBUG] Collection changed to ${newId}, loading tree`,
-      );
       hierarchicalTreeStore.loadHierarchicalTree(newId);
     }
   },
