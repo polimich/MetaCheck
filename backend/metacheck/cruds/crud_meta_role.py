@@ -8,8 +8,12 @@ from db.model.meta_element_type import MetaElementType
 from db.model.meta_element_detection_attribute_type import MetaElementDetectionAttributeType
 from typing import Optional
 
+# Author: Michael Polívka xpoliv07
+# Summary: CRUD operations for managing meta roles and retrieving available roles for detections and collections.
+# Includes functions for finding meta roles and getting roles relevant to specific parts of the data hierarchy.
 
 async def get_available_for_detection(detection_id: UUID, session: AsyncSession):
+    """Get available meta roles for a specific detection based on its position in the hierarchy."""
     # First get the detection and its associated image
     detection = await session.get(Detection, detection_id)
     if not detection:
@@ -43,16 +47,7 @@ async def get_available_for_detection(detection_id: UUID, session: AsyncSession)
     
     
 async def get_available_for_collection(collection_id: UUID, session: AsyncSession):
-    """
-    Get all available meta roles for all meta elements in the collection.
-    
-    Args:
-        collection_id: UUID of the collection
-        session: AsyncSession for database operations
-        
-    Returns:
-        List of available MetaRole objects for all meta elements in the collection
-    """
+    """Get all available meta roles for all unique meta element types present in the collection."""
     # Get all meta elements in the collection
     from db.model.meta_element import MetaElement
     stmt = select(MetaElement).where(
@@ -89,17 +84,7 @@ async def get_available_for_collection(collection_id: UUID, session: AsyncSessio
     
     
 async def find_meta_role(meta_attribute_name: str, meta_element_name: str, session: AsyncSession) -> Optional[UUID]:
-    """
-    Find a meta role by meta attribute name and meta element name.
-    
-    Args:
-        meta_attribute_name: Name of the meta element detection attribute type
-        meta_element_name: Name of the meta element type
-        session: AsyncSession for database operations
-        
-    Returns:
-        UUID of the matching meta role or None if not found
-    """
+    """Find a meta role by its meta attribute name and meta element type name."""
     # First find the meta element type by name
     element_type_stmt = select(MetaElementType).where(
         MetaElementType.name == meta_element_name,

@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.model.meta_element_detection import MetaElementDetection
@@ -14,6 +14,9 @@ from metacheck.database import DBError
 
 logger = logging.getLogger(__name__)
 
+# Author: Michael Polívka xpoliv07
+# Summary: CRUD operations for managing detections and their associated meta roles.
+# Includes functions for changing, updating, confirming, and deleting detections.
 
 async def change_detection_meta_role(
     detection_id: UUID, 
@@ -21,8 +24,9 @@ async def change_detection_meta_role(
     session: AsyncSession
 ) -> bool:
     """
-    Change the meta role for a detection, potentially moving it to a different meta element
-    if the new meta role belongs to a different meta element type.
+    Change the meta role for a detection.
+    Potentially moves the detection to a different meta element if the new meta role
+    belongs to a different meta element type.
     
     Args:
         detection_id: ID of the detection to update
@@ -106,7 +110,8 @@ async def update_detection_meta_role(
     session: AsyncSession
 ) -> bool:
     """
-    Update the meta role for a detection with a new value.
+    Update the meta role and value for a detection.
+    Also handles moving the detection to a different meta element if necessary.
     
     Args:
         detection_id: ID of the detection to update
@@ -241,5 +246,50 @@ async def confirm_detection(
     except Exception as e:
         logger.exception(f"Error confirming detection {detection_id}: {str(e)}")
         raise DBError(f"Failed to confirm detection: {str(e)}")
+
+
+async def delete_detection(
+    detection_id: UUID,
+    session: AsyncSession
+) -> bool:
+    """
+    Delete a detection and its associated meta_element_detection entries.
+    
+    Args:
+        detection_id: ID of the detection to delete
+        session: Database session
+        
+    Returns:
+        True if the deletion was successful, False if the detection was not found
+        
+    Raises:
+        DBError: If there's an error during the deletion
+    """
+    try:
+        # First delete associated meta_element_detection entries
+        delete_med_stmt = delete(MetaElementDetection).where(
+            MetaElementDetection.detection_id == detection_id
+        )
+        await session.execute(delete_med_stmt)
+        
+        # Then delete the detection itself
+        delete_detection_stmt = delete(Detection).where(
+            Detection.id == detection_id
+        )
+        result = await session.execute(delete_detection_stmt)
+        
+        await session.commit()
+        
+        # Check if any rows were deleted
+        if result.rowcount == 0:
+            logger.warning(f"No detection found with ID {detection_id}")
+            return False
+            
+        return True
+        
+    except Exception as e:
+        await session.rollback()
+        logger.exception(f"Error deleting detection {detection_id}: {str(e)}")
+        raise DBError(f"Failed to delete detection: {str(e)}")
 
 

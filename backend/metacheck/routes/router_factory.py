@@ -20,9 +20,11 @@ SchemaNewType = TypeVar('SchemaNewType', bound=BaseModel)
 SchemaUpdateType = TypeVar('SchemaUpdateType', bound=BaseModel)
 ModelType = TypeVar('ModelType', bound=model.Base)
 
+# Author: Michael Polívka xpoliv07
+# Summary: Factory class for efficiently generating standard CRUD API routes for various entity types.
 
 class CRUDRouter:
-    """A router factory that registers standard CRUD routes with a decorator pattern."""
+    """A router factory that registers standard CRUD routes."""
     
     def __init__(
         self,
@@ -36,16 +38,8 @@ class CRUDRouter:
         tags: List[str],
     ):
         """
-        Initialize the CRUD router.
-        
-        Args:
-            router: The FastAPI router to register routes with
-            schema: The Pydantic schema for reading the model
-            schema_new: The Pydantic schema for creating a new model
-            schema_update: The Pydantic schema for updating a model
-            model_class: The SQLAlchemy model class
-            prefix: The route prefix (used in messages)
-            tags: The OpenAPI tags for the routes
+        Initialize the CRUD router with necessary components to generate standard routes.
+        Sets up routes for creating, reading, updating, and deleting entities.
         """
         self.router = router
         self.schema = schema

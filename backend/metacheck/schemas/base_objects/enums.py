@@ -1,7 +1,11 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Enum definitions for work states, processing states, and page types.
+
 import enum
 
 
 class WorkState(str, enum.Enum):
+    """Defines the processing state of an item in the workflow."""
     NEW = "new"
     IN_PROGRESS = "in_progress"
     DONE = "done"
@@ -9,6 +13,7 @@ class WorkState(str, enum.Enum):
 
 
 class ProcessingState(str, enum.Enum):
+    """Defines the processing state for automated tasks."""
     PRISTINE = "pristine"
     QUEUED = "queued"
     PROCESSING = "processing"
@@ -18,6 +23,7 @@ class ProcessingState(str, enum.Enum):
 
 
 class PageType(str, enum.Enum):
+    """Defines the types of pages that can be found in a document."""
     ABSTRACT = "Abstract"
     ADVERTISEMENT = "Advertisement"
     APPENDIX = "Appendix"

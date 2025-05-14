@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Meta element type schemas for managing the types of meta elements.
+
 from __future__ import annotations
 
 from datetime import datetime

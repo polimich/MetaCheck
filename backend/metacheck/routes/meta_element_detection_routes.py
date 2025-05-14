@@ -13,6 +13,9 @@ from metacheck.schemas import base_objects
 
 logger = logging.getLogger(__name__)
 
+# Author: Michael Polívka xpoliv07
+# Summary: API routes for managing meta element detections using standard CRUD operations.
+
 # Register standard CRUD routes
 crud_router = CRUDRouter(
     router=meta_element_detection_route,

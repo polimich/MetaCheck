@@ -12,17 +12,12 @@ from metacheck.schemas.base_objects import MetaElementNew
 
 logger = logging.getLogger(__name__)
 
+# Author: Michael Polívka xpoliv07
+# Summary: CRUD operations and utility functions for managing meta elements and their hierarchical structure.
+# Includes functions for building element trees, creating elements, and retrieving subtrees and parent elements.
 
 def build_element_tree(elements: List[model.MetaElement]) -> List[Dict[str, Any]]:
-    """
-    Build a hierarchical tree from a flat list of MetaElements.
-    
-    Args:
-        elements: List of MetaElement SQLAlchemy objects
-        
-    Returns:
-        List of dictionaries representing the root elements with their children
-    """
+    """Build a hierarchical tree from a flat list of MetaElements."""
     # Convert all elements to dictionaries using our safe conversion function
     element_dicts = [crud_general.sqlalchemy_to_dict(element) for element in elements]
     
@@ -54,19 +49,7 @@ def build_element_tree(elements: List[model.MetaElement]) -> List[Dict[str, Any]
 
 
 async def create_meta_element(db: AsyncSession, meta_element: MetaElementNew) -> model.MetaElement:
-    """
-    Create a new meta element in the database.
-    
-    Args:
-        db: Database session
-        meta_element: Schema with meta element data
-        
-    Returns:
-        Created meta element SQLAlchemy object
-        
-    Raises:
-        DBError: If there's an error creating the meta element
-    """
+    """Create a new meta element in the database."""
     try:
         # Create the element directly - simpler approach to avoid refresh issues
         db_obj = model.MetaElement(**meta_element.model_dump())
@@ -82,19 +65,7 @@ async def get_meta_element_tree(
     db: AsyncSession, 
     collection_id: UUID
 ) -> List[Dict[str, Any]]:
-    """
-    Get a hierarchical tree of MetaElements for a specific collection.
-    
-    Args:
-        db: Database session
-        collection_id: UUID of the collection to get elements for
-        
-    Returns:
-        List of dictionaries representing the root elements with their nested children
-        
-    Raises:
-        DBError: If there's an error retrieving the meta elements
-    """
+    """Get a hierarchical tree of MetaElements for a specific collection."""
     try:
         async with db.begin():
             # Query all meta elements for this collection
@@ -125,19 +96,7 @@ async def get_meta_element_subtree(
     db: AsyncSession, 
     root_element_id: UUID
 ) -> Dict[str, Any]:
-    """
-    Get a subtree of MetaElements starting from a specific root element.
-    
-    Args:
-        db: Database session
-        root_element_id: UUID of the root element to start from
-        
-    Returns:
-        Dictionary representing the root element with its nested children
-        
-    Raises:
-        DBError: If there's an error retrieving the meta elements or if the root element doesn't exist
-    """
+    """Get a subtree of MetaElements starting from a specific root element."""
     try:
         async with db.begin():
             # First get the root element
@@ -205,16 +164,7 @@ async def get_parent_elements_up_to_root(
     db: AsyncSession,
     meta_element_id: UUID
 ) -> List[model.MetaElement]:
-    """
-    Get all parent elements up to the root for a given meta element.
-    
-    Args:
-        db: Database session
-        meta_element_id: ID of the meta element to start from
-        
-    Returns:
-        List of parent MetaElement objects, starting with the given element and going up to the root
-    """
+    """Get all parent elements up to the root for a given meta element."""
     current_element = await db.get(model.MetaElement, meta_element_id)
     if not current_element:
         return []
@@ -234,16 +184,7 @@ async def get_parent_elements_up_to_root_from_detection(
     db: AsyncSession,
     detection_id: UUID
 ) -> List[model.MetaElement]:
-    """
-    Get all parent elements up to the root for a given detection.
-    
-    Args:
-        db: Database session
-        detection_id: ID of the detection to start from
-        
-    Returns:
-        List of parent MetaElement objects, starting with the page meta element and going up to the root
-    """
+    """Get all parent elements up to the root for a given detection."""
     # Get the detection and its associated image
     detection = await db.get(model.Detection, detection_id)
     if not detection:

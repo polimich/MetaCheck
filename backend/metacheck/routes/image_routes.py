@@ -20,17 +20,22 @@ from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
 
+# Author: Michael Polívka xpoliv07
+# Summary: API routes for image management, including reading, uploading, previews, and detection manipulations.
+
 # Custom CRUD routes for Image - excluding the GET operation which is implemented separately
 # The PUT operation
 @image_route.put("", tags=["Image"])
 async def put_image(
     image_update: ImageUpdate, db: AsyncSession = Depends(get_async_session)
 ):
+    """Update an existing image."""
     await crud_general.update_obj(db, image_update, model.Image)
 
 # The GET ALL operation
 @image_route.get("", response_model=List[base_objects.Image], tags=["Image"])
 async def get_all_images(db: AsyncSession = Depends(get_async_session)):
+    """Retrieve all images from the database."""
     try:
         return await crud_general.get_all(db, base_objects.Image, model.Image)
     except Exception as e:
@@ -66,6 +71,7 @@ async def get_all_images(db: AsyncSession = Depends(get_async_session)):
 async def delete_image(
     image_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
+    """Delete an image by ID."""
     await crud_general.delete_obj(db, image_id, model.Image)
     return {"message": "Image deleted."}
 
@@ -78,6 +84,7 @@ async def upload_image(
     db: AsyncSession = Depends(get_async_session),
     parent_meta_element_id: UUID = None
 ):
+    """Upload a new image file and associate it with a collection."""
     if "image" not in file.content_type:
         raise HTTPException(
             status_code=400, detail=f"Unsuported file type - only images are supported."
@@ -117,6 +124,7 @@ async def upload_image(
 # This is needed for compatibility with other parts
 @image_route.get("/{image_id}", response_model=base_objects.Image, tags=["Image"])
 async def get_image(image_id: UUID, db: AsyncSession = Depends(get_async_session)):
+    """Retrieve a single image by ID."""
     return await crud_image.get_image(db, image_id)
 
 
@@ -124,6 +132,7 @@ async def get_image(image_id: UUID, db: AsyncSession = Depends(get_async_session
 async def get_image_raster(
     image_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
+    """Retrieve the raw image file for an image."""
     db_image = await crud_general.get(db, base_objects.Image, model.Image, image_id)
     image_path = await crud_image.get_image_path(
         image_id=image_id, collection_id=db_image.collection_id
@@ -133,6 +142,7 @@ async def get_image_raster(
 
 @image_route.get("/preview/{image_id}", response_class=FileResponse, tags=["Image"])
 async def image_preview(image_id: UUID, db: AsyncSession = Depends(get_async_session)):
+    """Retrieve a preview (thumbnail) of an image."""
     image_preview_path = await crud_image.get_preview_path(image_id)
 
     if not os.path.exists(image_preview_path):
@@ -146,6 +156,7 @@ async def post_image_detections(
     detections: List[base_objects.DetectionNew],
     db: AsyncSession = Depends(get_async_session),
 ):
+    """Create new detections for an image."""
     await crud_image.create_image_detections(db, image_id, detections)
 
 
@@ -159,6 +170,7 @@ async def get_image_detections(
     text_region_ids: List[UUID] = Query(None, alias="id[]"),
     db: AsyncSession = Depends(get_async_session),
 ):
+    """Retrieve detections for an image, optionally filtered by ID."""
     return await crud_image.get_image_detections(db, image_id, text_region_ids)
 
 
@@ -168,6 +180,7 @@ async def put_image_detections(
     text_region_updates: List[base_objects.DetectionUpdate],
     db: AsyncSession = Depends(get_async_session),
 ):
+    """Update existing detections for an image."""
     await crud_image.update_image_detections(db, image_id, text_region_updates)
 
 
@@ -177,6 +190,7 @@ async def post_image_detections(
     detections: List[base_objects.DetectionUpdate],
     db: AsyncSession = Depends(get_async_session),
 ):
+    """Create new detections or update existing ones for an image."""
     await crud_image.update_or_create_image_detections(db, image_id, detections)
 
 
@@ -184,6 +198,7 @@ async def post_image_detections(
 async def delete_image_detection(
     detection_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
+    """Delete a detection from an image."""
     await crud_general.delete_obj(db, detection_id, model.Detection)
 
 
@@ -192,11 +207,13 @@ async def put_image_detection(
     detection_update: base_objects.DetectionUpdate,
     db: AsyncSession = Depends(get_async_session),
 ):
+    """Update a single detection."""
     await crud_general.update_obj(db, detection_update, model.Detection)
 
 
 @image_route.post("/update_page_type/{image_id}/{page_type}", tags=["Image"])
 async def update_page_type(image_id: UUID, page_type: str, db: AsyncSession = Depends(get_async_session)):
+    """Update the page type for an image."""
     try:
         await crud_image.update_page_type(db, image_id, page_type)
         return {"message": f"Page type updated to {page_type} for image {image_id}"}
@@ -208,6 +225,7 @@ async def update_page_type(image_id: UUID, page_type: str, db: AsyncSession = De
 
 @image_route.post("/update_page_index/{image_id}/{page_index}", tags=["Image"])
 async def update_page_index(image_id: UUID, page_index: str, db: AsyncSession = Depends(get_async_session)):
+    """Update the page index for an image."""
     try:
         await crud_image.update_page_index(db, image_id, page_index)
         return {"message": f"Page index updated to {page_index} for image {image_id}"}

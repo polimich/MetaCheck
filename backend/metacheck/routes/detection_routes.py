@@ -11,6 +11,9 @@ from metacheck.routes import detection_route
 from metacheck.routes.router_factory import CRUDRouter
 from metacheck.schemas import base_objects
 
+# Author: Michael Polívka xpoliv07
+# Summary: API routes for managing detections, including standard CRUD operations and specialized manipulation endpoints.
+
 # Register standard CRUD routes
 crud_router = CRUDRouter(
     router=detection_route,
@@ -25,18 +28,22 @@ crud_router = CRUDRouter(
 # Custom routes can be added below if needed 
 @detection_route.post("/change_meta_role/{detection_id}/{meta_role_id}", response_model=bool, tags=["Detection"])
 async def change_meta_role(detection_id: UUID, meta_role_id: UUID, session: AsyncSession = Depends(get_async_session)):
+    """Change the meta role of a detection."""
     return await crud_detection.change_detection_meta_role(detection_id, meta_role_id, session)
 
 
 @detection_route.post("/update_detection_meta_role/{detection_id}/{meta_role_id}/{value}", response_model=bool, tags=["Detection"])
 async def update_detection_meta_role(detection_id: UUID, meta_role_id: UUID, value: str, session: AsyncSession = Depends(get_async_session)):
+    """Update the meta role and value of a detection."""
     return await crud_detection.update_detection_meta_role(detection_id, meta_role_id, value, session)
 
 
 @detection_route.post("/confirm/{detection_id}", response_model=bool, tags=["Detection"])
 async def confirm_detection(detection_id: UUID, session: AsyncSession = Depends(get_async_session)):
-    """
-    Confirm a detection by setting its confidence to 1.0 and annotated to True.
-    This endpoint is used to validate a detection without changing its value.
-    """
+    """Confirm a detection by setting its confidence to 1.0 and annotated to True."""
     return await crud_detection.confirm_detection(detection_id, session)
+
+@detection_route.delete("/meta_element_detection_delete/{detection_id}", response_model=bool, tags=["Detection"])
+async def delete_detection(detection_id: UUID, session: AsyncSession = Depends(get_async_session)):
+    """Delete a detection and its associated meta_element_detection entries."""
+    return await crud_detection.delete_detection(detection_id, session)

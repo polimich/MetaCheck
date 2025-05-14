@@ -1,3 +1,11 @@
+
+"""
+@author: Michael Polívka xpoliv07
+
+
+Create an empty database.
+"""
+
 import argparse
 import logging
 import sys

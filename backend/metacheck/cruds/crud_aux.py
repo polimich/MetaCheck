@@ -1,3 +1,11 @@
+"""
+@author: Michael Polívka xpoliv07
+
+
+
+Auxiliary functions for the CRUD operations.
+"""
+
 import logging
 import os
 from typing import List, Union

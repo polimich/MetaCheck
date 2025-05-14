@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Utility functions for working with element types, providing type conversion and validation.
+
 """
 Utility functions for working with element types.
 """

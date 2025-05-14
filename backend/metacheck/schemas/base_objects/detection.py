@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Detection schemas including new and update models for managing text regions and annotations.
+
 from __future__ import annotations
 
 from typing import Optional, TYPE_CHECKING, ForwardRef

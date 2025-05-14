@@ -24,8 +24,12 @@ from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
 
+# Author: Michael Polívka xpoliv07
+# Summary: CRUD operations for managing images, including saving, retrieving, updating, and creating previews.
+# Also includes functions for handling image detections and checking for duplicates.
 
 async def is_image_duplicate(db: AsyncSession, collection_id, img_hash):
+    """Checks if an image with the same hash already exists within a collection."""
     try:
         # Check if transaction is already in progress
         is_transaction_active = db.in_transaction()
@@ -44,7 +48,7 @@ async def is_image_duplicate(db: AsyncSession, collection_id, img_hash):
 
 
 async def _check_duplicate_image(db: AsyncSession, collection_id, img_hash):
-    """Internal function to check for duplicate images"""
+    """Internal function to check for duplicate images within a transaction."""
     stm = (
         select(model.Image)
         .join(
@@ -64,6 +68,7 @@ async def _check_duplicate_image(db: AsyncSession, collection_id, img_hash):
 async def create_image_detections(
     db: AsyncSession, image_id: UUID, detections: List[base_objects.DetectionNew]
 ):
+    """Create new detections for a specific image."""
     try:
         async with db.begin():
             db_image = await db.scalar(
@@ -92,7 +97,7 @@ async def create_image_detections(
 async def get_image_detections(
     db: AsyncSession, image_id: UUID, detection_ids: List[UUID] = None
 ) -> [base_objects.Detection]:
-
+    """Retrieve detections for a specific image, optionally filtered by detection IDs."""
     try:
         async with db.begin():
             if detection_ids is None:
@@ -121,6 +126,7 @@ async def update_image_detections(
     image_id: UUID,
     detection_updates: List[base_objects.DetectionUpdate],
 ):
+    """Update existing detections for a specific image."""
     try:
         async with db.begin():
             db_image_detection_ids = await db.scalars(
@@ -145,6 +151,7 @@ async def update_or_create_image_detections(
     image_id: UUID,
     detection_updates: List[base_objects.DetectionUpdate],
 ):
+    """Update existing detections or create new ones for a specific image."""
     try:
         async with db.begin():
             db_image_detection_ids = await db.scalars(
@@ -179,22 +186,27 @@ async def update_or_create_image_detections(
 
 
 async def get_image(db: AsyncSession, image_id: UUID) -> base_objects.Image:
+    """Retrieve a single image by its ID."""
     return await crud_general.get(db, base_objects.Image, model.Image, image_id)
 
 
 async def save_image_file(
-    raw_input, 
-    image_name, 
-    collection_id, 
-    image_id, 
-    order, 
-    db: AsyncSession, 
+    raw_input,
+    image_name,
+    collection_id,
+    image_id,
+    order,
+    db: AsyncSession,
     parent_meta_element_id=None,
     page_type=None,
     page_type_confidence=None,
     page_index=None,
     page_index_confidence=None
 ):
+    """
+    Saves an image file, creates a database record, generates a preview,
+    and checks for duplicates.
+    """
     contents = np.asarray(bytearray(raw_input), dtype="uint8")
     image = cv2.imdecode(contents, cv2.IMREAD_COLOR)
     if image is None:
@@ -260,12 +272,14 @@ async def save_image_file(
 
 
 async def get_image_path(image_id: UUID, collection_id: UUID):
+    """Generates and ensures the existence of the directory for a specific image."""
     path = os.path.join(config.IMAGE_UPLOADED_DIR, str(collection_id))
     await aiofiles_os.makedirs(path, exist_ok=True)
     return os.path.join(path, f"{image_id}.jpg")
 
 
 async def make_image_preview(db: AsyncSession, image_id: UUID, preview_path: str):
+    """Generates a preview image for a given image file."""
     from metacheck.cruds import crud_general
     image = await crud_general.get(db, base_objects.Image, model.Image, image_id)
     image_path = os.path.join(
@@ -278,6 +292,7 @@ async def make_image_preview(db: AsyncSession, image_id: UUID, preview_path: str
 
 
 async def get_preview_path(image_id: UUID) -> str:
+    """Generates and ensures the existence of the directory for a specific image preview."""
     image_id = str(image_id)
     path = os.path.join(config.IMAGE_PREVIEW_DIR, image_id[:2])
     await aiofiles_os.makedirs(path, exist_ok=True)
@@ -285,10 +300,7 @@ async def get_preview_path(image_id: UUID) -> str:
 
 
 async def update_page_type(db: AsyncSession, image_id: UUID, page_type: str):
-    """Update the page_type and page_type_confidence of an image.
-    
-    This function uses a direct SQL UPDATE statement and doesn't return anything.
-    """
+    """Update the page_type and page_type_confidence of an image using a direct SQL UPDATE."""
     try:
         # Check if the image exists first
         check_query = select(model.Image).where(model.Image.id == image_id)
@@ -325,10 +337,7 @@ async def update_page_type(db: AsyncSession, image_id: UUID, page_type: str):
 
 
 async def update_page_index(db: AsyncSession, image_id: UUID, page_index: str):
-    """Update the page_index and page_index_confidence of an image.
-    
-    This function uses a direct SQL UPDATE statement and doesn't return anything.
-    """
+    """Update the page_index and page_index_confidence of an image using a direct SQL UPDATE."""
     try:
         # Check if the image exists first
         check_query = select(model.Image).where(model.Image.id == image_id)

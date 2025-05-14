@@ -34,7 +34,7 @@ crud_router = CRUDRouter(
 async def get_collection_images(
     collection_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
-    """Get all images belonging to a specific collection"""
+    """Get all images belonging to a specific collection."""
     return await crud_collection.get_collection_images(db, collection_id)
 
 
@@ -42,7 +42,7 @@ async def get_collection_images(
 async def import_collection_yolo(
     file: UploadFile, db: AsyncSession = Depends(get_async_session)
 ):
-    """Import a YOLO formatted dataset"""
+    """Import a YOLO formatted dataset."""
     return await crud_collection.import_yolo_collection(file, db)
 
 
@@ -50,7 +50,7 @@ async def import_collection_yolo(
 async def import_collection_metakat(
     file: UploadFile, db: AsyncSession = Depends(get_async_session)
 ):
-    """Import a MetaKat formatted dataset"""
+    """Import a MetaKat formatted dataset."""
     return await crud_collection.import_metakat_collection(file, db)
 
 
@@ -62,7 +62,7 @@ async def import_collection_metakat(
 async def get_collection_full(
     collection_id: UUID, db: AsyncSession = Depends(get_async_session)
 ):
-    """Get a collection with all its images and meta_elements explicitly loaded"""
+    """Get a collection with all its images and meta_elements explicitly loaded."""
     # Get the collection with images and meta_elements
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
@@ -101,12 +101,12 @@ async def get_collection_hierarchical(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Get a collection with all its images and meta_elements in a hierarchical structure.
+    Get a collection with its images and meta_elements in a hierarchical structure.
     
     Parameters:
     - collection_id: The UUID of the collection
-    - use_cache: Whether to use the cached structure (default: True)
-    - force_rebuild: Whether to force rebuilding the hierarchical structure (default: False)
+    - use_cache: Whether to use the cached structure 
+    - force_rebuild: Whether to force rebuilding the hierarchical structure
     """
     return await crud_collection.get_collection_hierarchical(db, collection_id, use_cache, force_rebuild)
 
@@ -120,45 +120,21 @@ async def get_collection_hierarchical_tree_endpoint(
     db: AsyncSession = Depends(get_async_session)
 ):
     """
-    Get a collection's hierarchical structure organized as a tree with detections arranged by role.
+    Get a collection's hierarchical structure as a tree with detections arranged by role.
     
-    This endpoint returns a tree structure optimized for frontend display where detections are
-    organized by their meta roles (title, author, etc.) rather than by the images they belong to.
-    
-    The hierarchy is maintained through the structure:
-    - Root element: Contains metadata fields and possibly volumes list
-    - Volumes: Contains metadata fields and possibly issues list
-    - Issues: Contains metadata fields
-    
-    For each node in the tree, detections are organized by role (title, author, etc.).
-    
-    Example structure:
-    ```
-    {
-        "id": "uuid",
-        "type": "title",
-        "periodical": false,
-        "title": Detection,
-        "author": [Detection, Detection],
-        "volumes": [
-            {
-                "id": "uuid",
-                "type": "volume",
-                "title": Detection,
-                "issues": [
-                    {
-                        "id": "uuid",
-                        "type": "issue",
-                        "title": Detection,
-                        "issueNumber": Detection
-                    }
-                ]
-            }
-        ]
-    }
-    ```
-    
-    Returns:
-        A hierarchical tree object ready for frontend rendering
+    Returns a tree structure optimized for frontend display with detections organized by
+    their meta roles (title, author, etc.) instead of by images they belong to.
     """
     return await crud_collection.get_collection_hierarchical_tree(db, collection_id)
+
+
+@collection_route.get(
+    "/{collection_id}/export_metakat",
+    tags=["Export", "Collection"],
+)
+async def export_collection_as_metakat(
+    collection_id: UUID, 
+    db: AsyncSession = Depends(get_async_session)
+):
+    """Export a collection back to the MetaKatImport format."""
+    return await crud_collection.export_collection_as_metakat(db, collection_id)

@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Image schemas for managing document images, including update operations and metadata.
+
 from __future__ import annotations
 
 from datetime import datetime

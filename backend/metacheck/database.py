@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Database connection setup with async session management.
+
 import logging
 from typing import AsyncGenerator
 

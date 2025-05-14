@@ -1,5 +1,8 @@
 from fastapi import APIRouter
 
+# Author: Michael Polívka xpoliv07
+# Summary: Initializes and imports FastAPI routers for various application modules.
+
 collection_route = APIRouter()
 image_route = APIRouter()
 debug_route = APIRouter()

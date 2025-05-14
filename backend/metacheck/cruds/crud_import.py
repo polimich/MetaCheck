@@ -17,8 +17,15 @@ from metacheck_common.config import config
 
 logger = logging.getLogger(__name__)
 
+# Author: Michael Polívka xpoliv07
+# Summary: CRUD operations and processing logic for importing collections from MetaKat format.
+# Handles parsing the import file, creating/updating collections, processing meta elements, images, and detections in batches.
+
 async def import_metakat_collection(file: UploadFile, db: AsyncSession):
-    """Import a MetaKat formatted dataset - optimized for large batches"""
+    """
+    Import a MetaKat formatted dataset from an uploaded JSON file.
+    Processes data in phases: collection/elements, images, and detections, using optimized batch operations.
+    """
     if "json" not in file.content_type:
         raise HTTPException(
             status_code=400,
@@ -145,7 +152,7 @@ async def import_metakat_collection(file: UploadFile, db: AsyncSession):
 
 
 async def _create_or_update_collection(db: AsyncSession, metakat_data: dict):
-    """Create a new collection or update an existing one"""
+    """Create a new collection or update an existing one based on MetaKat data."""
     from metacheck.cruds import crud_general
 
     async with db.begin():
@@ -188,7 +195,7 @@ async def _create_or_update_collection(db: AsyncSession, metakat_data: dict):
 
 
 async def _process_images_parallel(db: AsyncSession, metakat_data: dict, collection_id: UUID, project_root: str, success_counters: dict):
-    """Process images in sequential batches to avoid database concurrency issues"""
+    """Process images sequentially in batches to avoid database concurrency issues."""
     import time
     from metacheck.cruds import crud_image
     
@@ -353,7 +360,7 @@ async def _process_images_parallel(db: AsyncSession, metakat_data: dict, collect
 
 
 async def _process_meta_elements_optimized(db: AsyncSession, metakat_data: dict, collection_id: UUID, success_counters: dict):
-    """Process all meta elements with batch insertion for better performance with large datasets"""
+    """Process all meta elements with batch insertion for better performance."""
     from metacheck.cruds import crud_meta_element
     from metacheck.constants import META_ELEMENT_TYPE_IDS
     
@@ -499,7 +506,7 @@ async def _process_meta_elements_optimized(db: AsyncSession, metakat_data: dict,
 
 
 async def _process_detections_in_batches(db: AsyncSession, metakat_data: dict, collection_id: UUID, image_id_map: dict, success_counters: dict):
-    """Process detections in batches for better performance"""
+    """Process detections in batches for better performance."""
     import time
     logger.info("Processing detections in batches...")
     
@@ -663,9 +670,9 @@ async def _process_detections_in_batches(db: AsyncSession, metakat_data: dict, c
     return verification_stats
 
 
-async def _batch_insert_detections(db: AsyncSession, detection_batch: list, meta_element_detection_batch: list, 
+async def _batch_insert_detections(db: AsyncSession, detection_batch: list, meta_element_detection_batch: list,
                                 verification_stats: dict, success_counters: dict):
-    """Insert a batch of detections and meta element detections using efficient bulk operations"""
+    """Insert a batch of detections and meta element detections using efficient bulk operations with fallback."""
     try:
         async with db.begin():
             # Create copies to avoid affecting the original lists
@@ -736,17 +743,7 @@ async def _batch_insert_detections(db: AsyncSession, detection_batch: list, meta
 
 
 async def find_and_set_root_meta_element(db: AsyncSession, collection_id: UUID, title_id=None, volume_id=None):
-    """Set the root meta element for a collection.
-    
-    Args:
-        db: Database session
-        collection_id: Collection ID
-        title_id: ID of a title element (first priority)
-        volume_id: ID of a volume element (second priority)
-        
-    Returns:
-        bool: True if a root element was set, False otherwise
-    """
+    """Set the root meta element for a collection based on provided title or volume IDs."""
     try:
         if title_id:
             # Set title as root element (first priority)
@@ -780,7 +777,7 @@ async def find_and_set_root_meta_element(db: AsyncSession, collection_id: UUID, 
 
 
 async def _parse_metakat_json(file: UploadFile):
-    """Parse the uploaded MetaKat JSON file"""
+    """Parse the uploaded MetaKat JSON file and validate its structure."""
     try:
         from metacheck.schemas.metakat_object import MetaKatImport
         content = await file.read()
@@ -804,7 +801,7 @@ async def _parse_metakat_json(file: UploadFile):
 
 
 async def _batch_create_meta_elements(db: AsyncSession, elements: list, success_counters: dict, element_type: str):
-    """Create meta elements in batches using bulk insert operations for better performance"""
+    """Create meta elements in batches using bulk insert operations with fallback."""
     try:
         # Use the bulk_save_objects method for more efficient insertion
         async with db.begin():

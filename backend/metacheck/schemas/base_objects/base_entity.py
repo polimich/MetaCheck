@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Base entity model with common fields shared by all data models in the application.
+
 from datetime import datetime
 from uuid import UUID
 

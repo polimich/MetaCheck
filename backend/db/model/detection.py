@@ -1,3 +1,11 @@
+
+"""
+@author: Michael Polívka xpoliv07
+
+
+Detection model.
+"""
+
 import uuid
 from typing import List, TYPE_CHECKING, Optional
 

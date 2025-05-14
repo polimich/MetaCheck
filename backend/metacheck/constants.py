@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Constants for the MetaCheck application including element types, UUIDs, and configuration settings.
+
 """
 Constants for the MetaCheck application.
 These constants can be accessed from anywhere in the application.

@@ -1,3 +1,11 @@
+
+"""
+@author: Michael Polívka xpoliv07
+
+
+Meta role model.
+"""
+
 import uuid
 from typing import List
 

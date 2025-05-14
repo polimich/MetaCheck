@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Main FastAPI application entry point with route registrations and middleware setup.
+
 import logging
 import logging.config
 import os

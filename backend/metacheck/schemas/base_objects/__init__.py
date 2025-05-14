@@ -1,5 +1,7 @@
 """
 Base Pydantic models for the MetaCheck application.
+
+Author: Michael Polívka xpoliv07
 """
 
 from pydantic import BaseModel

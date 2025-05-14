@@ -28,10 +28,12 @@ crud_router = CRUDRouter(
 
 @meta_role_route.get("/available_for_detection/{detection_id}",response_model=list[base_objects.MetaRole], tags=["MetaRole"])
 async def get_available_for_detection(detection_id: UUID, session: AsyncSession = Depends(get_async_session)):
+    """Get meta roles available for a specific detection."""
     return await crud_meta_role.get_available_for_detection(detection_id, session)
 
 @meta_role_route.get("/available_for_collection/{collection_id}",response_model=list[base_objects.MetaRole], tags=["MetaRole"])
 async def get_available_for_collection(collection_id: UUID, session: AsyncSession = Depends(get_async_session)):
+    """Get meta roles available for all elements in a collection."""
     return await crud_meta_role.get_available_for_collection(collection_id, session)
 
 # If needed, add custom routes below:
@@ -39,14 +41,5 @@ async def get_available_for_collection(collection_id: UUID, session: AsyncSessio
 
 @meta_role_route.get("/find/{meta_attribute_name}/{meta_element_name}", response_model=Optional[UUID], tags=["MetaRole"])
 async def find_meta_role(meta_attribute_name: str, meta_element_name: str, session: AsyncSession = Depends(get_async_session)):
-    """
-    Find a meta role by meta attribute name and meta element name.
-    
-    Args:
-        meta_attribute_name: Name of the meta element detection attribute type
-        meta_element_name: Name of the meta element type
-        
-    Returns:
-        UUID of the matching meta role
-    """
+    """Find a meta role by meta attribute name and meta element name."""
     return await crud_meta_role.find_meta_role(meta_attribute_name, meta_element_name, session)

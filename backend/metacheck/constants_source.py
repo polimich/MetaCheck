@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Shared constant definitions used across both application code and database migrations.
+
 """
 Constants source definitions that can be shared between migrations and application code.
 IMPORTANT: This file must NOT have any dependencies on SQLAlchemy, models, or anything 

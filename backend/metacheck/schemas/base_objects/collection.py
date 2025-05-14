@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Collection schemas including new, update, and hierarchical models.
+
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
 from uuid import UUID

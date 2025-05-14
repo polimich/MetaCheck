@@ -18,18 +18,14 @@ logger = logging.getLogger(__name__)
 # Type variable for Pydantic models
 T = TypeVar('T', bound=BaseModel)
 
+# Author: Michael Polívka xpoliv07
+# Summary: General purpose CRUD operations and utility functions for database interaction and object conversion.
+# Provides functions for retrieving, creating, updating, and deleting database objects, as well as converting SQLAlchemy objects to dictionaries with proper handling of relationships.
 
 def sqlalchemy_to_dict(obj, visited=None):
     """
-    Direct approach to convert SQLAlchemy objects to dictionaries with
-    special handling for self-referential relationships and async safety.
-    
-    Args:
-        obj: SQLAlchemy ORM object
-        visited: Set of already visited object IDs to prevent circular references
-        
-    Returns:
-        Dictionary representation with proper handling of relationships
+    Converts SQLAlchemy objects to dictionaries, handling relationships and preventing circular references.
+    Safely extracts column values and includes specified relationships.
     """
     if obj is None:
         return None
@@ -208,6 +204,7 @@ async def get(
     table: model.Base, 
     id: UUID,
 ) -> Union[T, None]:
+    """Retrieve a single object by its ID, with specified relationships loaded separately."""
     try:
         # First step: Get the base object without eager loading
         query = select(table).where(table.id == id)
@@ -273,6 +270,7 @@ async def get_all(
     table: model.Base,
     limit: int = 1000,
 ) -> List[T]:
+    """Retrieve all objects of a given type with an optional limit."""
     try:
         async with db.begin():
             # Build the base query
@@ -319,6 +317,7 @@ async def get_or_none(
     table: model.Base, 
     id: UUID,
 ) -> Union[T, None]:
+    """Retrieve a single object by its ID or return None if not found, with specified relationships eagerly loaded."""
     try:
         async with db.begin():
             # Build the base query with ID filter
@@ -356,6 +355,7 @@ async def get_or_none(
 
 
 async def new(db: AsyncSession, obj: Dict[str, Any], table: model.Base, start_transaction: bool = True):
+    """Create a new object in the database."""
     try:
         if start_transaction:
             async with db.begin():
@@ -381,6 +381,7 @@ async def new(db: AsyncSession, obj: Dict[str, Any], table: model.Base, start_tr
 async def update_obj(
     db: AsyncSession, obj: BaseModel, table: model.Base, exclude_none=True
 ):
+    """Update an existing object in the database."""
     try:
         async with db.begin():
             data = obj.model_dump(exclude={"id"}, exclude_none=exclude_none)
@@ -392,6 +393,7 @@ async def update_obj(
 
 
 async def delete_obj(db: AsyncSession, id: UUID, table: model.Base):
+    """Delete an object from the database by its ID."""
     try:
         async with db.begin():
             stm = delete(table).where(table.id == id)

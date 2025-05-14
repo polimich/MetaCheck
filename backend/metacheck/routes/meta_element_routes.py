@@ -25,6 +25,8 @@ crud_router = CRUDRouter(
     tags=["MetaElement"],
 )
 
+# Author: Michael Polívka xpoliv07
+# Summary: API routes for managing meta elements, including standard CRUD operations and hierarchical tree retrieval.
 
 @meta_element_route.get(
     "/tree/{collection_id}",
@@ -38,16 +40,7 @@ async def get_meta_element_tree(
 ):
     """
     Get a hierarchical tree of MetaElements for a specific collection.
-    
-    This endpoint retrieves all MetaElements for a collection and organizes
-    them into a proper hierarchical tree based on parent-child relationships.
-    
-    Args:
-        collection_id: UUID of the collection to get elements for
-        db: Database session
-        
-    Returns:
-        List of dictionaries representing the root elements with their nested children
+    Organizes elements into a tree based on parent-child relationships.
     """
     try:
         # Use the CRUD function from crud_meta_element module
@@ -73,16 +66,7 @@ async def get_meta_element_subtree(
 ):
     """
     Get a subtree of MetaElements starting from a specific element.
-    
-    This endpoint retrieves a subtree of MetaElements starting from the specified
-    element and including all its descendants in a hierarchical structure.
-    
-    Args:
-        element_id: UUID of the root element to start from
-        db: Database session
-        
-    Returns:
-        Dictionary representing the root element with its nested children
+    Returns the specified element and all its descendants in a hierarchical structure.
     """
     try:
         # Use the CRUD function from crud_meta_element module

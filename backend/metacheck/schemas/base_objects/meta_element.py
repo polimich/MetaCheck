@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Meta element schemas for managing hierarchical document structures such as titles, volumes, and issues.
+
 from __future__ import annotations
 
 from datetime import datetime

@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Meta element detection attribute type schemas for managing attribute types in detections.
+
 from __future__ import annotations
 
 from datetime import datetime

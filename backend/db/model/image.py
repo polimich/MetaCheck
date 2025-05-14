@@ -1,3 +1,11 @@
+
+"""
+@author: Michael Polívka xpoliv07
+
+
+Image model.
+"""
+
 import uuid
 from typing import List, cast, TYPE_CHECKING, Optional
 

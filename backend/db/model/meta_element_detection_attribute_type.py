@@ -1,3 +1,11 @@
+
+"""
+@author: Michael Polívka xpoliv07
+
+
+Meta element detection attribute type model.
+"""
+
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column, column_property
 from sqlalchemy.sql import func

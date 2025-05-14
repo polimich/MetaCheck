@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Meta element detection schemas for linking detections with meta elements and roles.
+
 from __future__ import annotations
 
 from datetime import datetime

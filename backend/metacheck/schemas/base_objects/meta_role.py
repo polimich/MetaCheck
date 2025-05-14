@@ -1,3 +1,6 @@
+# Author: Michael Polívka xpoliv07
+# Summary: Meta role schemas for managing the roles of detections within meta elements.
+
 from __future__ import annotations
 
 from datetime import datetime
