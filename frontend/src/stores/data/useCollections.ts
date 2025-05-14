@@ -5,6 +5,7 @@ import {
   getCollections as apiGetCollections,
   addCollection as apiAddCollection,
   importCollection as apiImportCollection,
+  importMetaKatCollection as apiImportMetaKatCollection,
 } from 'src/api/services';
 import { CollectionListType, CollectionNewType, CollectionType } from './types';
 import { CollectionType as CollectionTypeDA } from 'src/types/data-access';
@@ -147,11 +148,36 @@ export const useCollections = defineStore('collections', () => {
     }
   };
 
+  const importMetaKatCollection = async (
+    file: File,
+  ): Promise<ApiResponse<void>> => {
+    setLoading(true);
+    error.value = '';
+
+    try {
+      const errorMsg = await apiImportMetaKatCollection(file);
+      if (errorMsg) {
+        error.value = errorMsg;
+        return { error: errorMsg };
+      } else {
+        await loadCollections();
+        return { error: undefined, success: true };
+      }
+    } catch (err) {
+      const errorMsg = 'Failed to import MetaKat collection';
+      error.value = errorMsg;
+      return { error: errorMsg };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     collectionsGetter,
     loadCollections,
     addCollection,
     importCollection,
+    importMetaKatCollection,
     loading,
     error,
     loaded,

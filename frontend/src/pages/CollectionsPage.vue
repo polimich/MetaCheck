@@ -124,7 +124,7 @@ const handleImport = async () => {
   if (collectionToImport.value) {
     loadingState.startLoading('importingCollection', 'Importing collection...');
     try {
-      await collectionsStore.importCollection(collectionToImport.value);
+      await collectionsStore.importMetaKatCollection(collectionToImport.value);
       $q.notify({
         type: 'positive',
         message: 'Collection imported successfully',
@@ -360,13 +360,15 @@ const onRowClick = (_evt: Event, row: CollectionType) => {
 
         <q-form @submit="handleImport" @reset="handleResetImport">
           <q-card-section class="q-pt-lg">
-            <p>Please upload your collection in the YOLO format (ZIP file)</p>
+            <p>
+              Please upload your collection in the MetaKat format (.json file)
+            </p>
 
             <q-file
               v-model="collectionToImport"
-              label="Select ZIP file"
+              label="Select JSON file"
               filled
-              accept=".zip"
+              accept=".json"
               clearable
               :rules="[(val) => !!val || 'Please select a file']"
             >

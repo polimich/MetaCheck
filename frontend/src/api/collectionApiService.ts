@@ -219,6 +219,24 @@ export const importCollection = async (file: File): Promise<string> => {
 };
 
 /**
+ * Import a collection from a MetaKat format file
+ */
+export const importMetaKatCollection = async (file: File): Promise<string> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    await axios.post('collection/import_metakat', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return '';
+  } catch (error) {
+    return axiosErrorHandler(error);
+  }
+};
+
+/**
  * Get collection hierarchical tree data
  */
 export const getCollectionHierarchical = async (
