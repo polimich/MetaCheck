@@ -2,6 +2,8 @@
 import { ref } from 'vue';
 import { useQuasar } from 'quasar';
 import { PageType } from 'src/stores/data/types/enum';
+import { updateImagePageType } from 'src/api/imageApiService';
+import { updateImagePageIndex } from 'src/api/imageApiNew';
 
 // Create page type options from the enum
 const pageTypeOptions = Object.values(PageType).map((value) => ({
@@ -80,6 +82,7 @@ const pageIndexForm = ref({
   endNumber: null as number | null,
   step: 1,
   pagesPerImage: 1,
+  separator: ',',
 });
 
 // Selected page type
@@ -108,6 +111,137 @@ const refreshData = async () => {
   }
 };
 
+// Function to change page type for selected images
+const change_page_type = async (pageType: string) => {
+  if (!pageType || !props.selectedImages.length) return;
+
+  const totalImages = props.selectedImages.length;
+  let successCount = 0;
+  let errorCount = 0;
+  let errors: string[] = [];
+
+  for (const imageId of props.selectedImages) {
+    try {
+      const result = await updateImagePageType(imageId, pageType);
+      if (result === '') {
+        successCount++;
+      } else {
+        errorCount++;
+        errors.push(`Error updating image ${imageId}: ${result}`);
+      }
+    } catch (error) {
+      errorCount++;
+      errors.push(
+        `Exception for image ${imageId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  // Display success message
+  if (successCount > 0) {
+    $q.notify({
+      type: 'positive',
+      message: `Successfully updated ${successCount} of ${totalImages} images to page type: ${pageType}`,
+      timeout: 3000,
+    });
+  }
+
+  // Display error message if any
+  if (errorCount > 0) {
+    console.error('Page type update errors:', errors);
+    $q.notify({
+      type: 'negative',
+      message: `Failed to update ${errorCount} of ${totalImages} images. See console for details.`,
+      timeout: 3000,
+    });
+  }
+
+  // Refresh data to show updates
+  setTimeout(() => refreshData(), 1000);
+};
+
+// Function to change page indices for selected images
+const change_page_indices = async (options: {
+  prefix: string;
+  suffix: string;
+  startNumber: number;
+  endNumber: number;
+  step: number;
+  pagesPerImage: number;
+  separator: string;
+}) => {
+  if (!props.selectedImages.length) return;
+
+  const totalImages = props.selectedImages.length;
+  let successCount = 0;
+  let errorCount = 0;
+  let errors: string[] = [];
+
+  // Sort selected images by order if possible
+  const selectedImageIds = [...props.selectedImages];
+
+  // Apply page indices
+  let currentNumber = options.startNumber;
+
+  for (const imageId of selectedImageIds) {
+    try {
+      // Generate page index with multiple pages if pagesPerImage > 1
+      let pageIndex: string;
+
+      if (options.pagesPerImage <= 1) {
+        // Single page per image
+        pageIndex = `${options.prefix}${currentNumber}${options.suffix}`;
+      } else {
+        // Multiple pages per image - use the specified separator
+        const pageNumbers = [];
+        for (let i = 0; i < options.pagesPerImage; i++) {
+          pageNumbers.push(currentNumber + i);
+        }
+        pageIndex = `${options.prefix}${pageNumbers.join(options.separator)}${options.suffix}`;
+      }
+
+      const result = await updateImagePageIndex(imageId, pageIndex);
+
+      if (result.success) {
+        successCount++;
+      } else {
+        errorCount++;
+        errors.push(`Error updating image ${imageId}: ${result.error}`);
+      }
+
+      // Increment by step * pagesPerImage for the next image
+      currentNumber += options.step * options.pagesPerImage;
+    } catch (error) {
+      errorCount++;
+      errors.push(
+        `Exception for image ${imageId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  // Display success message
+  if (successCount > 0) {
+    $q.notify({
+      type: 'positive',
+      message: `Successfully updated ${successCount} of ${totalImages} images with page indices`,
+      timeout: 3000,
+    });
+  }
+
+  // Display error message if any
+  if (errorCount > 0) {
+    console.error('Page index update errors:', errors);
+    $q.notify({
+      type: 'negative',
+      message: `Failed to update ${errorCount} of ${totalImages} images. See console for details.`,
+      timeout: 3000,
+    });
+  }
+
+  // Refresh data to show updates
+  setTimeout(() => refreshData(), 1000);
+};
+
 // Form submission handlers
 const submitPageIndexChange = async () => {
   if (loadingPageIndex.value) return;
@@ -115,25 +249,31 @@ const submitPageIndexChange = async () => {
   loadingPageIndex.value = true;
 
   try {
-    // Emit the event but don't use the return value from emit
-    emit('changePageIndices', {
+    // Prepare options for page index changes
+    const options = {
       prefix: pageIndexForm.value.prefix,
       suffix: pageIndexForm.value.suffix,
       startNumber: pageIndexForm.value.startNumber,
       endNumber: pageIndexForm.value.endNumber || props.selectedImages.length,
       step: pageIndexForm.value.step,
       pagesPerImage: pageIndexForm.value.pagesPerImage,
-    });
+      separator: pageIndexForm.value.separator,
+    };
+
+    // Call the function to change page indices for all selected images
+    await change_page_indices(options);
+
+    // Emit the event but don't use the return value from emit
+    emit('changePageIndices', options);
 
     // Show a simple success notification
     $q.notify({
       type: 'positive',
-      message: 'Page indices update in progress',
+      message: 'Page indices update completed',
       timeout: 2000,
     });
 
-    // Refresh data after updating
-    setTimeout(() => refreshData(), 1000);
+    // Note: No need to call refreshData() here as it's already called in change_page_indices
   } catch (error) {
     $q.notify({
       type: 'negative',
@@ -164,7 +304,10 @@ const submitPageTypeChange = async () => {
       pageTypeValue = pageTypeValue.value;
     }
 
-    // Emit the event with just the string value
+    // Call the function to change page types for all selected images
+    await change_page_type(pageTypeValue);
+
+    // Emit the event as well (for parent components that may need to react)
     emit('changePageType', pageTypeValue);
 
     // Show a simple success notification
@@ -374,6 +517,16 @@ console.log('Select mode is:', props.selectMode);
                     (val) => val > 0 || 'Must be greater than 0',
                   ]"
                   hint="Number of pages contained in each image"
+                />
+              </div>
+              <div class="col-12">
+                <q-input
+                  v-model="pageIndexForm.separator"
+                  label="Separator"
+                  outlined
+                  dense
+                  hint="Separator for multiple pages (e.g. ',' or ';')"
+                  :rules="[(val) => !!val || 'Required']"
                 />
               </div>
             </div>
