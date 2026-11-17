@@ -1,6 +1,32 @@
 # MetaCheck
 
-MetaCheck is a full-stack application for analyzing and managing metadata elements, built with FastAPI (backend) and Quasar/Vue.js (frontend).
+Web application for checking and correcting bibliographic metadata that an AI tool extracted from scanned books and periodicals. My bachelor's thesis at the Faculty of Information Technology, Brno University of Technology (2025).
+
+![A collection of scanned pages with confidence and verification status](docs/collection.png)
+
+## Why it exists
+
+Libraries and archives scan their collections at scale, but describing each document (title, author, publisher, volume, chapters) is still mostly manual work. MetaKat, a tool from the Smart Digilinka project, detects these elements on the page automatically. Its output still needs a person to confirm it, fix it and fill in what could not be detected. MetaCheck is the interface for that step.
+
+## What it does
+
+- Imports MetaKat JSON output together with the page scans and exports the corrected data back in the same format without losing information.
+- Shows each detection as a box on the page, linked to its place in the document's bibliographic structure.
+- Lets the user move, resize, relabel, add and delete detections on a canvas, with undo and redo.
+- Sorts and filters pages by detection confidence and verification state, so low-confidence pages get checked first.
+- Organises documents into collections with role-based access.
+
+<img src="docs/annotator.png" alt="Detections drawn over a scanned title page" width="420">
+
+## Stack
+
+| Part | Technology |
+|---|---|
+| Frontend | Vue 3, TypeScript, Quasar, Pinia, Konva (canvas editor) |
+| Backend | Python, FastAPI, SQLAlchemy 2 (async), Alembic, OpenCV |
+| Database | PostgreSQL, with JSONB for the parts of the source format kept as-is |
+
+The thesis covers the analysis of existing annotation tools, the data model, the system architecture, the user interface design, and testing with a sample of target users.
 
 ## Project Structure
 
